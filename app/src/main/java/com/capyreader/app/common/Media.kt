@@ -9,7 +9,9 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class MediaItem(
     val url: String,
-    val altText: String?
+    val altText: String?,
+    val cachedImageId: String? = null,
+    val originalUrl: String? = null,
 )
 
 @Serializable
@@ -27,4 +29,3 @@ val Media.Companion.Saver
             mutableStateOf(Json.decodeFromString(jsonString))
         }
     )
-

@@ -319,4 +319,21 @@
     <string name="show_unread_badge">Mostrar Selo Não-lido</string>
     <string name="settings_panel_unread_counts_title">Selos Não-lidos</string>
     <string name="settings_option_badge_style">Estilo de selo</string>
+    <string name="article_image_download_mode_label">Pré-carregamento de imagens</string>
+    <string name="article_image_download_mode_off">Desativado</string>
+    <string name="article_image_download_mode_wifi_only">Somente Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi e dados móveis</string>
+    <string name="article_image_cache_size_label">Tamanho do cache de imagens</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Ilimitado</string>
+    <string name="article_image_cache_cleanup_label">Limpeza do cache de imagens</string>
+    <string name="article_image_cache_cleanup_manual">Somente manual</string>
+    <string name="article_image_cache_cleanup_weekly">Semanal</string>
+    <string name="article_image_cache_cleanup_monthly">Mensal</string>
+    <string name="article_image_cache_cleanup_always">Sempre que a sincronização for executada</string>
+    <string name="article_image_cache_clear_button">Limpar cache de imagens</string>
+    <string name="article_image_cache_clear_message">Excluir deste dispositivo as imagens de artigos baixadas? Os artigos ainda mostrarão imagens remotas quando disponíveis.</string>
+    <string name="article_image_cache_clear_confirm">Limpar cache</string>
 </resources>

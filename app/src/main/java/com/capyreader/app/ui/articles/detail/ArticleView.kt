@@ -20,7 +20,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,6 +30,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import androidx.paging.compose.LazyPagingItems
 import com.capyreader.app.common.AudioEnclosure
@@ -58,6 +61,8 @@ fun ArticleView(
     onDeletePage: () -> Unit = {},
     onScrollToArticle: (index: Int) -> Unit,
     onSelectArticle: (id: String) -> Unit,
+    preloadedArticles: Map<String, Article> = emptyMap(),
+    onPreloadAdjacentArticles: (articleIDs: List<String?>) -> Unit = {},
     onSelectMedia: (media: Media) -> Unit,
     onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
@@ -94,6 +99,10 @@ fun ArticleView(
 
     val previousArticleId = if (hasPrevious) articles[previousIndex]?.id else null
     val nextArticleId = if (hasNext) articles[nextIndex]?.id else null
+
+    LaunchedEffect(previousArticleId, nextArticleId) {
+        onPreloadAdjacentArticles(listOf(previousArticleId, nextArticleId))
+    }
 
     fun selectPrevious() {
         if (previousIndex < 0) return
@@ -158,22 +167,17 @@ fun ArticleView(
                         onSelectPrevious = { selectPrevious() },
                         onSelectNext = { selectNext() },
                     ) {
-                        ArticleTransition(
+                        ArticleReaderPool(
                             article = article,
-                            enableHorizontalPager = enableHorizontalPager,
-                            previousArticleId = previousArticleId,
-                            nextArticleId = nextArticleId,
-                        ) { targetArticle ->
-                            ArticleReader(
-                                article = targetArticle,
-                                pinToolbars = pinToolbars,
-                                onSelectMedia = onSelectMedia,
-                                onSelectAudio = onSelectAudio,
-                                onPauseAudio = onPauseAudio,
-                                currentAudioUrl = currentAudioUrl,
-                                isAudioPlaying = isAudioPlaying,
-                            )
-                        }
+                            previousArticle = previousArticleId?.let(preloadedArticles::get),
+                            nextArticle = nextArticleId?.let(preloadedArticles::get),
+                            pinToolbars = pinToolbars,
+                            onSelectMedia = onSelectMedia,
+                            onSelectAudio = onSelectAudio,
+                            onPauseAudio = onPauseAudio,
+                            currentAudioUrl = currentAudioUrl,
+                            isAudioPlaying = isAudioPlaying,
+                        )
                     }
                 }
             }
@@ -216,6 +220,45 @@ fun ArticleView(
         }
     }
 
+}
+
+@Composable
+private fun ArticleReaderPool(
+    article: Article,
+    previousArticle: Article?,
+    nextArticle: Article?,
+    pinToolbars: Boolean,
+    onSelectMedia: (media: Media) -> Unit,
+    onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
+    onPauseAudio: () -> Unit = {},
+    currentAudioUrl: String? = null,
+    isAudioPlaying: Boolean = false,
+) {
+    val readerArticles = remember(article, previousArticle, nextArticle) {
+        listOfNotNull(previousArticle, article, nextArticle).distinctBy { it.id }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        readerArticles.forEach { targetArticle ->
+            val isCurrent = targetArticle.id == article.id
+
+            key(targetArticle.id) {
+                ArticleReader(
+                    article = targetArticle,
+                    pinToolbars = pinToolbars,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(if (isCurrent) 1f else 0f)
+                        .zIndex(if (isCurrent) 1f else 0f),
+                    onSelectMedia = onSelectMedia,
+                    onSelectAudio = onSelectAudio,
+                    onPauseAudio = onPauseAudio,
+                    currentAudioUrl = currentAudioUrl,
+                    isAudioPlaying = isAudioPlaying,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -315,4 +358,3 @@ private fun rememberContentPadding(pinToolbars: Boolean): PaddingValues {
         PaddingValues()
     }
 }
-

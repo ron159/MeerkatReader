@@ -51,6 +51,7 @@ import kotlin.math.roundToInt
 fun ArticleReader(
     article: Article,
     pinToolbars: Boolean,
+    modifier: Modifier = Modifier,
     onSelectMedia: (media: Media) -> Unit,
     onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
@@ -130,7 +131,7 @@ fun ArticleReader(
 
     if (improveTalkback) {
         Column(
-            Modifier.fillMaxSize()
+            modifier.fillMaxSize()
         ) {
             WebView(
                 modifier = Modifier.fillMaxSize(),
@@ -140,7 +141,7 @@ fun ArticleReader(
             )
         }
     } else {
-        ScrollableWebView(webViewState, article, showImages, pinToolbars)
+        ScrollableWebView(webViewState, article, showImages, pinToolbars, modifier)
     }
 
     ArticleStyleListener(webView = webViewState.webView)
@@ -167,7 +168,13 @@ fun ArticleReader(
 }
 
 @Composable
-fun ScrollableWebView(webViewState: WebViewState, article: Article, showImages: Boolean, pinToolbars: Boolean) {
+fun ScrollableWebView(
+    webViewState: WebViewState,
+    article: Article,
+    showImages: Boolean,
+    pinToolbars: Boolean,
+    modifier: Modifier = Modifier,
+) {
     var maxHeight by remember { mutableFloatStateOf(0f) }
     val scrollState = rememberSaveable(article.id, saver = ScrollState.Saver) {
         ScrollState(initial = 0)
@@ -183,6 +190,7 @@ fun ScrollableWebView(webViewState: WebViewState, article: Article, showImages: 
         ColumnScrollbar(state = scrollState) {
             Column(
                 modifier = Modifier
+                    .then(modifier)
                     .fillMaxSize()
                     .verticalScroll(scrollState)
                     .onGloballyPositioned { coordinates ->

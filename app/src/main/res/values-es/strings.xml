@@ -333,4 +333,21 @@
     <string name="starred_export_button_text">Exportar Artículos Marcados</string>
     <string name="starred_exporter_success">Exportación completada</string>
     <string name="starred_exporter_failure">Exportación fallida</string>
+    <string name="article_image_download_mode_label">Precarga de imágenes</string>
+    <string name="article_image_download_mode_off">Desactivado</string>
+    <string name="article_image_download_mode_wifi_only">Solo Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi y datos móviles</string>
+    <string name="article_image_cache_size_label">Tamaño de caché de imágenes</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Ilimitado</string>
+    <string name="article_image_cache_cleanup_label">Limpieza de caché de imágenes</string>
+    <string name="article_image_cache_cleanup_manual">Solo manual</string>
+    <string name="article_image_cache_cleanup_weekly">Semanal</string>
+    <string name="article_image_cache_cleanup_monthly">Mensual</string>
+    <string name="article_image_cache_cleanup_always">Cada vez que se sincronice</string>
+    <string name="article_image_cache_clear_button">Borrar caché de imágenes</string>
+    <string name="article_image_cache_clear_message">¿Eliminar las imágenes de artículos descargadas de este dispositivo? Los artículos seguirán mostrando imágenes remotas cuando estén disponibles.</string>
+    <string name="article_image_cache_clear_confirm">Borrar caché</string>
 </resources>

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.refresher.RefreshInterval
@@ -20,7 +21,8 @@ import kotlinx.coroutines.launch
 class GeneralSettingsViewModel(
     private val refreshScheduler: RefreshScheduler,
     val account: Account,
-    private val appPreferences: AppPreferences
+    private val appPreferences: AppPreferences,
+    private val articleImageCacheCleaner: ArticleImageCacheCleaner,
 ) : ViewModel() {
     val source = account.source
 
@@ -116,8 +118,9 @@ class GeneralSettingsViewModel(
     }
 
     fun clearAllArticles() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             account.clearAllArticles()
+            articleImageCacheCleaner.cleanup()
         }
     }
 

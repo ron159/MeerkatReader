@@ -1,5 +1,6 @@
 package com.jocmp.capy
 
+import com.jocmp.capy.articles.CachedArticleImage
 import java.net.URL
 import java.time.ZonedDateTime
 
@@ -27,6 +28,7 @@ data class Article(
     val enclosures: List<Enclosure> = emptyList(),
     val enclosureType: EnclosureType? = null,
     val isReadLater: Boolean = false,
+    val cachedImages: List<CachedArticleImage> = emptyList(),
 ) {
     val defaultContent = contentHTML.ifBlank { summary }
 

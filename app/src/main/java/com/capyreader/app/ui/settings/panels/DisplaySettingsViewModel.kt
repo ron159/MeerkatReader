@@ -4,17 +4,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.capyreader.app.articleimages.ArticleImageCacheCleaner
+import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.common.ImagePreview
 import com.capyreader.app.preferences.AppPreferences
+import com.capyreader.app.preferences.ArticleImageCacheCleanupInterval
+import com.capyreader.app.preferences.ArticleImageCacheSize
+import com.capyreader.app.preferences.ArticleImageDownloadMode
 import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
 import com.capyreader.app.ui.articles.ArticleListFontScale
 import com.capyreader.app.ui.articles.MarkReadPosition
 import com.jocmp.capy.Account
+import kotlinx.coroutines.launch
 
 class DisplaySettingsViewModel(
     val account: Account,
     val appPreferences: AppPreferences,
+    private val articleImagePreloader: ArticleImagePreloader,
+    private val articleImageCacheCleaner: ArticleImageCacheCleaner,
 ) : ViewModel() {
     var themeMode by mutableStateOf(appPreferences.themeMode.get())
         private set
@@ -62,6 +71,15 @@ class DisplaySettingsViewModel(
     var imageVisibility by mutableStateOf(appPreferences.readerOptions.imageVisibility.get())
         private set
 
+    var articleImageDownloadMode by mutableStateOf(appPreferences.articleImageDownloadMode.get())
+        private set
+
+    var articleImageCacheSize by mutableStateOf(appPreferences.articleImageCacheSize.get())
+        private set
+
+    var articleImageCacheCleanupInterval by mutableStateOf(appPreferences.articleImageCacheCleanupInterval.get())
+        private set
+
     val improveTalkback = appPreferences.readerOptions.improveTalkback
 
     val markReadButtonPosition = appPreferences.articleListOptions.markReadButtonPosition
@@ -107,6 +125,47 @@ class DisplaySettingsViewModel(
         appPreferences.readerOptions.imageVisibility.set(option)
 
         this.imageVisibility = option
+    }
+
+    fun updateArticleImageDownloadMode(mode: ArticleImageDownloadMode) {
+        appPreferences.articleImageDownloadMode.set(mode)
+
+        this.articleImageDownloadMode = mode
+
+        if (mode == ArticleImageDownloadMode.OFF) {
+            articleImagePreloader.cancel()
+            viewModelScope.launch {
+                articleImageCacheCleaner.resetInFlightDownloads()
+            }
+        } else {
+            articleImagePreloader.enqueue(replaceExisting = true)
+        }
+    }
+
+    fun updateArticleImageCacheSize(size: ArticleImageCacheSize) {
+        appPreferences.articleImageCacheSize.set(size)
+        this.articleImageCacheSize = size
+
+        viewModelScope.launch {
+            articleImageCacheCleaner.cleanup(force = true)
+            articleImagePreloader.enqueue(replaceExisting = true)
+        }
+    }
+
+    fun updateArticleImageCacheCleanupInterval(interval: ArticleImageCacheCleanupInterval) {
+        appPreferences.articleImageCacheCleanupInterval.set(interval)
+        this.articleImageCacheCleanupInterval = interval
+
+        viewModelScope.launch {
+            articleImageCacheCleaner.cleanup(force = interval == ArticleImageCacheCleanupInterval.ALWAYS)
+        }
+    }
+
+    fun clearArticleImageCache() {
+        viewModelScope.launch {
+            articleImagePreloader.cancel()
+            articleImageCacheCleaner.clear()
+        }
     }
 
     fun updateMarkReadButtonPosition(position: MarkReadPosition) {

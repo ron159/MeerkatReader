@@ -1,0 +1,33 @@
+findByArticleID:
+SELECT article_id, content_html, created_at, updated_at
+FROM article_full_content_cache
+WHERE article_id = :articleID
+LIMIT 1;
+
+upsert:
+INSERT INTO article_full_content_cache(
+  article_id,
+  content_html,
+  created_at,
+  updated_at
+)
+VALUES (
+  :articleID,
+  :contentHTML,
+  :createdAt,
+  :updatedAt
+)
+ON CONFLICT(article_id) DO UPDATE
+SET
+  content_html = excluded.content_html,
+  updated_at = excluded.updated_at;
+
+deleteByArticleID:
+DELETE FROM article_full_content_cache
+WHERE article_id = :articleID;
+
+deleteWithoutArticle:
+DELETE FROM article_full_content_cache
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);

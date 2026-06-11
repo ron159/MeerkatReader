@@ -7,14 +7,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.capyreader.app.R
+import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.common.MediaItem
 import com.capyreader.app.common.shareImage
 import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.jocmp.capy.common.launchIO
 import com.jocmp.capy.common.launchUI
 import com.jocmp.capy.common.withUIContext
+import org.koin.compose.koinInject
 
 @Composable
-fun MediaShareButton(imageUrl: String) {
+fun MediaShareButton(
+    image: MediaItem,
+    articleImageStore: ArticleImageStore = koinInject(),
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val failureMessage = stringResource(R.string.media_share_failure)
@@ -28,7 +34,11 @@ fun MediaShareButton(imageUrl: String) {
 
     fun shareImage() {
         scope.launchIO {
-            val result = ImageSaver.shareImage(imageUrl, context = context)
+            val result = ImageSaver.shareImage(
+                image,
+                context = context,
+                articleImageStore = articleImageStore,
+            )
 
             withUIContext {
                 result.fold(

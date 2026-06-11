@@ -16,6 +16,7 @@ import com.jocmp.capy.common.transactionWithErrorHandling
 import com.jocmp.capy.common.withResult
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
 import com.jocmp.capy.persistence.FeedRecords
@@ -55,6 +56,7 @@ internal class ReaderAccountDelegate(
 ) : AccountDelegate {
     private var postToken = AtomicReference<String?>(null)
     private val articleRecords = ArticleRecords(database)
+    private val articleImageRecords = ArticleImageRecords(database)
     private val feedRecords = FeedRecords(database)
     private val enclosureRecords = EnclosureRecords(database)
     private val taggingRecords = TaggingRecords(database)
@@ -512,26 +514,34 @@ internal class ReaderAccountDelegate(
         }
 
         database.transactionWithErrorHandling {
-                val labels = savedSearchRecords.allIDs()
+            val labels = savedSearchRecords.allIDs()
 
-                items.forEach { item ->
-                    val updated = TimeHelpers.nowUTC()
-                    val enclosures = ReaderEnclosureParsing.validEnclosures(item)
-                    val enclosureType = enclosures.firstOrNull()?.type
+            items.forEach { item ->
+                val updated = TimeHelpers.nowUTC()
+                val enclosures = ReaderEnclosureParsing.validEnclosures(item)
+                val enclosureType = enclosures.firstOrNull()?.type
+                val contentHTML = item.content?.content ?: item.summary.content
+                val articleURL = item.canonical.firstOrNull()?.href
 
-                    database.articlesQueries.create(
-                        id = item.hexID,
-                        feed_id = item.origin.streamId,
-                        title = item.title,
-                        author = item.author,
-                        content_html = item.content?.content ?: item.summary.content,
-                        extracted_content_url = null,
-                        summary = summaries[item.hexID],
-                        url = item.canonical.firstOrNull()?.href,
-                        image_url = ReaderEnclosureParsing.parsedImageURL(item),
-                        published_at = item.published,
-                        enclosure_type = enclosureType,
-                    )
+                database.articlesQueries.create(
+                    id = item.hexID,
+                    feed_id = item.origin.streamId,
+                    title = item.title,
+                    author = item.author,
+                    content_html = contentHTML,
+                    extracted_content_url = null,
+                    summary = summaries[item.hexID],
+                    url = articleURL,
+                    image_url = ReaderEnclosureParsing.parsedImageURL(item),
+                    published_at = item.published,
+                    enclosure_type = enclosureType,
+                )
+                articleImageRecords.replaceArticleRefs(
+                    articleID = item.hexID,
+                    contentHTML = contentHTML,
+                    articleURL = articleURL,
+                    siteURL = item.origin.htmlUrl,
+                )
 
                 articleRecords.updateStatus(
                     articleID = item.hexID,

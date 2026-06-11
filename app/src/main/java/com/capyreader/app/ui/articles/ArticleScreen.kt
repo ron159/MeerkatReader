@@ -668,6 +668,8 @@ fun ArticleScreen(
                         onSelectArticle = { articleID ->
                             setArticle(articleID)
                         },
+                        preloadedArticles = viewModel.preloadedArticles,
+                        onPreloadAdjacentArticles = viewModel::preloadAdjacentArticles,
                         onScrollToArticle = { index ->
                             scrollToArticle(index)
                         },

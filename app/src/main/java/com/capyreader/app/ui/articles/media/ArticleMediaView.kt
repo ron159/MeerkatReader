@@ -52,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import coil3.request.ImageRequest
+import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.Media
 import com.capyreader.app.common.MediaItem
 import com.capyreader.app.preferences.AppPreferences
@@ -115,7 +116,7 @@ fun ArticleMediaView(
         footer = {
             CaptionOverlay(
                 caption = currentImage?.altText?.ifBlank { null },
-                imageUrl = currentImage?.url ?: "",
+                imageItem = currentImage,
             )
         }
     ) {
@@ -166,9 +167,16 @@ fun ArticleMediaView(
 @Composable
 private fun ImagePage(
     imageItem: MediaItem,
-    onToggleOverlay: () -> Unit
+    onToggleOverlay: () -> Unit,
+    articleImageStore: ArticleImageStore = koinInject(),
 ) {
     var showError by rememberSaveable(imageItem.url) { mutableStateOf(false) }
+    val imageData = remember(imageItem) {
+        imageItem.cachedImageId
+            ?.let { articleImageStore.fileForAssetID(it) }
+            ?.takeIf { it.exists() }
+            ?: imageItem.url
+    }
 
     val imageState = rememberZoomableImageState(
         rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 4f))
@@ -177,7 +185,7 @@ private fun ImagePage(
     Box(modifier = Modifier.fillMaxSize()) {
         ZoomableAsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(imageItem.url)
+                .data(imageData)
                 .listener(
                     onError = { _, _ ->
                         showError = true
@@ -290,7 +298,7 @@ fun MediaScaffold(
 @Composable
 private fun CaptionOverlay(
     caption: String?, 
-    imageUrl: String,
+    imageItem: MediaItem?,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -320,8 +328,10 @@ private fun CaptionOverlay(
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MediaSaveButton(imageUrl)
-            MediaShareButton(imageUrl)
+            imageItem?.let {
+                MediaSaveButton(it)
+                MediaShareButton(it)
+            }
         }
     }
 }
@@ -400,7 +410,7 @@ private fun ArticleMediaViewPreview_Foldable() {
             Box(Modifier.align(Alignment.BottomStart)) {
                 CaptionOverlay(
                     caption = "A description of the picture you're taking a look at",
-                    imageUrl = "http://example.com/test.jpg",
+                    imageItem = null,
                 )
             }
         }
@@ -419,7 +429,7 @@ private fun ArticleMediaViewPreview_Phone() {
             Box(Modifier.align(Alignment.BottomStart)) {
                 CaptionOverlay(
                     caption = "A description",
-                    imageUrl = "http://example.com/test.jpg",
+                    imageItem = null,
                 )
             }
         }
@@ -439,7 +449,7 @@ private fun ArticleMediaViewPreview_Tablet() {
             Box(Modifier.align(Alignment.BottomStart)) {
                 CaptionOverlay(
                     caption = "A description of the picture you're taking a look at",
-                    imageUrl = "http://example.com/test.jpg",
+                    imageItem = null,
                 )
             }
         }

@@ -16,6 +16,7 @@ import com.jocmp.capy.common.toDateTimeFromSeconds
 import com.jocmp.capy.common.transactionWithErrorHandling
 import com.jocmp.capy.common.withResult
 import com.jocmp.capy.db.Database
+import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
 import com.jocmp.capy.persistence.FeedRecords
@@ -48,6 +49,7 @@ internal class FeedbinAccountDelegate(
     private val preferences: AccountPreferences,
 ) : AccountDelegate {
     private val articleRecords = ArticleRecords(database)
+    private val articleImageRecords = ArticleImageRecords(database)
     private val enclosureRecords = EnclosureRecords(database)
     private val feedRecords = FeedRecords(database)
     private val taggingRecords = TaggingRecords(database)
@@ -467,6 +469,12 @@ internal class FeedbinAccountDelegate(
                     image_url = entry.images?.size_1?.cdn_url,
                     published_at = entry.published.toDateTime?.toEpochSecond() ?: updated.toEpochSecond(),
                     enclosure_type = enclosureType,
+                )
+                articleImageRecords.replaceArticleRefs(
+                    articleID = articleID,
+                    contentHTML = entry.content,
+                    articleURL = entry.url,
+                    siteURL = null,
                 )
 
                 articleRecords.createStatus(

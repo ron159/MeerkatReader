@@ -17,4 +17,25 @@
     <string name="feed_action_unsubscribe_message">Esteu segur que voleu cancel·lar la subscripció de \"%1$s\"?</string>
     <string name="feed_action_unsubscribe_confirm">Cancel·la la subscripció</string>
     <string name="edit_feed_submit">Desa</string>
+    <string name="reader_image_visibility_show_on_wifi">Mostra les imatges només amb Wi-Fi</string>
+    <string name="reader_image_visibility_always_hide">Bloca les imatges</string>
+    <string name="reader_image_visibility_always_show">Mostra sempre les imatges</string>
+    <string name="reader_image_visibility_label">Imatges</string>
+    <string name="article_image_download_mode_label">Precàrrega d\'imatges</string>
+    <string name="article_image_download_mode_off">Desactivada</string>
+    <string name="article_image_download_mode_wifi_only">Només Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi i dades mòbils</string>
+    <string name="article_image_cache_size_label">Mida de la memòria cau d\'imatges</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Il·limitada</string>
+    <string name="article_image_cache_cleanup_label">Neteja de la memòria cau d\'imatges</string>
+    <string name="article_image_cache_cleanup_manual">Només manual</string>
+    <string name="article_image_cache_cleanup_weekly">Setmanal</string>
+    <string name="article_image_cache_cleanup_monthly">Mensual</string>
+    <string name="article_image_cache_cleanup_always">Cada vegada que s\'executi la sincronització</string>
+    <string name="article_image_cache_clear_button">Esborra la memòria cau d\'imatges</string>
+    <string name="article_image_cache_clear_message">Vols suprimir les imatges d\'articles baixades d\'aquest dispositiu? Els articles continuaran mostrant imatges remotes quan estiguin disponibles.</string>
+    <string name="article_image_cache_clear_confirm">Esborra la memòria cau</string>
 </resources>

@@ -172,4 +172,24 @@
     <string name="settings_section_mark_all_as_read">सबैलाई पढिएको चिन्ह लगाउनुहोस्</string>
     <string name="opml_import_button_text">फाइलबाट आयात गर्नुहोस्</string>
     <string name="action_mark_all_read">सबैलाई पढिएको चिन्ह लगाउनुहोस्</string>
+    <string name="reader_image_visibility_show_on_wifi">Wi-Fi मा मात्र छविहरू देखाउनुहोस्</string>
+    <string name="reader_image_visibility_always_hide">छविहरू रोक्नुहोस्</string>
+    <string name="reader_image_visibility_always_show">सधैं छविहरू देखाउनुहोस्</string>
+    <string name="article_image_download_mode_label">छवि पूर्वलोडिङ</string>
+    <string name="article_image_download_mode_off">बन्द</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi मात्र</string>
+    <string name="article_image_download_mode_always">Wi-Fi र मोबाइल डाटा</string>
+    <string name="article_image_cache_size_label">छवि क्यास आकार</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">असीमित</string>
+    <string name="article_image_cache_cleanup_label">छवि क्यास सफाइ</string>
+    <string name="article_image_cache_cleanup_manual">म्यानुअल मात्र</string>
+    <string name="article_image_cache_cleanup_weekly">साप्ताहिक</string>
+    <string name="article_image_cache_cleanup_monthly">मासिक</string>
+    <string name="article_image_cache_cleanup_always">सिङ्क चल्दा हरेक पटक</string>
+    <string name="article_image_cache_clear_button">छवि क्यास खाली गर्नुहोस्</string>
+    <string name="article_image_cache_clear_message">यस उपकरणबाट डाउनलोड गरिएका लेखका छविहरू मेटाउने हो? उपलब्ध हुँदा लेखहरूले अझै टाढाका छविहरू देखाउनेछन्।</string>
+    <string name="article_image_cache_clear_confirm">क्यास खाली गर्नुहोस्</string>
 </resources>

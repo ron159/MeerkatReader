@@ -13,6 +13,7 @@ import com.jocmp.capy.common.toDateTime
 import com.jocmp.capy.common.transactionWithErrorHandling
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
 import com.jocmp.capy.persistence.FeedRecords
@@ -44,6 +45,7 @@ internal class MinifluxAccountDelegate(
     private val preferences: AccountPreferences,
 ) : AccountDelegate {
     private val articleRecords = ArticleRecords(database)
+    private val articleImageRecords = ArticleImageRecords(database)
     private val enclosureRecords = EnclosureRecords(database)
     private val feedRecords = FeedRecords(database)
     private val taggingRecords = TaggingRecords(database)
@@ -404,6 +406,12 @@ internal class MinifluxAccountDelegate(
                     image_url = imageURL,
                     published_at = entry.published_at.toDateTime?.toEpochSecond() ?: updated.toEpochSecond(),
                     enclosure_type = enclosures.firstOrNull()?.mime_type,
+                )
+                articleImageRecords.replaceArticleRefs(
+                    articleID = articleID,
+                    contentHTML = entry.content,
+                    articleURL = entry.url,
+                    siteURL = null,
                 )
 
                 articleRecords.createStatus(

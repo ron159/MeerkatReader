@@ -356,4 +356,21 @@
     <string name="article_list_new_articles_pill">新文章</string>
     <string name="settings_refresh_on_wifi_only">仅在 Wi-Fi 下刷新</string>
     <string name="refresh_skipped_mobile">在移动网络下跳过刷新</string>
+    <string name="article_image_download_mode_label">图片预加载</string>
+    <string name="article_image_download_mode_off">关闭</string>
+    <string name="article_image_download_mode_wifi_only">仅 Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi 和移动数据</string>
+    <string name="article_image_cache_size_label">图片缓存大小</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">无限制</string>
+    <string name="article_image_cache_cleanup_label">图片缓存清理</string>
+    <string name="article_image_cache_cleanup_manual">仅手动</string>
+    <string name="article_image_cache_cleanup_weekly">每周</string>
+    <string name="article_image_cache_cleanup_monthly">每月</string>
+    <string name="article_image_cache_cleanup_always">每次同步时</string>
+    <string name="article_image_cache_clear_button">清除图片缓存</string>
+    <string name="article_image_cache_clear_message">要从此设备删除已下载的文章图片吗？文章仍会在可用时显示远程图片。</string>
+    <string name="article_image_cache_clear_confirm">清除缓存</string>
 </resources>

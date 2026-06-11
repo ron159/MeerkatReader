@@ -232,4 +232,21 @@
     <string name="full_content_error_missing_response">Nu s-a putut prelua articolul</string>
     <string name="full_content_error_generic">Nu s-a putut analiza articolul</string>
     <string name="full_content_error_forbidden">Preluarea blocată de site</string>
+    <string name="article_image_download_mode_label">Preîncărcare imagini</string>
+    <string name="article_image_download_mode_off">Dezactivat</string>
+    <string name="article_image_download_mode_wifi_only">Doar Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi și date mobile</string>
+    <string name="article_image_cache_size_label">Dimensiunea cache-ului de imagini</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Nelimitat</string>
+    <string name="article_image_cache_cleanup_label">Curățarea cache-ului de imagini</string>
+    <string name="article_image_cache_cleanup_manual">Doar manual</string>
+    <string name="article_image_cache_cleanup_weekly">Săptămânal</string>
+    <string name="article_image_cache_cleanup_monthly">Lunar</string>
+    <string name="article_image_cache_cleanup_always">La fiecare sincronizare</string>
+    <string name="article_image_cache_clear_button">Golește cache-ul de imagini</string>
+    <string name="article_image_cache_clear_message">Ștergi imaginile articolelor descărcate de pe acest dispozitiv? Articolele vor afișa în continuare imaginile de la distanță atunci când sunt disponibile.</string>
+    <string name="article_image_cache_clear_confirm">Golește cache-ul</string>
 </resources>

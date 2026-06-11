@@ -21,8 +21,10 @@ function addImageClickListeners() {
 
   /** @type {MediaItem[]} */
   const galleryImages = images.map((i) => ({
-    url: i.src,
+    url: i.dataset.capyOriginalSrc || i.src,
     altText: i.alt || null,
+    cachedImageId: i.dataset.capyImageId || null,
+    originalUrl: i.dataset.capyOriginalSrc || null,
   }));
 
   images.forEach((img, index) => {
@@ -33,9 +35,46 @@ function addImageClickListeners() {
 
     longPress(img, (e) => {
       e.preventDefault();
-      Android.showImageDialog(img.src);
+      Android.showImageDialog(img.dataset.capyOriginalSrc || img.src);
     });
   });
+}
+
+function addImageDebugLabels() {
+  const content = document.getElementById("article-body-content");
+  if (!content) return;
+
+  content.querySelectorAll("img").forEach((img) => {
+    if (img.classList.contains("iframe-embed__image")) {
+      return;
+    }
+
+    if (img.nextElementSibling?.classList.contains("image-debug-label")) {
+      return;
+    }
+
+    const source = img.dataset.capyImageId ? "cached" : "remote";
+    const loading = img.loading || "auto";
+    const label = document.createElement("div");
+    label.className = `image-debug-label image-debug-label--${source}`;
+    label.textContent = `${source} / ${loading}`;
+
+    img.insertAdjacentElement("afterend", label);
+  });
+}
+
+function primeArticleImages() {
+  const content = document.getElementById("article-body-content");
+  if (!content) return;
+
+  [...content.querySelectorAll("img")]
+    .filter((img) => !img.classList.contains("iframe-embed__image"))
+    .slice(0, EAGER_IMAGE_COUNT)
+    .forEach((img) => {
+      if (typeof img.decode === "function") {
+        img.decode().catch(() => {});
+      }
+    });
 }
 
 function addEmbedListeners() {
@@ -199,6 +238,9 @@ function postProcessContent(baseUrl, hideImages) {
     table.parentNode?.insertBefore(wrapper, table);
     wrapper.appendChild(table);
   });
+
+  addImageDebugLabels();
+  primeArticleImages();
 }
 
 /**
@@ -328,5 +370,7 @@ window.onload = () => {
   addImageClickListeners();
   addEmbedListeners();
   configureVideoTags();
+  addImageDebugLabels();
+  primeArticleImages();
   Android.requestAudioState();
 };

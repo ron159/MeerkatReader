@@ -388,6 +388,26 @@ ul:has(img) {
     background-color: var(--color-surface-container-highest);
     border-radius: 0.125rem;
   }
+
+  .image-debug-label {
+    display: inline-block;
+    margin: 0.25rem 0 1rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.65);
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  .image-debug-label--cached {
+    background-color: rgba(23, 120, 73, 0.9);
+  }
+
+  .image-debug-label--remote {
+    background-color: rgba(166, 88, 0, 0.9);
+  }
 }
 
 @each $family, $value in $font-families {

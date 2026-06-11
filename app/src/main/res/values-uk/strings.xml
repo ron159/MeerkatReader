@@ -351,4 +351,21 @@
     <string name="article_list_new_articles_pill">Нові статті</string>
     <string name="settings_refresh_on_wifi_only">Оновлювати лише по Wi-Fi</string>
     <string name="refresh_skipped_mobile">Не оновлено, бо мобільна мережа</string>
+    <string name="article_image_download_mode_label">Попереднє завантаження зображень</string>
+    <string name="article_image_download_mode_off">Вимкнено</string>
+    <string name="article_image_download_mode_wifi_only">Лише Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi і мобільні дані</string>
+    <string name="article_image_cache_size_label">Розмір кешу зображень</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Без обмежень</string>
+    <string name="article_image_cache_cleanup_label">Очищення кешу зображень</string>
+    <string name="article_image_cache_cleanup_manual">Лише вручну</string>
+    <string name="article_image_cache_cleanup_weekly">Щотижня</string>
+    <string name="article_image_cache_cleanup_monthly">Щомісяця</string>
+    <string name="article_image_cache_cleanup_always">Під час кожної синхронізації</string>
+    <string name="article_image_cache_clear_button">Очистити кеш зображень</string>
+    <string name="article_image_cache_clear_message">Видалити завантажені зображення статей із цього пристрою? Статті й надалі показуватимуть віддалені зображення, коли вони доступні.</string>
+    <string name="article_image_cache_clear_confirm">Очистити кеш</string>
 </resources>

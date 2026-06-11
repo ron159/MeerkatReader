@@ -13,6 +13,7 @@ class ArticleRenderer(
     private val titleFollowsBodyFont: Preference<Boolean>,
     private val enableHorizontalScroll: Preference<Boolean>,
     private val audioPlayerLabels: AudioPlayerLabels = AudioPlayerLabels(),
+    private val imageRewriter: ArticleImageRewriter = ArticleImageRewriter(),
 ) {
 
     fun render(
@@ -54,6 +55,7 @@ class ArticleRenderer(
             "font_size" to "${textSize.get()}px",
             "font_family" to fontFamily.slug,
             "font_preload" to fontPreload(fontFamily),
+            "image_preload" to imagePreload(article, hideImages),
             "pre_white_space" to preWhiteSpace(enableHorizontalScroll),
             "table_overflow_x" to tableOverflowX(enableHorizontalScroll),
             "title_font_size" to "${titleFontSize.get()}px",
@@ -74,7 +76,13 @@ class ArticleRenderer(
                 pauseLabel = audioPlayerLabels.pause,
             )
             val otherEnclosures = article.enclosureHTML()
-            audioEnclosures + article.content + otherEnclosures + postProcessScript(article, hideImages)
+            val articleContent = imageRewriter.rewrite(
+                html = article.content,
+                cachedImages = if (hideImages) emptyList() else article.cachedImages,
+            )
+            val content = audioEnclosures + articleContent + otherEnclosures
+
+            content + postProcessScript(article, hideImages)
         }
     }
 
@@ -101,6 +109,22 @@ class ArticleRenderer(
                 <link rel="preload" href="https://appassets.androidplatform.net/res/font/${fontFamily.slug}.ttf" as="font" type="font/ttf" crossorigin>
                 """
         }
+    }
+
+    private fun imagePreload(article: Article, hideImages: Boolean): String {
+        if (hideImages) {
+            return ""
+        }
+
+        return article.cachedImages
+            .take(IMAGE_PRELOAD_COUNT)
+            .joinToString(separator = "\n") { image ->
+                """<link rel="preload" href="${image.localURL}" as="image">"""
+            }
+    }
+
+    companion object {
+        private const val IMAGE_PRELOAD_COUNT = 8
     }
 }
 

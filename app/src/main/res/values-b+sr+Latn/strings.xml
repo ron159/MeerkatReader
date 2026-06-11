@@ -230,4 +230,21 @@
     <string name="full_content_error_generic">Raščlanjivanje članka nije uspelo</string>
     <string name="full_content_error_forbidden">Preuzimanje blokirano od strane sajta</string>
     <string name="after_read_all_behavior_open_drawer">Otvorite fioku za navigaciju</string>
+    <string name="article_image_download_mode_label">Predučitavanje slika</string>
+    <string name="article_image_download_mode_off">Isključeno</string>
+    <string name="article_image_download_mode_wifi_only">Samo Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi i mobilni podaci</string>
+    <string name="article_image_cache_size_label">Veličina keša slika</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Neograničeno</string>
+    <string name="article_image_cache_cleanup_label">Čišćenje keša slika</string>
+    <string name="article_image_cache_cleanup_manual">Samo ručno</string>
+    <string name="article_image_cache_cleanup_weekly">Nedeljno</string>
+    <string name="article_image_cache_cleanup_monthly">Mesečno</string>
+    <string name="article_image_cache_cleanup_always">Kad god se pokrene sinhronizacija</string>
+    <string name="article_image_cache_clear_button">Obriši keš slika</string>
+    <string name="article_image_cache_clear_message">Izbrisati preuzete slike članaka sa ovog uređaja? Članci će i dalje prikazivati udaljene slike kada su dostupne.</string>
+    <string name="article_image_cache_clear_confirm">Obriši keš</string>
 </resources>

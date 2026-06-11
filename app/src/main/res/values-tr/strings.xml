@@ -310,4 +310,21 @@
     <string name="freshrss_visibility">Görünürlük</string>
     <string name="freshrss_visibility_option_important">Önemli</string>
     <string name="freshrss_visibility_option_feed">Yayın</string>
+    <string name="article_image_download_mode_label">Görsel ön yükleme</string>
+    <string name="article_image_download_mode_off">Kapalı</string>
+    <string name="article_image_download_mode_wifi_only">Yalnızca Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi ve mobil veri</string>
+    <string name="article_image_cache_size_label">Görsel önbellek boyutu</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Sınırsız</string>
+    <string name="article_image_cache_cleanup_label">Görsel önbellek temizliği</string>
+    <string name="article_image_cache_cleanup_manual">Yalnızca elle</string>
+    <string name="article_image_cache_cleanup_weekly">Haftalık</string>
+    <string name="article_image_cache_cleanup_monthly">Aylık</string>
+    <string name="article_image_cache_cleanup_always">Eşitleme her çalıştığında</string>
+    <string name="article_image_cache_clear_button">Görsel önbelleğini temizle</string>
+    <string name="article_image_cache_clear_message">İndirilen makale görselleri bu cihazdan silinsin mi? Makaleler kullanılabilir olduğunda uzak görselleri göstermeye devam eder.</string>
+    <string name="article_image_cache_clear_confirm">Önbelleği temizle</string>
 </resources>

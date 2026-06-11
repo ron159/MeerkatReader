@@ -357,4 +357,21 @@
     <string name="article_list_new_articles_pill">Uued artiklid</string>
     <string name="settings_refresh_on_wifi_only">Uuenda andmeid vaid Wifi ühendusega</string>
     <string name="refresh_skipped_mobile">Mobiilse andmeside puhul jääb andmete uuendamine vahele</string>
+    <string name="article_image_download_mode_label">Piltide eellaadimine</string>
+    <string name="article_image_download_mode_off">Väljas</string>
+    <string name="article_image_download_mode_wifi_only">Ainult Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi ja mobiilandmeside</string>
+    <string name="article_image_cache_size_label">Piltide vahemälu suurus</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Piiramatu</string>
+    <string name="article_image_cache_cleanup_label">Piltide vahemälu puhastamine</string>
+    <string name="article_image_cache_cleanup_manual">Ainult käsitsi</string>
+    <string name="article_image_cache_cleanup_weekly">Iga nädal</string>
+    <string name="article_image_cache_cleanup_monthly">Iga kuu</string>
+    <string name="article_image_cache_cleanup_always">Igal sünkroonimisel</string>
+    <string name="article_image_cache_clear_button">Tühjenda piltide vahemälu</string>
+    <string name="article_image_cache_clear_message">Kas kustutada sellest seadmest allalaaditud artiklipildid? Artiklid näitavad võimaluse korral endiselt kaugpilte.</string>
+    <string name="article_image_cache_clear_confirm">Tühjenda vahemälu</string>
 </resources>

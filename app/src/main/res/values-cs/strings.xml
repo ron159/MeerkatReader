@@ -289,4 +289,21 @@
     <string name="auth_fields_freshrss_api_password">API heslo</string>
     <string name="freshrss_visibility_option_important">Důležité</string>
     <string name="freshrss_visibility_option_folder">Kategorie</string>
+    <string name="article_image_download_mode_label">Přednačítání obrázků</string>
+    <string name="article_image_download_mode_off">Vypnuto</string>
+    <string name="article_image_download_mode_wifi_only">Pouze Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi a mobilní data</string>
+    <string name="article_image_cache_size_label">Velikost mezipaměti obrázků</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Neomezeně</string>
+    <string name="article_image_cache_cleanup_label">Čištění mezipaměti obrázků</string>
+    <string name="article_image_cache_cleanup_manual">Pouze ručně</string>
+    <string name="article_image_cache_cleanup_weekly">Týdně</string>
+    <string name="article_image_cache_cleanup_monthly">Měsíčně</string>
+    <string name="article_image_cache_cleanup_always">Při každé synchronizaci</string>
+    <string name="article_image_cache_clear_button">Vymazat mezipaměť obrázků</string>
+    <string name="article_image_cache_clear_message">Smazat stažené obrázky článků z tohoto zařízení? Články budou nadále zobrazovat vzdálené obrázky, pokud budou dostupné.</string>
+    <string name="article_image_cache_clear_confirm">Vymazat mezipaměť</string>
 </resources>

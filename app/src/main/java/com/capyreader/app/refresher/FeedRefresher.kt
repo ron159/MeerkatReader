@@ -1,6 +1,8 @@
 package com.capyreader.app.refresher
 
 import android.content.Context
+import com.capyreader.app.articleimages.ArticleImageCacheCleaner
+import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.common.isOnWifi
 import com.capyreader.app.notifications.NotificationHelper
 import com.capyreader.app.preferences.AppPreferences
@@ -17,7 +19,9 @@ class FeedRefresher(
     private val appContext: Context,
     private val notificationHelper: NotificationHelper,
     private val appPreferences: AppPreferences,
-): KoinComponent {
+    private val articleImagePreloader: ArticleImagePreloader,
+    private val articleImageCacheCleaner: ArticleImageCacheCleaner,
+) : KoinComponent {
     suspend fun refresh() {
         if (appPreferences.refreshOnWiFiOnly.get() && !appContext.isOnWifi()) {
             CapyLog.info("refresh_skipped_mobile", mapOf("type" to "background"))
@@ -28,6 +32,8 @@ class FeedRefresher(
 
         return withContext(Dispatchers.IO) {
             account.refresh()
+            articleImageCacheCleaner.cleanup()
+            articleImagePreloader.enqueue()
             notificationHelper.notify(since = since)
             WidgetUpdater.update(appContext)
         }

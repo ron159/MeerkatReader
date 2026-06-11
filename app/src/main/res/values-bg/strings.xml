@@ -358,4 +358,21 @@
     <string name="article_list_new_articles_pill">Нови статии</string>
     <string name="settings_refresh_on_wifi_only">Обновяване само през Wi-Fi</string>
     <string name="refresh_skipped_mobile">Обновяването е пропуснато в мобилната мрежа</string>
+    <string name="article_image_download_mode_label">Предварително зареждане на изображения</string>
+    <string name="article_image_download_mode_off">Изключено</string>
+    <string name="article_image_download_mode_wifi_only">Само Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi и мобилни данни</string>
+    <string name="article_image_cache_size_label">Размер на кеша за изображения</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Неограничен</string>
+    <string name="article_image_cache_cleanup_label">Почистване на кеша за изображения</string>
+    <string name="article_image_cache_cleanup_manual">Само ръчно</string>
+    <string name="article_image_cache_cleanup_weekly">Седмично</string>
+    <string name="article_image_cache_cleanup_monthly">Месечно</string>
+    <string name="article_image_cache_cleanup_always">При всяка синхронизация</string>
+    <string name="article_image_cache_clear_button">Изчистване на кеша за изображения</string>
+    <string name="article_image_cache_clear_message">Да се изтрият ли изтеглените изображения на статии от това устройство? Статиите пак ще показват отдалечени изображения, когато са налични.</string>
+    <string name="article_image_cache_clear_confirm">Изчистване на кеша</string>
 </resources>

@@ -324,4 +324,21 @@
     <string name="tag_action_edit_success">Etiqueta atualizada</string>
     <string name="tag_action_edit_error">Erro ao atualizar etiqueta</string>
     <string name="tag_action_edit">Editar Etiqueta</string>
+    <string name="article_image_download_mode_label">Pré-carregamento de imagens</string>
+    <string name="article_image_download_mode_off">Desativado</string>
+    <string name="article_image_download_mode_wifi_only">Apenas Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi e dados móveis</string>
+    <string name="article_image_cache_size_label">Tamanho da cache de imagens</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Ilimitado</string>
+    <string name="article_image_cache_cleanup_label">Limpeza da cache de imagens</string>
+    <string name="article_image_cache_cleanup_manual">Apenas manual</string>
+    <string name="article_image_cache_cleanup_weekly">Semanal</string>
+    <string name="article_image_cache_cleanup_monthly">Mensal</string>
+    <string name="article_image_cache_cleanup_always">Sempre que a sincronização for executada</string>
+    <string name="article_image_cache_clear_button">Limpar cache de imagens</string>
+    <string name="article_image_cache_clear_message">Eliminar deste dispositivo as imagens de artigos transferidas? Os artigos continuarão a mostrar imagens remotas quando disponíveis.</string>
+    <string name="article_image_cache_clear_confirm">Limpar cache</string>
 </resources>

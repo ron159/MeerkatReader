@@ -358,4 +358,21 @@
     <string name="article_list_new_articles_pill">مقالات جديدة</string>
     <string name="settings_refresh_on_wifi_only">التحديث عبر شبكة Wi-Fi فقط</string>
     <string name="refresh_skipped_mobile">تخطي التحديث عبر شبكة الجوّال</string>
+    <string name="article_image_download_mode_label">التحميل المسبق للصور</string>
+    <string name="article_image_download_mode_off">إيقاف</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi فقط</string>
+    <string name="article_image_download_mode_always">Wi-Fi وبيانات الجوال</string>
+    <string name="article_image_cache_size_label">حجم ذاكرة الصور المؤقتة</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">غير محدود</string>
+    <string name="article_image_cache_cleanup_label">تنظيف ذاكرة الصور المؤقتة</string>
+    <string name="article_image_cache_cleanup_manual">يدويًا فقط</string>
+    <string name="article_image_cache_cleanup_weekly">أسبوعيًا</string>
+    <string name="article_image_cache_cleanup_monthly">شهريًا</string>
+    <string name="article_image_cache_cleanup_always">كلما تم تشغيل المزامنة</string>
+    <string name="article_image_cache_clear_button">مسح ذاكرة الصور المؤقتة</string>
+    <string name="article_image_cache_clear_message">هل تريد حذف صور المقالات التي تم تنزيلها من هذا الجهاز؟ ستظل المقالات تعرض الصور البعيدة عند توفرها.</string>
+    <string name="article_image_cache_clear_confirm">مسح الذاكرة المؤقتة</string>
 </resources>

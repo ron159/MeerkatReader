@@ -351,4 +351,21 @@
     <string name="freshrss_visibility_option_main">Główny strumień</string>
     <string name="widget_spotlight_see_all">Pokaż wszystko</string>
     <string name="article_list_new_articles_pill">Nowe artykuły</string>
+    <string name="article_image_download_mode_label">Wstępne pobieranie obrazów</string>
+    <string name="article_image_download_mode_off">Wyłączone</string>
+    <string name="article_image_download_mode_wifi_only">Tylko Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi i dane komórkowe</string>
+    <string name="article_image_cache_size_label">Rozmiar pamięci podręcznej obrazów</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Bez limitu</string>
+    <string name="article_image_cache_cleanup_label">Czyszczenie pamięci podręcznej obrazów</string>
+    <string name="article_image_cache_cleanup_manual">Tylko ręcznie</string>
+    <string name="article_image_cache_cleanup_weekly">Co tydzień</string>
+    <string name="article_image_cache_cleanup_monthly">Co miesiąc</string>
+    <string name="article_image_cache_cleanup_always">Przy każdej synchronizacji</string>
+    <string name="article_image_cache_clear_button">Wyczyść pamięć podręczną obrazów</string>
+    <string name="article_image_cache_clear_message">Usunąć pobrane obrazy artykułów z tego urządzenia? Artykuły nadal będą pokazywać zdalne obrazy, gdy będą dostępne.</string>
+    <string name="article_image_cache_clear_confirm">Wyczyść pamięć podręczną</string>
 </resources>

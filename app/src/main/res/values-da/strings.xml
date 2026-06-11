@@ -291,4 +291,21 @@
     <string name="audio_player_close">Luk lydafspiller</string>
     <string name="audio_player_skip_back">Gå 30 sekunder tilbage</string>
     <string name="audio_player_skip_forward">Gå 30 sekunder frem</string>
+    <string name="article_image_download_mode_label">Forudindlæsning af billeder</string>
+    <string name="article_image_download_mode_off">Fra</string>
+    <string name="article_image_download_mode_wifi_only">Kun Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi og mobildata</string>
+    <string name="article_image_cache_size_label">Størrelse på billedcache</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Ubegrænset</string>
+    <string name="article_image_cache_cleanup_label">Oprydning i billedcache</string>
+    <string name="article_image_cache_cleanup_manual">Kun manuelt</string>
+    <string name="article_image_cache_cleanup_weekly">Ugentligt</string>
+    <string name="article_image_cache_cleanup_monthly">Månedligt</string>
+    <string name="article_image_cache_cleanup_always">Hver gang synkronisering kører</string>
+    <string name="article_image_cache_clear_button">Ryd billedcache</string>
+    <string name="article_image_cache_clear_message">Slet downloadede artikelbilleder fra denne enhed? Artikler viser stadig eksterne billeder, når de er tilgængelige.</string>
+    <string name="article_image_cache_clear_confirm">Ryd cache</string>
 </resources>

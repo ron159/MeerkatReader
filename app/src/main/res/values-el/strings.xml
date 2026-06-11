@@ -334,4 +334,21 @@
     <string name="auth_fields_miniflux_use_api_token">Χρήση API Token αντ \'αυτού</string>
     <string name="auth_fields_miniflux_use_password">Χρήση Κωδικού αντ \'αυτού</string>
     <string name="auth_fields_show_advanced">Προχωρημένες ρυθμίσεις</string>
+    <string name="article_image_download_mode_label">Προφόρτωση εικόνων</string>
+    <string name="article_image_download_mode_off">Ανενεργό</string>
+    <string name="article_image_download_mode_wifi_only">Μόνο Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi και δεδομένα κινητής</string>
+    <string name="article_image_cache_size_label">Μέγεθος προσωρινής μνήμης εικόνων</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Απεριόριστο</string>
+    <string name="article_image_cache_cleanup_label">Εκκαθάριση προσωρινής μνήμης εικόνων</string>
+    <string name="article_image_cache_cleanup_manual">Μόνο χειροκίνητα</string>
+    <string name="article_image_cache_cleanup_weekly">Εβδομαδιαία</string>
+    <string name="article_image_cache_cleanup_monthly">Μηνιαία</string>
+    <string name="article_image_cache_cleanup_always">Κάθε φορά που εκτελείται συγχρονισμός</string>
+    <string name="article_image_cache_clear_button">Εκκαθάριση προσωρινής μνήμης εικόνων</string>
+    <string name="article_image_cache_clear_message">Να διαγραφούν οι ληφθείσες εικόνες άρθρων από αυτήν τη συσκευή; Τα άρθρα θα συνεχίσουν να εμφανίζουν απομακρυσμένες εικόνες όταν είναι διαθέσιμες.</string>
+    <string name="article_image_cache_clear_confirm">Εκκαθάριση προσωρινής μνήμης</string>
 </resources>

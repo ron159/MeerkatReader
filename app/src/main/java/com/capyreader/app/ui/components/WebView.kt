@@ -18,6 +18,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewAssetLoader.ResourcesPathHandler
+import com.capyreader.app.articleimages.ArticleImagePathHandler
+import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.AudioEnclosure
 import com.capyreader.app.common.Media
 import com.capyreader.app.common.WebViewInterface
@@ -230,6 +232,7 @@ class WebViewState(
 fun rememberWebViewState(
     renderer: ArticleRenderer = koinInject(),
     httpClient: OkHttpClient = koinInject(),
+    articleImageStore: ArticleImageStore = koinInject(),
     onNavigateToMedia: (media: Media) -> Unit,
     onRequestLinkDialog: (link: ShareLink) -> Unit,
     onRequestImageDialog: (imageUrl: String) -> Unit = {},
@@ -257,6 +260,7 @@ fun rememberWebViewState(
             assetLoader = WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", AssetsPathHandler(context))
                 .addPathHandler("/res/", ResourcesPathHandler(context))
+                .addPathHandler("/article-images/", ArticleImagePathHandler(articleImageStore))
                 .build(),
             onOpenLink = onOpenLink,
             httpClient = httpClient,

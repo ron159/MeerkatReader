@@ -284,4 +284,21 @@
     <string name="selected">Wedi\'i ddewis</string>
     <string name="auth_fields_client_certificate">Tystysgrif y cleient (dewisol)</string>
     <string name="auth_fields_remove_client_cert">Cael gwared ar dystysgrif y cleient</string>
+    <string name="article_image_download_mode_label">Rhaglwytho delweddau</string>
+    <string name="article_image_download_mode_off">I ffwrdd</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi yn unig</string>
+    <string name="article_image_download_mode_always">Wi-Fi a data symudol</string>
+    <string name="article_image_cache_size_label">Maint storfa delweddau</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Diderfyn</string>
+    <string name="article_image_cache_cleanup_label">Glanhau storfa delweddau</string>
+    <string name="article_image_cache_cleanup_manual">Â llaw yn unig</string>
+    <string name="article_image_cache_cleanup_weekly">Wythnosol</string>
+    <string name="article_image_cache_cleanup_monthly">Misol</string>
+    <string name="article_image_cache_cleanup_always">Bob tro mae cydamseru yn rhedeg</string>
+    <string name="article_image_cache_clear_button">Clirio storfa delweddau</string>
+    <string name="article_image_cache_clear_message">Dileu delweddau erthyglau sydd wedi\'u llwytho i lawr o\'r ddyfais hon? Bydd erthyglau\'n dal i ddangos delweddau o bell pan fyddant ar gael.</string>
+    <string name="article_image_cache_clear_confirm">Clirio\'r storfa</string>
 </resources>

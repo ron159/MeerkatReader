@@ -214,4 +214,21 @@
     <string name="full_content_error_missing_response">Kunne ikke hente artikkel</string>
     <string name="full_content_error_generic">Kunne ikke behandle artikkel</string>
     <string name="full_content_error_forbidden">Henting blokkert av nettstedet</string>
+    <string name="article_image_download_mode_label">Forhåndslasting av bilder</string>
+    <string name="article_image_download_mode_off">Av</string>
+    <string name="article_image_download_mode_wifi_only">Bare Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi og mobildata</string>
+    <string name="article_image_cache_size_label">Størrelse på bildebuffer</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Ubegrenset</string>
+    <string name="article_image_cache_cleanup_label">Opprydding i bildebuffer</string>
+    <string name="article_image_cache_cleanup_manual">Bare manuelt</string>
+    <string name="article_image_cache_cleanup_weekly">Ukentlig</string>
+    <string name="article_image_cache_cleanup_monthly">Månedlig</string>
+    <string name="article_image_cache_cleanup_always">Hver gang synkronisering kjører</string>
+    <string name="article_image_cache_clear_button">Tøm bildebuffer</string>
+    <string name="article_image_cache_clear_message">Slette nedlastede artikkelbilder fra denne enheten? Artikler viser fortsatt eksterne bilder når de er tilgjengelige.</string>
+    <string name="article_image_cache_clear_confirm">Tøm buffer</string>
 </resources>

@@ -258,4 +258,21 @@
     <string name="media_share">பங்கு</string>
     <string name="settings_gestures_improve_talkback_title">டாக் பேக்கை மேம்படுத்தவும்</string>
     <string name="settings_gestures_improve_talkback_subtitle">டாக் பேக் உரை-க்கு-பேச்சை மேம்படுத்த சில அமைப்புகளை முடக்குகிறது</string>
+    <string name="article_image_download_mode_label">படங்களை முன்கூட்டியே ஏற்றுதல்</string>
+    <string name="article_image_download_mode_off">முடக்கு</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi மட்டும்</string>
+    <string name="article_image_download_mode_always">Wi-Fi மற்றும் மொபைல் தரவு</string>
+    <string name="article_image_cache_size_label">பட கேச் அளவு</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">வரம்பற்றது</string>
+    <string name="article_image_cache_cleanup_label">பட கேச் சுத்தம்</string>
+    <string name="article_image_cache_cleanup_manual">கையேடு மட்டும்</string>
+    <string name="article_image_cache_cleanup_weekly">வாரந்தோறும்</string>
+    <string name="article_image_cache_cleanup_monthly">மாதந்தோறும்</string>
+    <string name="article_image_cache_cleanup_always">ஒத்திசைவு இயங்கும் போதெல்லாம்</string>
+    <string name="article_image_cache_clear_button">பட கேச்சை அழிக்கவும்</string>
+    <string name="article_image_cache_clear_message">இந்த சாதனத்திலிருந்து பதிவிறக்கிய கட்டுரை படங்களை நீக்கவா? கிடைக்கும் போது கட்டுரைகள் தொலைநிலை படங்களை தொடர்ந்து காட்டும்.</string>
+    <string name="article_image_cache_clear_confirm">கேச்சை அழிக்கவும்</string>
 </resources>

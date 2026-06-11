@@ -15,7 +15,8 @@ val settingsModule = module {
         GeneralSettingsViewModel(
             refreshScheduler = get(),
             account = get(),
-            appPreferences = get()
+            appPreferences = get(),
+            articleImageCacheCleaner = get(),
         )
     }
     viewModel {
@@ -30,6 +31,8 @@ val settingsModule = module {
         DisplaySettingsViewModel(
             account = get(),
             appPreferences = get(),
+            articleImagePreloader = get(),
+            articleImageCacheCleaner = get(),
         )
     }
     viewModel {

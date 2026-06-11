@@ -355,4 +355,21 @@
     <string name="article_list_new_articles_pill">Nouveaux articles</string>
     <string name="settings_refresh_on_wifi_only">Actualiser en Wi-Fi uniquement</string>
     <string name="refresh_skipped_mobile">Actualisation ignorée sur le réseau mobile</string>
+    <string name="article_image_download_mode_label">Préchargement des images</string>
+    <string name="article_image_download_mode_off">Désactivé</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi uniquement</string>
+    <string name="article_image_download_mode_always">Wi-Fi et données mobiles</string>
+    <string name="article_image_cache_size_label">Taille du cache des images</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Illimité</string>
+    <string name="article_image_cache_cleanup_label">Nettoyage du cache des images</string>
+    <string name="article_image_cache_cleanup_manual">Manuel uniquement</string>
+    <string name="article_image_cache_cleanup_weekly">Hebdomadaire</string>
+    <string name="article_image_cache_cleanup_monthly">Mensuel</string>
+    <string name="article_image_cache_cleanup_always">À chaque synchronisation</string>
+    <string name="article_image_cache_clear_button">Vider le cache des images</string>
+    <string name="article_image_cache_clear_message">Supprimer les images d’articles téléchargées de cet appareil ? Les articles continueront d’afficher les images distantes lorsqu’elles sont disponibles.</string>
+    <string name="article_image_cache_clear_confirm">Vider le cache</string>
 </resources>

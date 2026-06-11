@@ -55,6 +55,12 @@ internal val articlesModule = module {
             appPreferences = appPreferences,
             notificationHelper = get(),
             application = get(),
+            articleImageRecords = get(),
+            articleImagePreloader = get(),
+            articleImageDownloader = get(),
+            articleImageStore = get(),
+            articleImageCacheCleaner = get(),
+            articleFullContentRecords = get(),
         )
     }
     viewModel {

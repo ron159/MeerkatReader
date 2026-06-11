@@ -12,12 +12,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.capyreader.app.R
+import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.common.MediaItem
 import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.jocmp.capy.common.launchIO
 import com.jocmp.capy.common.launchUI
+import org.koin.compose.koinInject
 
 @Composable
-fun MediaSaveButton(imageUrl: String) {
+fun MediaSaveButton(
+    image: MediaItem,
+    articleImageStore: ArticleImageStore = koinInject(),
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbarHost.current
@@ -33,7 +39,7 @@ fun MediaSaveButton(imageUrl: String) {
     fun saveImage() {
         scope.launchIO {
             ImageSaver
-                .saveImage(imageUrl, context = context)
+                .saveImage(image, context = context, articleImageStore = articleImageStore)
                 .fold(
                     onSuccess = {
                         showSnackbar(message = successMessage)
@@ -58,13 +64,18 @@ fun MediaSaveButton(imageUrl: String) {
 @Preview
 @Composable
 fun SaveButtonPreview() {
+    val context = LocalContext.current
+
     Box(
         Modifier.background(Color.Cyan)
     ) {
         Box(
             Modifier.background(Color.Black.copy(alpha = 0.8f)),
         ) {
-            MediaSaveButton(imageUrl = "https://example.com/jpeg.jpeg")
+            MediaSaveButton(
+                image = MediaItem(url = "https://example.com/jpeg.jpeg", altText = null),
+                articleImageStore = ArticleImageStore(context),
+            )
         }
     }
 }

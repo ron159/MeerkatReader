@@ -252,4 +252,21 @@
     <string name="settings_gestures_enable_horizontal_pagination_subtitle">Svep vänster eller höger för att navigera bland artiklar</string>
     <string name="settings_gestures_enable_horizontal_pagination_title">Aktivera horisontell rullning</string>
     <string name="theme_default">Standard</string>
+    <string name="article_image_download_mode_label">Förinläsning av bilder</string>
+    <string name="article_image_download_mode_off">Av</string>
+    <string name="article_image_download_mode_wifi_only">Endast Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi och mobildata</string>
+    <string name="article_image_cache_size_label">Storlek på bildcache</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Obegränsat</string>
+    <string name="article_image_cache_cleanup_label">Rensa bildcache</string>
+    <string name="article_image_cache_cleanup_manual">Endast manuellt</string>
+    <string name="article_image_cache_cleanup_weekly">Varje vecka</string>
+    <string name="article_image_cache_cleanup_monthly">Varje månad</string>
+    <string name="article_image_cache_cleanup_always">När synkronisering körs</string>
+    <string name="article_image_cache_clear_button">Rensa bildcache</string>
+    <string name="article_image_cache_clear_message">Ta bort nedladdade artikelbilder från den här enheten? Artiklar visar fortfarande fjärrbilder när de är tillgängliga.</string>
+    <string name="article_image_cache_clear_confirm">Rensa cache</string>
 </resources>

@@ -10,7 +10,9 @@ import androidx.core.net.toUri
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
+import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.MD5
+import com.capyreader.app.common.MediaItem
 import com.capyreader.app.common.externalImageCacheFile
 import com.capyreader.app.common.fileURI
 import com.jocmp.capy.logging.CapyLog
@@ -21,11 +23,27 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 object ImageSaver {
+    suspend fun saveImage(
+        image: MediaItem,
+        context: Context,
+        articleImageStore: ArticleImageStore,
+    ): Result<Uri> {
+        return saveImage(
+            imageUrl = image.originalUrl ?: image.url,
+            imageData = image.data(articleImageStore),
+            context = context,
+        )
+    }
+
     suspend fun saveImage(imageUrl: String, context: Context): Result<Uri> {
+        return saveImage(imageUrl = imageUrl, imageData = imageUrl, context = context)
+    }
+
+    private suspend fun saveImage(imageUrl: String, imageData: Any, context: Context): Result<Uri> {
         return withContext(Dispatchers.IO) {
             return@withContext try {
                 val bitmap =
-                    createBitmap(imageUrl, context) ?: throw IOException("Failed to generate image")
+                    createBitmap(imageData, context) ?: throw IOException("Failed to generate image")
 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, jpegFileName(imageUrl))
@@ -53,11 +71,27 @@ object ImageSaver {
         }
     }
 
+    suspend fun shareImage(
+        image: MediaItem,
+        context: Context,
+        articleImageStore: ArticleImageStore,
+    ): Result<Uri> {
+        return shareImage(
+            imageUrl = image.originalUrl ?: image.url,
+            imageData = image.data(articleImageStore),
+            context = context,
+        )
+    }
+
     suspend fun shareImage(imageUrl: String, context: Context): Result<Uri> {
+        return shareImage(imageUrl = imageUrl, imageData = imageUrl, context = context)
+    }
+
+    private suspend fun shareImage(imageUrl: String, imageData: Any, context: Context): Result<Uri> {
         return withContext(Dispatchers.IO) {
             return@withContext try {
                 val bitmap =
-                    createBitmap(imageUrl, context) ?: throw IOException("Failed to generate image")
+                    createBitmap(imageData, context) ?: throw IOException("Failed to generate image")
 
                 val target = context.externalImageCacheFile(jpegFileName(imageUrl))
 
@@ -85,9 +119,16 @@ object ImageSaver {
         return "${MD5.from(imageUrl)}.jpg"
     }
 
-    private suspend fun createBitmap(imageUrl: String, context: Context): Bitmap? {
+    private fun MediaItem.data(articleImageStore: ArticleImageStore): Any {
+        return cachedImageId
+            ?.let { articleImageStore.fileForAssetID(it) }
+            ?.takeIf { it.exists() }
+            ?: url
+    }
+
+    private suspend fun createBitmap(data: Any, context: Context): Bitmap? {
         val imageRequest = ImageRequest.Builder(context)
-            .data(imageUrl)
+            .data(data)
             .build()
 
         return context.imageLoader.execute(imageRequest).image?.toBitmap()

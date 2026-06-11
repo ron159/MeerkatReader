@@ -1,0 +1,262 @@
+findRefsByArticleID:
+SELECT
+  article_image_refs.*,
+  article_image_assets.status,
+  article_image_assets.relative_path,
+  article_image_assets.mime_type
+FROM article_image_refs
+JOIN article_image_assets ON article_image_refs.asset_id = article_image_assets.id
+WHERE article_image_refs.article_id = :articleID
+ORDER BY article_image_refs.ordinal ASC;
+
+findReadyRefsByArticleID:
+SELECT
+  article_image_refs.*,
+  article_image_assets.relative_path,
+  article_image_assets.mime_type
+FROM article_image_refs
+JOIN article_image_assets ON article_image_refs.asset_id = article_image_assets.id
+WHERE article_image_refs.article_id = :articleID
+  AND article_image_assets.status = 'ready'
+  AND article_image_assets.relative_path IS NOT NULL
+ORDER BY article_image_refs.ordinal ASC;
+
+findDownloadCandidates:
+SELECT
+  article_image_assets.id,
+  article_image_assets.source_url,
+  articles.url AS article_url
+FROM article_image_assets
+JOIN article_image_refs ON article_image_refs.asset_id = article_image_assets.id
+JOIN articles ON articles.id = article_image_refs.article_id
+WHERE article_image_assets.status = 'pending'
+  OR (
+    article_image_assets.status = 'downloading'
+    AND article_image_assets.updated_at < :staleBefore
+  )
+  OR (
+    article_image_assets.status = 'failed'
+    AND article_image_assets.failure_count < :maxFailureCount
+  )
+GROUP BY article_image_assets.id
+ORDER BY article_image_assets.updated_at ASC
+LIMIT :limit;
+
+findDownloadCandidatesByArticleID:
+SELECT
+  article_image_assets.id,
+  article_image_assets.source_url,
+  articles.url AS article_url
+FROM article_image_assets
+JOIN article_image_refs ON article_image_refs.asset_id = article_image_assets.id
+JOIN articles ON articles.id = article_image_refs.article_id
+WHERE article_image_refs.article_id = :articleID
+  AND (
+    article_image_assets.status = 'pending'
+    OR (
+      article_image_assets.status = 'downloading'
+      AND article_image_assets.updated_at < :staleBefore
+    )
+    OR (
+      article_image_assets.status = 'failed'
+      AND article_image_assets.failure_count < :maxFailureCount
+    )
+  )
+GROUP BY article_image_assets.id
+ORDER BY article_image_refs.ordinal ASC
+LIMIT :limit;
+
+findAssetsWithFiles:
+SELECT id, relative_path, byte_size, last_accessed_at
+FROM article_image_assets
+WHERE relative_path IS NOT NULL;
+
+findReadyAssetsWithFiles:
+SELECT id, relative_path, byte_size, last_accessed_at
+FROM article_image_assets
+WHERE status = 'ready'
+  AND relative_path IS NOT NULL
+ORDER BY COALESCE(last_accessed_at, fetched_at, updated_at, created_at) ASC;
+
+upsertAsset:
+INSERT INTO article_image_assets(
+  id,
+  source_url,
+  status,
+  created_at,
+  updated_at
+)
+VALUES (
+  :id,
+  :sourceURL,
+  :status,
+  :createdAt,
+  :updatedAt
+)
+ON CONFLICT(id) DO UPDATE
+SET
+  status = CASE article_image_assets.status
+    WHEN 'pruned' THEN excluded.status
+    ELSE article_image_assets.status
+  END,
+  last_error = CASE article_image_assets.status
+    WHEN 'pruned' THEN NULL
+    ELSE article_image_assets.last_error
+  END,
+  updated_at = excluded.updated_at;
+
+insertRef:
+INSERT INTO article_image_refs(
+  article_id,
+  asset_id,
+  original_src,
+  resolved_url,
+  ordinal,
+  alt_text,
+  created_at
+)
+VALUES (
+  :articleID,
+  :assetID,
+  :originalSrc,
+  :resolvedURL,
+  :ordinal,
+  :altText,
+  :createdAt
+);
+
+deleteRefsByArticleID:
+DELETE FROM article_image_refs
+WHERE article_id = :articleID;
+
+deleteRefsByArticleIDs:
+DELETE FROM article_image_refs
+WHERE article_id IN :articleIDs;
+
+deleteRefsWithoutArticle:
+DELETE FROM article_image_refs
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);
+
+findOrphanedAssetIDs:
+SELECT id
+FROM article_image_assets
+WHERE id NOT IN (
+  SELECT asset_id FROM article_image_refs
+);
+
+findOrphanedAssets:
+SELECT id, relative_path, byte_size, last_accessed_at
+FROM article_image_assets
+WHERE id NOT IN (
+  SELECT asset_id FROM article_image_refs
+);
+
+deleteAssetsByID:
+DELETE FROM article_image_assets
+WHERE id IN :assetIDs;
+
+markDownloading:
+UPDATE article_image_assets
+SET
+  status = 'downloading',
+  updated_at = :updatedAt
+WHERE id = :id;
+
+markReady:
+UPDATE article_image_assets
+SET
+  status = 'ready',
+  final_url = :finalURL,
+  relative_path = :relativePath,
+  mime_type = :mimeType,
+  byte_size = :byteSize,
+  etag = :etag,
+  last_modified = :lastModified,
+  failure_count = 0,
+  fetched_at = :fetchedAt,
+  last_accessed_at = :fetchedAt,
+  updated_at = :updatedAt,
+  last_error = NULL
+WHERE id = :id;
+
+markFailed:
+UPDATE article_image_assets
+SET
+  status = 'failed',
+  failure_count = failure_count + 1,
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE id = :id;
+
+markSkipped:
+UPDATE article_image_assets
+SET
+  status = 'skipped',
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE id = :id;
+
+markPending:
+UPDATE article_image_assets
+SET
+  status = 'pending',
+  final_url = NULL,
+  relative_path = NULL,
+  mime_type = NULL,
+  byte_size = NULL,
+  etag = NULL,
+  last_modified = NULL,
+  failure_count = 0,
+  fetched_at = NULL,
+  last_accessed_at = NULL,
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE id = :id;
+
+markPruned:
+UPDATE article_image_assets
+SET
+  status = 'pruned',
+  final_url = NULL,
+  relative_path = NULL,
+  mime_type = NULL,
+  byte_size = NULL,
+  etag = NULL,
+  last_modified = NULL,
+  fetched_at = NULL,
+  last_accessed_at = NULL,
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE id = :id;
+
+resetStoredAssets:
+UPDATE article_image_assets
+SET
+  status = 'pending',
+  final_url = NULL,
+  relative_path = NULL,
+  mime_type = NULL,
+  byte_size = NULL,
+  etag = NULL,
+  last_modified = NULL,
+  failure_count = 0,
+  fetched_at = NULL,
+  last_accessed_at = NULL,
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE relative_path IS NOT NULL;
+
+resetDownloadingAssets:
+UPDATE article_image_assets
+SET
+  status = 'pending',
+  last_error = :lastError,
+  updated_at = :updatedAt
+WHERE status = 'downloading';
+
+touchAsset:
+UPDATE article_image_assets
+SET last_accessed_at = :lastAccessedAt
+WHERE id = :id;

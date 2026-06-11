@@ -347,4 +347,21 @@
     <string name="article_byline_date_only">%1$s %2$s(e)tan</string>
     <string name="article_list_new_articles_pill">Artikulu berriak</string>
     <string name="article_byline">%1$s %2$s(e)tan %3$s bidez</string>
+    <string name="article_image_download_mode_label">Irudien aurrekarga</string>
+    <string name="article_image_download_mode_off">Desaktibatuta</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi bakarrik</string>
+    <string name="article_image_download_mode_always">Wi-Fi eta datu mugikorrak</string>
+    <string name="article_image_cache_size_label">Irudien cachearen tamaina</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Mugagabea</string>
+    <string name="article_image_cache_cleanup_label">Irudien cachea garbitzea</string>
+    <string name="article_image_cache_cleanup_manual">Eskuz bakarrik</string>
+    <string name="article_image_cache_cleanup_weekly">Astero</string>
+    <string name="article_image_cache_cleanup_monthly">Hilero</string>
+    <string name="article_image_cache_cleanup_always">Sinkronizazioa exekutatzen den bakoitzean</string>
+    <string name="article_image_cache_clear_button">Garbitu irudien cachea</string>
+    <string name="article_image_cache_clear_message">Gailu honetatik deskargatutako artikulu-irudiak ezabatu? Artikuluek urruneko irudiak erakusten jarraituko dute erabilgarri daudenean.</string>
+    <string name="article_image_cache_clear_confirm">Garbitu cachea</string>
 </resources>

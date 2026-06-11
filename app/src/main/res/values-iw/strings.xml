@@ -330,4 +330,21 @@
     <string name="article_actions_delete_page_title">הסרה</string>
     <string name="article_actions_delete_page_message">האם אתה בטוח שאתה רוצה למחוק את הדף הזה?</string>
     <string name="article_actions_delete_page_confirm">הסרה</string>
+    <string name="article_image_download_mode_label">טעינה מראש של תמונות</string>
+    <string name="article_image_download_mode_off">כבוי</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi בלבד</string>
+    <string name="article_image_download_mode_always">Wi-Fi ונתונים סלולריים</string>
+    <string name="article_image_cache_size_label">גודל מטמון התמונות</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">ללא הגבלה</string>
+    <string name="article_image_cache_cleanup_label">ניקוי מטמון התמונות</string>
+    <string name="article_image_cache_cleanup_manual">ידני בלבד</string>
+    <string name="article_image_cache_cleanup_weekly">שבועי</string>
+    <string name="article_image_cache_cleanup_monthly">חודשי</string>
+    <string name="article_image_cache_cleanup_always">בכל הפעלת סנכרון</string>
+    <string name="article_image_cache_clear_button">נקה מטמון תמונות</string>
+    <string name="article_image_cache_clear_message">למחוק מהמכשיר הזה את תמונות הכתבות שהורדו? כתבות עדיין יציגו תמונות מרוחקות כאשר הן זמינות.</string>
+    <string name="article_image_cache_clear_confirm">נקה מטמון</string>
 </resources>

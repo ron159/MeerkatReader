@@ -256,4 +256,21 @@
     <string name="settings_select_none">すべて選択解除</string>
     <string name="settings_confirm_mark_all_read">すべてを既読としてマークすることを確認</string>
     <string name="settings_mark_read_on_scroll">スクロール時に既読としてマーク</string>
+    <string name="article_image_download_mode_label">画像の先読み</string>
+    <string name="article_image_download_mode_off">オフ</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi のみ</string>
+    <string name="article_image_download_mode_always">Wi-Fi とモバイルデータ</string>
+    <string name="article_image_cache_size_label">画像キャッシュサイズ</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">無制限</string>
+    <string name="article_image_cache_cleanup_label">画像キャッシュのクリーンアップ</string>
+    <string name="article_image_cache_cleanup_manual">手動のみ</string>
+    <string name="article_image_cache_cleanup_weekly">毎週</string>
+    <string name="article_image_cache_cleanup_monthly">毎月</string>
+    <string name="article_image_cache_cleanup_always">同期のたび</string>
+    <string name="article_image_cache_clear_button">画像キャッシュを削除</string>
+    <string name="article_image_cache_clear_message">このデバイスからダウンロード済みの記事画像を削除しますか？記事は利用可能な場合、引き続きリモート画像を表示します。</string>
+    <string name="article_image_cache_clear_confirm">キャッシュを削除</string>
 </resources>

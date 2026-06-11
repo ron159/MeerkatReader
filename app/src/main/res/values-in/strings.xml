@@ -347,4 +347,21 @@
     <string name="widget_spotlight_next">Berikutnya</string>
     <string name="freshrss_visibility">Visibilitas</string>
     <string name="freshrss_visibility_option_main">Aliran Utama</string>
+    <string name="article_image_download_mode_label">Prapemuatan gambar</string>
+    <string name="article_image_download_mode_off">Mati</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi saja</string>
+    <string name="article_image_download_mode_always">Wi-Fi dan data seluler</string>
+    <string name="article_image_cache_size_label">Ukuran cache gambar</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Tak terbatas</string>
+    <string name="article_image_cache_cleanup_label">Pembersihan cache gambar</string>
+    <string name="article_image_cache_cleanup_manual">Manual saja</string>
+    <string name="article_image_cache_cleanup_weekly">Mingguan</string>
+    <string name="article_image_cache_cleanup_monthly">Bulanan</string>
+    <string name="article_image_cache_cleanup_always">Setiap kali sinkronisasi berjalan</string>
+    <string name="article_image_cache_clear_button">Hapus cache gambar</string>
+    <string name="article_image_cache_clear_message">Hapus gambar artikel yang diunduh dari perangkat ini? Artikel tetap akan menampilkan gambar jarak jauh jika tersedia.</string>
+    <string name="article_image_cache_clear_confirm">Hapus cache</string>
 </resources>

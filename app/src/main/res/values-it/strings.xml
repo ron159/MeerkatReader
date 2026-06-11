@@ -358,4 +358,21 @@
     <string name="article_list_new_articles_pill">Nuovi articoli</string>
     <string name="settings_refresh_on_wifi_only">Aggiorna solo tramite Wi-Fi</string>
     <string name="refresh_skipped_mobile">Aggiornamento saltato sulla rete mobile</string>
+    <string name="article_image_download_mode_label">Precaricamento immagini</string>
+    <string name="article_image_download_mode_off">Disattivato</string>
+    <string name="article_image_download_mode_wifi_only">Solo Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi e dati mobili</string>
+    <string name="article_image_cache_size_label">Dimensione cache immagini</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Illimitata</string>
+    <string name="article_image_cache_cleanup_label">Pulizia cache immagini</string>
+    <string name="article_image_cache_cleanup_manual">Solo manuale</string>
+    <string name="article_image_cache_cleanup_weekly">Settimanale</string>
+    <string name="article_image_cache_cleanup_monthly">Mensile</string>
+    <string name="article_image_cache_cleanup_always">A ogni sincronizzazione</string>
+    <string name="article_image_cache_clear_button">Svuota cache immagini</string>
+    <string name="article_image_cache_clear_message">Eliminare da questo dispositivo le immagini degli articoli scaricate? Gli articoli continueranno a mostrare le immagini remote quando disponibili.</string>
+    <string name="article_image_cache_clear_confirm">Svuota cache</string>
 </resources>

@@ -3,6 +3,7 @@ package com.capyreader.app.ui.articles
 import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +11,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import com.capyreader.app.R
+import com.capyreader.app.articleimages.ArticleImageCacheCleaner
+import com.capyreader.app.articleimages.ArticleImageDownloader
+import com.capyreader.app.articleimages.ArticleImagePreloader
+import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.isOnWifi
 import com.capyreader.app.common.toast
 import com.capyreader.app.notifications.NotificationHelper
@@ -30,6 +35,7 @@ import com.jocmp.capy.Folder
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.SavedSearch
 import com.jocmp.capy.articles.ArticleContent
+import com.jocmp.capy.articles.CachedArticleImage
 import com.jocmp.capy.articles.SidebarItem
 import com.jocmp.capy.common.UnauthorizedError
 import com.jocmp.capy.common.launchIO
@@ -38,6 +44,8 @@ import com.jocmp.capy.common.withIOContext
 import com.jocmp.capy.common.withUIContext
 import com.jocmp.capy.countToday
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleFullContentRecords
+import com.jocmp.capy.persistence.ArticleImageRecords
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,12 +69,20 @@ class ArticleScreenViewModel(
     private val appPreferences: AppPreferences,
     private val application: Application,
     private val notificationHelper: NotificationHelper,
+    private val articleImageRecords: ArticleImageRecords,
+    private val articleImagePreloader: ArticleImagePreloader,
+    private val articleImageDownloader: ArticleImageDownloader,
+    private val articleImageStore: ArticleImageStore,
+    private val articleImageCacheCleaner: ArticleImageCacheCleaner,
+    private val articleFullContentRecords: ArticleFullContentRecords,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val syncFlushInterval: Duration? = SYNC_FLUSH_INTERVAL,
 ) : AndroidViewModel(application) {
     private var refreshJob: Job? = null
 
     private var fullContentJob: Job? = null
+
+    val preloadedArticles = mutableStateMapOf<String, Article>()
 
     var refreshSkipReason by mutableStateOf<RefreshSkipReason?>(null)
         private set
@@ -397,6 +413,7 @@ class ArticleScreenViewModel(
     fun deletePage(articleID: String) {
         viewModelScope.launchIO {
             account.deletePage(articleID)
+            articleImageCacheCleaner.cleanup()
         }
     }
 
@@ -413,6 +430,7 @@ class ArticleScreenViewModel(
         viewModelScope.launchIO {
             account.removeFeed(feedID = feedID)
                 .onSuccess {
+                    articleImageCacheCleaner.cleanup()
                     resetToDefaultFilter()
                 }
         }
@@ -425,6 +443,7 @@ class ArticleScreenViewModel(
         viewModelScope.launchIO {
             account.removeFolder(folderTitle).fold(
                 onSuccess = {
+                    articleImageCacheCleaner.cleanup()
                     resetToDefaultFilter()
                     completion(Result.success(Unit))
                 },
@@ -454,6 +473,8 @@ class ArticleScreenViewModel(
                     _showUnauthorizedMessage = UnauthorizedMessageState.SHOW
                 }
             }
+            articleImageCacheCleaner.cleanup()
+            articleImagePreloader.enqueue()
 
             launchIO {
                 WidgetUpdater.update(context)
@@ -563,7 +584,7 @@ class ArticleScreenViewModel(
         }
 
         viewModelScope.launchIO {
-            val article = buildArticle(articleID) ?: return@launchIO
+            val article = preloadedArticles.remove(articleID) ?: buildArticle(articleID) ?: return@launchIO
             _article = article
 
             launchIO {
@@ -578,6 +599,35 @@ class ArticleScreenViewModel(
                 fullContentJob?.cancel()
 
                 fullContentJob = viewModelScope.launchIO { fetchFullContent(article) }
+            }
+
+            articleImagePreloader.enqueue()
+        }
+    }
+
+    fun preloadAdjacentArticles(articleIDs: List<String?>) {
+        val ids = articleIDs
+            .filterNotNull()
+            .distinct()
+            .filterNot { it == _article?.id }
+
+        if (ids.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launchIO {
+            preloadedArticles.keys
+                .toList()
+                .filterNot { it in ids }
+                .forEach { preloadedArticles.remove(it) }
+
+            ids.forEach { articleID ->
+                if (preloadedArticles.containsKey(articleID)) {
+                    return@forEach
+                }
+
+                val article = buildArticle(articleID, downloadImages = true) ?: return@forEach
+                preloadedArticles[articleID] = article
             }
         }
     }
@@ -742,25 +792,62 @@ class ArticleScreenViewModel(
         return savedSearch.copy(count = counts.getOrDefault(savedSearch.id, 0))
     }
 
-    private suspend fun buildArticle(articleID: String): Article? {
+    private suspend fun buildArticle(
+        articleID: String,
+        downloadImages: Boolean = false,
+    ): Article? {
         val article = account.findArticle(articleID = articleID) ?: return null
+        val cachedFullContent = articleFullContentRecords.find(articleID)
+        val hasCachedFullContent = cachedFullContent != null && article.enableStickyFullContent
 
-        val fullContent = if (enableStickyFullContent && article.enableStickyFullContent) {
+        val fullContent = if (hasCachedFullContent) {
+            Article.FullContentState.LOADED
+        } else if (enableStickyFullContent && article.enableStickyFullContent) {
             Article.FullContentState.LOADING
         } else {
             Article.FullContentState.NONE
         }
 
         val content = when (fullContent) {
+            Article.FullContentState.LOADED -> cachedFullContent?.contentHTML.orEmpty()
             Article.FullContentState.LOADING -> ""
             else -> article.defaultContent
         }
 
+        articleImageRecords.replaceArticleRefs(
+            articleID = article.id,
+            contentHTML = content.ifBlank { article.defaultContent },
+            articleURL = article.url?.toString(),
+            siteURL = article.siteURL,
+        )
+
+        if (downloadImages) {
+            articleImageDownloader.downloadPendingForArticle(articleID)
+        }
+
+        val cachedImages = cachedImagesForArticle(articleID)
+
         return article.copy(
             read = true,
             content = content,
-            fullContent = fullContent
+            fullContent = fullContent,
+            cachedImages = cachedImages,
         )
+    }
+
+    private suspend fun cachedImagesForArticle(articleID: String): List<CachedArticleImage> {
+        return articleImageRecords.findCachedImages(articleID).filter { image ->
+            val file = articleImageStore.fileForRelativePath(image.relativePath)
+            val exists = file != null && file.exists() && file.isFile
+
+            if (exists) {
+                articleImageRecords.touch(image.assetID)
+            } else {
+                articleImageRecords.markPending(image.assetID, "Cached file missing")
+            }
+
+            exists
+        }
     }
 
     fun fetchFullContentAsync(article: Article? = _article) {
@@ -779,6 +866,14 @@ class ArticleScreenViewModel(
 
     fun resetFullContent() {
         val article = _article ?: return
+        viewModelScope.launchIO {
+            articleImageRecords.replaceArticleRefs(
+                articleID = article.id,
+                contentHTML = article.defaultContent,
+                articleURL = article.url?.toString(),
+                siteURL = article.siteURL,
+            )
+        }
 
         _article = article.copy(
             content = article.defaultContent,
@@ -797,9 +892,23 @@ class ArticleScreenViewModel(
             .fold(
                 onSuccess = { value ->
                     if (_article?.id == article.id) {
+                        articleFullContentRecords.upsert(
+                            articleID = article.id,
+                            contentHTML = value,
+                        )
+                        articleImageRecords.replaceArticleRefs(
+                            articleID = article.id,
+                            contentHTML = value,
+                            articleURL = article.url?.toString(),
+                            siteURL = article.siteURL,
+                        )
+                        articleImageDownloader.downloadPendingForArticle(article.id)
+                        val cachedImages = cachedImagesForArticle(article.id)
+
                         _article = article.copy(
                             content = value,
-                            fullContent = Article.FullContentState.LOADED
+                            fullContent = Article.FullContentState.LOADED,
+                            cachedImages = cachedImages,
                         )
                     }
                 },

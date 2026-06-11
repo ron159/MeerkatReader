@@ -113,4 +113,22 @@
     <string name="settings_clear_all_articles_confirm">സ്ഥിരീകരിക്കുക</string>
     <string name="settings_section_mark_all_as_read">എല്ലാം വായിച്ചതായി അടയാളപ്പെടുത്തുക</string>
     <string name="settings_panel_gestures_title">ആംഗ്യങ്ങൾ</string>
+    <string name="reader_image_visibility_show_on_wifi">Wi-Fi ഉപയോഗിക്കുമ്പോൾ മാത്രം ചിത്രങ്ങൾ കാണിക്കുക</string>
+    <string name="article_image_download_mode_label">ചിത്രങ്ങൾ മുൻകൂട്ടി ലോഡ് ചെയ്യൽ</string>
+    <string name="article_image_download_mode_off">ഓഫ്</string>
+    <string name="article_image_download_mode_wifi_only">Wi-Fi മാത്രം</string>
+    <string name="article_image_download_mode_always">Wi-Fiയും മൊബൈൽ ഡാറ്റയും</string>
+    <string name="article_image_cache_size_label">ചിത്ര കാഷ് വലുപ്പം</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">പരിധിയില്ല</string>
+    <string name="article_image_cache_cleanup_label">ചിത്ര കാഷ് വൃത്തിയാക്കൽ</string>
+    <string name="article_image_cache_cleanup_manual">സ്വമേധയാ മാത്രം</string>
+    <string name="article_image_cache_cleanup_weekly">ആഴ്ചതോറും</string>
+    <string name="article_image_cache_cleanup_monthly">മാസംതോറും</string>
+    <string name="article_image_cache_cleanup_always">സിങ്ക് നടക്കുമ്പോഴെല്ലാം</string>
+    <string name="article_image_cache_clear_button">ചിത്ര കാഷ് മായ്‌ക്കുക</string>
+    <string name="article_image_cache_clear_message">ഈ ഉപകരണത്തിൽ നിന്ന് ഡൗൺലോഡ് ചെയ്ത ലേഖന ചിത്രങ്ങൾ ഇല്ലാതാക്കണോ? ലഭ്യമാകുമ്പോൾ ലേഖനങ്ങൾ ദൂരസ്ഥ ചിത്രങ്ങൾ തുടർന്നും കാണിക്കും.</string>
+    <string name="article_image_cache_clear_confirm">കാഷ് മായ്‌ക്കുക</string>
 </resources>

@@ -12,6 +12,7 @@ import com.jocmp.capy.common.TimeHelpers.published
 import com.jocmp.capy.common.transactionWithErrorHandling
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
 import com.jocmp.capy.persistence.FeedRecords
@@ -37,6 +38,7 @@ internal class LocalAccountDelegate(
 ) : AccountDelegate {
     private val feedRecords = FeedRecords(database)
     private val articleRecords = ArticleRecords(database)
+    private val articleImageRecords = ArticleImageRecords(database)
     private val taggingRecords = TaggingRecords(database)
     private val enclosureRecords = EnclosureRecords(database)
 
@@ -289,19 +291,26 @@ internal class LocalAccountDelegate(
 
                 if (parsedItem.id != null && withinCutoff && !blocked) {
                     val enclosureType = parsedItem.enclosures.firstOrNull()?.type
+                    val contentHTML = parsedItem.contentHTML
 
                     database.articlesQueries.create(
                         id = parsedItem.id,
                         feed_id = feed.id,
                         title = parsedItem.title,
                         author = item.author,
-                        content_html = parsedItem.contentHTML,
+                        content_html = contentHTML,
                         url = parsedItem.url,
                         summary = item.summary,
                         extracted_content_url = null,
                         image_url = parsedItem.imageURL,
                         published_at = publishedAt,
                         enclosure_type = enclosureType,
+                    )
+                    articleImageRecords.replaceArticleRefs(
+                        articleID = parsedItem.id,
+                        contentHTML = contentHTML,
+                        articleURL = parsedItem.url,
+                        siteURL = feed.siteURL,
                     )
 
                     articleRecords.createStatus(

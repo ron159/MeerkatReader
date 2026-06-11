@@ -13,7 +13,6 @@ import com.jocmp.capy.articles.FontOption
 import com.jocmp.capy.articles.FontSize
 import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.articles.TextAlignment
-import com.capyreader.app.preferences.AndroidPreferenceStore
 import com.jocmp.capy.preferences.Preference
 import com.jocmp.capy.preferences.PreferenceStore
 import com.jocmp.capy.preferences.getEnum
@@ -74,6 +73,21 @@ class AppPreferences(context: Context) {
 
     val refreshOnWiFiOnly: Preference<Boolean>
         get() = preferenceStore.getBoolean("refresh_on_wifi_only", false)
+
+    val articleImageDownloadMode: Preference<ArticleImageDownloadMode>
+        get() = preferenceStore.getEnum("article_image_download_mode", ArticleImageDownloadMode.default)
+
+    val articleImageCacheSize: Preference<ArticleImageCacheSize>
+        get() = preferenceStore.getEnum("article_image_cache_size", ArticleImageCacheSize.default)
+
+    val articleImageCacheCleanupInterval: Preference<ArticleImageCacheCleanupInterval>
+        get() = preferenceStore.getEnum(
+            "article_image_cache_cleanup_interval",
+            ArticleImageCacheCleanupInterval.default,
+        )
+
+    val lastArticleImageCacheCleanupAt: Preference<Long>
+        get() = preferenceStore.getLong("last_article_image_cache_cleanup_at", 0L)
 
     val paneExpansionIndex: Preference<Int>
         get() = preferenceStore.getInt("pane_expansion_index", DefaultPaneExpansionIndex)

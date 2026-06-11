@@ -2,6 +2,10 @@ package com.capyreader.app.ui.articles
 
 import android.app.Application
 import app.cash.turbine.test
+import com.capyreader.app.articleimages.ArticleImageCacheCleaner
+import com.capyreader.app.articleimages.ArticleImageDownloader
+import com.capyreader.app.articleimages.ArticleImagePreloader
+import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.notifications.NotificationHelper
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
@@ -13,6 +17,8 @@ import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.Feed
 import com.jocmp.capy.Folder
 import com.jocmp.capy.accounts.Source
+import com.jocmp.capy.persistence.ArticleImageRecords
+import com.jocmp.capy.persistence.ArticleFullContentRecords
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +50,12 @@ class ArticleScreenViewModelTest {
     private lateinit var account: Account
     private lateinit var appPreferences: AppPreferences
     private lateinit var notificationHelper: NotificationHelper
+    private lateinit var articleImageRecords: ArticleImageRecords
+    private lateinit var articleImagePreloader: ArticleImagePreloader
+    private lateinit var articleImageDownloader: ArticleImageDownloader
+    private lateinit var articleImageStore: ArticleImageStore
+    private lateinit var articleImageCacheCleaner: ArticleImageCacheCleaner
+    private lateinit var articleFullContentRecords: ArticleFullContentRecords
 
     @Before
     fun setUp() {
@@ -71,6 +83,14 @@ class ArticleScreenViewModelTest {
         }
 
         notificationHelper = mockk(relaxed = true)
+        articleImageRecords = mockk(relaxed = true)
+        coEvery { articleImageRecords.findCachedImages(any()) } returns emptyList()
+        articleImagePreloader = mockk(relaxed = true)
+        articleImageDownloader = mockk(relaxed = true)
+        articleImageStore = mockk(relaxed = true)
+        articleImageCacheCleaner = mockk(relaxed = true)
+        articleFullContentRecords = mockk(relaxed = true)
+        coEvery { articleFullContentRecords.find(any()) } returns null
     }
 
     @After
@@ -224,6 +244,12 @@ class ArticleScreenViewModelTest {
             appPreferences = appPreferences,
             application = application,
             notificationHelper = notificationHelper,
+            articleImageRecords = articleImageRecords,
+            articleImagePreloader = articleImagePreloader,
+            articleImageDownloader = articleImageDownloader,
+            articleImageStore = articleImageStore,
+            articleImageCacheCleaner = articleImageCacheCleaner,
+            articleFullContentRecords = articleFullContentRecords,
             ioDispatcher = testDispatcher,
             syncFlushInterval = syncFlushInterval,
         )

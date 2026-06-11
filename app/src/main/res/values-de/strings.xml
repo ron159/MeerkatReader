@@ -354,4 +354,21 @@
     <string name="widget_receiver_spotlight_title">Spotlight</string>
     <string name="settings_refresh_on_wifi_only">Nur im WLAN aktualisieren</string>
     <string name="refresh_skipped_mobile">Aktualisierung im Mobilfunknetz übersprungen</string>
+    <string name="article_image_download_mode_label">Bilder vorab laden</string>
+    <string name="article_image_download_mode_off">Aus</string>
+    <string name="article_image_download_mode_wifi_only">Nur Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi und mobile Daten</string>
+    <string name="article_image_cache_size_label">Größe des Bildcaches</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Unbegrenzt</string>
+    <string name="article_image_cache_cleanup_label">Bildcache bereinigen</string>
+    <string name="article_image_cache_cleanup_manual">Nur manuell</string>
+    <string name="article_image_cache_cleanup_weekly">Wöchentlich</string>
+    <string name="article_image_cache_cleanup_monthly">Monatlich</string>
+    <string name="article_image_cache_cleanup_always">Bei jeder Synchronisierung</string>
+    <string name="article_image_cache_clear_button">Bildcache löschen</string>
+    <string name="article_image_cache_clear_message">Heruntergeladene Artikelbilder von diesem Gerät löschen? Artikel zeigen weiterhin entfernte Bilder an, wenn sie verfügbar sind.</string>
+    <string name="article_image_cache_clear_confirm">Cache löschen</string>
 </resources>

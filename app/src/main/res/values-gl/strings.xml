@@ -351,4 +351,21 @@
     <string name="article_list_new_articles_pill">Novos artigos</string>
     <string name="settings_refresh_on_wifi_only">Actualizar só con Wi-Fi</string>
     <string name="refresh_skipped_mobile">Omítese a actualización usando rede móbil</string>
+    <string name="article_image_download_mode_label">Precarga de imaxes</string>
+    <string name="article_image_download_mode_off">Desactivada</string>
+    <string name="article_image_download_mode_wifi_only">Só Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi e datos móbiles</string>
+    <string name="article_image_cache_size_label">Tamaño da caché de imaxes</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">Sen límite</string>
+    <string name="article_image_cache_cleanup_label">Limpeza da caché de imaxes</string>
+    <string name="article_image_cache_cleanup_manual">Só manual</string>
+    <string name="article_image_cache_cleanup_weekly">Semanal</string>
+    <string name="article_image_cache_cleanup_monthly">Mensual</string>
+    <string name="article_image_cache_cleanup_always">Cada vez que se sincronice</string>
+    <string name="article_image_cache_clear_button">Limpar a caché de imaxes</string>
+    <string name="article_image_cache_clear_message">Eliminar deste dispositivo as imaxes de artigos descargadas? Os artigos seguirán mostrando imaxes remotas cando estean dispoñibles.</string>
+    <string name="article_image_cache_clear_confirm">Limpar caché</string>
 </resources>

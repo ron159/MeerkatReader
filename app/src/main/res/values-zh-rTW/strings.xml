@@ -356,4 +356,21 @@
     <string name="article_list_new_articles_pill">新文章</string>
     <string name="settings_refresh_on_wifi_only">僅在 Wi-Fi 上重新整理</string>
     <string name="refresh_skipped_mobile">已在行動網路上略過重新整理</string>
+    <string name="article_image_download_mode_label">圖片預載</string>
+    <string name="article_image_download_mode_off">關閉</string>
+    <string name="article_image_download_mode_wifi_only">僅限 Wi-Fi</string>
+    <string name="article_image_download_mode_always">Wi-Fi 和行動數據</string>
+    <string name="article_image_cache_size_label">圖片快取大小</string>
+    <string name="article_image_cache_size_standard">250 MB</string>
+    <string name="article_image_cache_size_large">1 GB</string>
+    <string name="article_image_cache_size_huge">5 GB</string>
+    <string name="article_image_cache_size_unlimited">無限制</string>
+    <string name="article_image_cache_cleanup_label">圖片快取清理</string>
+    <string name="article_image_cache_cleanup_manual">僅手動</string>
+    <string name="article_image_cache_cleanup_weekly">每週</string>
+    <string name="article_image_cache_cleanup_monthly">每月</string>
+    <string name="article_image_cache_cleanup_always">每次同步時</string>
+    <string name="article_image_cache_clear_button">清除圖片快取</string>
+    <string name="article_image_cache_clear_message">要從此裝置刪除已下載的文章圖片嗎？文章仍會在可用時顯示遠端圖片。</string>
+    <string name="article_image_cache_clear_confirm">清除快取</string>
 </resources>
