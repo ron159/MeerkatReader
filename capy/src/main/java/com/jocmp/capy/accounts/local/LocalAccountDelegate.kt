@@ -2,7 +2,10 @@ package com.jocmp.capy.accounts.local
 
 import com.jocmp.capy.AccountDelegate
 import com.jocmp.capy.AccountPreferences
+import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.ArticleFilter
+import com.jocmp.capy.ArticleRuleAction
+import com.jocmp.capy.ArticleRuleField
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
 import com.jocmp.capy.accounts.FeedOption
@@ -16,6 +19,7 @@ import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
 import com.jocmp.capy.persistence.FeedRecords
+import com.jocmp.capy.persistence.SavedSearchRecords
 import com.jocmp.capy.persistence.TaggingRecords
 import com.jocmp.feedfinder.DefaultFeedFinder
 import com.jocmp.feedfinder.FeedFinder
@@ -41,6 +45,7 @@ internal class LocalAccountDelegate(
     private val articleImageRecords = ArticleImageRecords(database)
     private val taggingRecords = TaggingRecords(database)
     private val enclosureRecords = EnclosureRecords(database)
+    private val savedSearchRecords = SavedSearchRecords(database)
 
     override suspend fun refresh(filter: ArticleFilter, cutoffDate: ZonedDateTime?): Result<Unit> {
         when (filter) {
@@ -277,6 +282,7 @@ internal class LocalAccountDelegate(
         updatedAt: ZonedDateTime = nowUTC()
     ) {
         val filters = preferences.filterKeywords.get()
+        val rules = preferences.automationRules.get()
 
         database.transactionWithErrorHandling {
             items.forEach { item ->
@@ -287,9 +293,17 @@ internal class LocalAccountDelegate(
                 )
 
                 val withinCutoff = cutoffDate == null || publishedAt > cutoffDate.toEpochSecond()
-                val blocked = containsFilteredText(parsedItem, filters)
+                val automation = applyAutomationRules(
+                    parsedItem = parsedItem,
+                    feed = feed,
+                    keywordFilters = filters,
+                    rules = rules,
+                )
 
-                if (parsedItem.id != null && withinCutoff && !blocked) {
+                if (parsedItem.id != null && withinCutoff && !automation.mute) {
+                    val isNewArticle = !database.articlesQueries
+                        .statusExists(parsedItem.id)
+                        .executeAsOne()
                     val enclosureType = parsedItem.enclosures.firstOrNull()?.type
                     val contentHTML = parsedItem.contentHTML
 
@@ -319,6 +333,14 @@ internal class LocalAccountDelegate(
                         read = false
                     )
 
+                    if (isNewArticle) {
+                        applyAutomationActions(
+                            articleID = parsedItem.id,
+                            automation = automation,
+                            updatedAt = updatedAt,
+                        )
+                    }
+
                     parsedItem.enclosures.forEach {
                         enclosureRecords.create(
                             url = it.url.toString(),
@@ -333,11 +355,119 @@ internal class LocalAccountDelegate(
         }
     }
 
-    private fun containsFilteredText(parsedItem: ParsedItem, filters: Set<String>): Boolean {
-        return filters.any { keyword ->
-            parsedItem.title.contains(keyword, ignoreCase = true) ||
-                    parsedItem.summary.orEmpty().contains(keyword, ignoreCase = true) ||
-                    parsedItem.contentHTML.orEmpty().contains(keyword, ignoreCase = true)
+    private fun applyAutomationActions(
+        articleID: String,
+        automation: ArticleAutomationResult,
+        updatedAt: ZonedDateTime,
+    ) {
+        if (automation.markRead) {
+            database.articlesQueries.markRead(
+                articleIDs = listOf(articleID),
+                read = true,
+                lastReadAt = updatedAt.toEpochSecond(),
+            )
+        }
+
+        if (automation.star) {
+            database.articlesQueries.markStarred(
+                articleID = articleID,
+                starred = true,
+                lastUnstarredAt = null,
+            )
+        }
+
+        automation.categoryName?.let { categoryName ->
+            val categoryID = "local:$categoryName"
+            savedSearchRecords.upsert(
+                id = categoryID,
+                name = categoryName,
+            )
+            savedSearchRecords.upsertArticle(
+                articleID = articleID,
+                savedSearchID = categoryID,
+            )
+        }
+
+        if (automation.notify) {
+            database.article_notificationsQueries.createNotification(article_id = articleID)
+        }
+    }
+
+    private fun applyAutomationRules(
+        parsedItem: ParsedItem,
+        feed: Feed,
+        keywordFilters: Set<String>,
+        rules: List<ArticleAutomationRule>,
+    ): ArticleAutomationResult {
+        val legacyMuted = keywordFilters.any { keyword ->
+            matchesPattern(parsedItem.title, keyword) ||
+                    matchesPattern(parsedItem.summary.orEmpty(), keyword) ||
+                    matchesPattern(parsedItem.contentHTML.orEmpty(), keyword)
+        }
+
+        return rules
+            .filter { it.enabled && it.pattern.isNotBlank() && it.actions.isNotEmpty() }
+            .filter { it.matches(parsedItem, feed) }
+            .fold(ArticleAutomationResult(mute = legacyMuted)) { result, rule ->
+                val keep = ArticleRuleAction.KEEP in rule.actions
+
+                result.copy(
+                    mute = (result.mute || ArticleRuleAction.MUTE in rule.actions) && !keep,
+                    markRead = result.markRead || ArticleRuleAction.MARK_READ in rule.actions,
+                    star = result.star || ArticleRuleAction.STAR in rule.actions,
+                    categoryName = result.categoryName ?: rule.categoryName(),
+                    notify = result.notify || ArticleRuleAction.NOTIFY in rule.actions,
+                )
+            }
+    }
+
+    private fun ArticleAutomationRule.categoryName(): String? {
+        if (ArticleRuleAction.CATEGORIZE !in actions) {
+            return null
+        }
+
+        return categoryName.trim().ifBlank { name.trim() }.ifBlank { null }
+    }
+
+    private fun ArticleAutomationRule.matches(parsedItem: ParsedItem, feed: Feed): Boolean {
+        return fieldsFor(field, parsedItem, feed).any { value ->
+            matchesPattern(value, pattern)
+        }
+    }
+
+    private fun fieldsFor(field: ArticleRuleField, parsedItem: ParsedItem, feed: Feed): List<String> {
+        val content = "${parsedItem.summary.orEmpty()}\n${parsedItem.contentHTML.orEmpty()}"
+
+        return when (field) {
+            ArticleRuleField.ANY -> listOf(
+                feed.title,
+                feed.feedURL,
+                parsedItem.title,
+                parsedItem.author.orEmpty(),
+                content,
+            )
+
+            ArticleRuleField.FEED -> listOf(feed.title, feed.feedURL)
+            ArticleRuleField.AUTHOR -> listOf(parsedItem.author.orEmpty())
+            ArticleRuleField.TITLE -> listOf(parsedItem.title)
+            ArticleRuleField.CONTENT -> listOf(content)
+        }
+    }
+
+    private fun matchesPattern(value: String, pattern: String): Boolean {
+        val query = pattern.trim()
+
+        if (query.isEmpty()) {
+            return false
+        }
+
+        return if (query.length > 2 && query.startsWith("/") && query.endsWith("/")) {
+            runCatching {
+                Regex(query.substring(1, query.lastIndex), RegexOption.IGNORE_CASE)
+                    .containsMatchIn(value)
+            }.getOrDefault(false)
+        } else {
+            value.contains(query, ignoreCase = true)
         }
     }
 
@@ -388,6 +518,14 @@ internal class LocalAccountDelegate(
         private const val MAX_CONCURRENT_FETCHES = 4
     }
 }
+
+private data class ArticleAutomationResult(
+    val mute: Boolean = false,
+    val markRead: Boolean = false,
+    val star: Boolean = false,
+    val categoryName: String? = null,
+    val notify: Boolean = false,
+)
 
 internal val RssItem.contentHTML: String?
     get() {

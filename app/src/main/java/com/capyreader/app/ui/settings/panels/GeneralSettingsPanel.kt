@@ -70,11 +70,15 @@ fun GeneralSettingsPanel(
     onNavigateToNotifications: () -> Unit,
 ) {
     val keywords by viewModel.filterKeywords.collectAsStateWithLifecycle()
+    val rules by viewModel.automationRules.collectAsStateWithLifecycle()
 
     val filterKeywords = FilterKeywords(
         keywords = keywords.toList().sortedWith(compareBy(CASE_INSENSITIVE_ORDER) { it }),
         remove = viewModel::removeFilterKeyword,
         add = viewModel::addFilterKeyword,
+        rules = rules,
+        removeRule = viewModel::removeAutomationRule,
+        addRule = viewModel::addAutomationRule,
     )
 
     CompositionLocalProvider(

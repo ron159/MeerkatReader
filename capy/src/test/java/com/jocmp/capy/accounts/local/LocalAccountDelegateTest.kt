@@ -2,7 +2,10 @@ package com.jocmp.capy.accounts.local
 
 import com.jocmp.capy.AccountDelegate
 import com.jocmp.capy.AccountPreferences
+import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.ArticleFilter
+import com.jocmp.capy.ArticleRuleAction
+import com.jocmp.capy.ArticleRuleField
 import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.accounts.AddFeedResult
@@ -153,6 +156,96 @@ class LocalAccountDelegateTest {
 
         assertEquals(expected = 1, actual = feeds.size)
         assertEquals(expected = 1, actual = articlesCount)
+    }
+
+    @Test
+    fun refreshAll_appliesAutomationRules() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Apple coverage",
+                    field = ArticleRuleField.AUTHOR,
+                    pattern = "Ed Zitron",
+                    actions = setOf(
+                        ArticleRuleAction.MARK_READ,
+                        ArticleRuleAction.STAR,
+                        ArticleRuleAction.CATEGORIZE,
+                        ArticleRuleAction.NOTIFY,
+                    ),
+                    categoryName = "Apple",
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)!!
+        val notifications = database
+            .article_notificationsQueries
+            .notificationsByID(listOf(item.link!!))
+            .executeAsList()
+        val savedSearchArticles = database
+            .saved_searchesQueries
+            .articlesBySavedSearchID("local:Apple")
+            .executeAsList()
+
+        assertTrue(article.read)
+        assertTrue(article.starred)
+        assertEquals(expected = 1, actual = notifications.size)
+        assertEquals(
+            expected = listOf(item.link!!, oldItem.link!!),
+            actual = savedSearchArticles,
+        )
+    }
+
+    @Test
+    fun refreshAll_automationKeepOverridesKeywordFilter() = runTest {
+        accountPreferences.filterKeywords.set(setOf("Apple Intelligence"))
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Keep Ed",
+                    field = ArticleRuleField.AUTHOR,
+                    pattern = "Ed Zitron",
+                    actions = setOf(ArticleRuleAction.KEEP),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        assertNotNull(ArticleRecords(database).find(articleID = item.link!!))
+    }
+
+    @Test
+    fun refreshAll_automationActionsOnlyApplyOnFirstImport() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Star Apple",
+                    field = ArticleRuleField.TITLE,
+                    pattern = "Tim Cook",
+                    actions = setOf(ArticleRuleAction.STAR),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+        ArticleRecords(database).removeStar(item.link!!)
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)!!
+
+        assertEquals(expected = false, actual = article.starred)
     }
 
     @Test

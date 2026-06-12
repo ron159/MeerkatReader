@@ -37,12 +37,19 @@ fun FiltersItem() {
             DialogCard {
                 FiltersView(
                     keywords = keywords.keywords,
-                    onAdd = {
+                    onAddKeyword = {
                         keywords.add(it)
                     },
-                    onRemove = {
+                    onRemoveKeyword = {
                         keywords.remove(it)
-                    }
+                    },
+                    rules = keywords.rules,
+                    onAddRule = {
+                        keywords.addRule(it)
+                    },
+                    onRemoveRule = {
+                        keywords.removeRule(it)
+                    },
                 )
             }
         }

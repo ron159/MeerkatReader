@@ -11,6 +11,7 @@ import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.refresher.RefreshScheduler
 import com.jocmp.capy.Account
+import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.accounts.AutoDelete
 import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.preferences.getAndSet
@@ -61,6 +62,11 @@ class GeneralSettingsViewModel(
     val filterKeywords = account
         .preferences
         .filterKeywords
+        .stateIn(viewModelScope)
+
+    val automationRules = account
+        .preferences
+        .automationRules
         .stateIn(viewModelScope)
 
     fun updateRefreshInterval(interval: RefreshInterval) {
@@ -133,6 +139,18 @@ class GeneralSettingsViewModel(
     fun removeFilterKeyword(keyword: String) {
         account.preferences.filterKeywords.getAndSet { list ->
             list.toMutableSet().apply { remove(keyword) }
+        }
+    }
+
+    fun addAutomationRule(rule: ArticleAutomationRule) {
+        account.preferences.automationRules.getAndSet { rules ->
+            rules + rule
+        }
+    }
+
+    fun removeAutomationRule(rule: ArticleAutomationRule) {
+        account.preferences.automationRules.getAndSet { rules ->
+            rules.filterNot { it.id == rule.id }
         }
     }
 

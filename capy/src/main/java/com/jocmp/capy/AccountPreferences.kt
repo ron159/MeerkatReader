@@ -6,10 +6,15 @@ import com.jocmp.capy.common.TimeHelpers
 import com.jocmp.capy.preferences.Preference
 import com.jocmp.capy.preferences.PreferenceStore
 import com.jocmp.capy.preferences.getEnum
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class AccountPreferences(
     private val store: PreferenceStore,
 ) {
+    private val json = Json { ignoreUnknownKeys = true }
+
     val source: Preference<Source>
         get() = store.getEnum("source", Source.LOCAL)
 
@@ -30,6 +35,14 @@ class AccountPreferences(
 
     val filterKeywords: Preference<Set<String>>
         get() = store.getStringSet("keyword_blocklist")
+
+    val automationRules: Preference<List<ArticleAutomationRule>>
+        get() = store.getObject(
+            key = "article_automation_rules",
+            defaultValue = emptyList(),
+            serializer = { json.encodeToString(it) },
+            deserializer = { json.decodeFromString(it) },
+        )
 
     val canSaveArticleExternally: Preference<Boolean>
         get() = store.getBoolean("can_save_article_externally", false)
