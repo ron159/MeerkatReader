@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.capyreader.app.preferences.AppPreferences
+import com.capyreader.app.transfers.CapyBackupFile
 import com.capyreader.app.transfers.OPMLImportWorker
 import com.capyreader.app.transfers.OPMLImportWorker.Companion.PROGRESS_CURRENT_COUNT
 import com.capyreader.app.transfers.OPMLImportWorker.Companion.PROGRESS_TOTAL
@@ -32,6 +33,9 @@ class AccountSettingsViewModel(
     val accountSource: Source = account.source
 
     var importProgress by mutableStateOf<ImportProgress?>(null)
+        private set
+
+    var backupImportInProgress by mutableStateOf(false)
         private set
 
     val accountURL = account.preferences.url.get()
@@ -69,6 +73,20 @@ class AccountSettingsViewModel(
                         )
                     }
                 }
+        }
+    }
+
+    fun startBackupImport(uri: Uri?) {
+        uri ?: return
+
+        viewModelScope.launch {
+            backupImportInProgress = true
+
+            try {
+                CapyBackupFile(applicationContext).restore(account, uri)
+            } finally {
+                backupImportInProgress = false
+            }
         }
     }
 

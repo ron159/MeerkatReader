@@ -22,6 +22,7 @@ class ArticleRenderer(
         colors: Map<String, String>,
         hideImages: Boolean,
         feedName: String = article.feedName,
+        articleTopMargin: String = "0px",
     ): String {
         val fontFamily = fontOption.get()
         val showPlaceholderTitle = article.title.isBlank()
@@ -61,6 +62,7 @@ class ArticleRenderer(
             "title_font_size" to "${titleFontSize.get()}px",
             "title_text_align" to textAlignment.get().toCSS,
             "title_font_family" to titleFontFamily.slug,
+            "article_top_margin" to articleTopMargin,
             "body" to content,
         )
 

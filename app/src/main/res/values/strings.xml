@@ -144,6 +144,9 @@
     <string name="refresh_skipped_mobile">Refresh skipped on mobile network</string>
     <string name="opml_import_button_text">Import from File</string>
     <string name="opml_export_button_text">Export to OPML</string>
+    <string name="backup_import_button_text">Restore from Backup</string>
+    <string name="backup_import_button_text_in_progress">Restoring backup…</string>
+    <string name="backup_export_button_text">Export Backup</string>
     <string name="opml_import_progress_content_text_start">Starting import</string>
     <string name="settings_import_progress_placeholder">Importing subscriptions…</string>
     <string name="settings_import_progress">Importing subscriptions %1$d of %2$d</string>
@@ -211,6 +214,7 @@
     <string name="feed_list_top_bar_close_search">Dismiss search</string>
     <string name="settings_panel_general_title">General</string>
     <string name="settings_panel_display_title">Display &amp; Appearance</string>
+    <string name="settings_panel_ai_title">AI</string>
     <string name="settings_panel_notifications_title">Notifications</string>
     <string name="settings_panel_gestures_title">Gestures</string>
     <string name="settings_account_title">Account</string>
@@ -233,11 +237,43 @@
     <string name="settings_article_list_title">Article List</string>
     <string name="opml_exporter_success">Export complete</string>
     <string name="opml_exporter_failure">Export failed</string>
+    <string name="backup_exporter_success">Backup exported</string>
+    <string name="backup_exporter_failure">Backup export failed</string>
+    <string name="backup_importer_success">Backup restored</string>
+    <string name="backup_importer_failure">Backup restore failed</string>
+    <string name="backup_importer_source_mismatch">Backup account type does not match the current account</string>
     <string name="starred_export_button_text">Export Starred Articles</string>
     <string name="starred_exporter_success">Export complete</string>
     <string name="starred_exporter_failure">Export failed</string>
     <string name="settings_reader_title">Reader</string>
     <string name="settings_options_reader_pin_top_toolbar">Pin Toolbars</string>
+
+    <string name="ai_provider_openai_compatible">OpenAI-compatible</string>
+    <string name="ai_provider_deepseek" translatable="false">DeepSeek</string>
+    <string name="ai_settings_enabled">Enable AI actions</string>
+    <string name="ai_settings_privacy_notice">Article content is sent to your configured third-party AI provider.</string>
+    <string name="ai_settings_privacy_detail">When you use Translate, Summarize, or Key Points, this app sends the article title, URL, and text content to the selected AI API. Results are cached locally to avoid repeat requests.</string>
+    <string name="ai_settings_provider">Provider</string>
+    <string name="ai_settings_base_url">API base URL</string>
+    <string name="ai_settings_api_key">API key</string>
+    <string name="ai_settings_model">Model</string>
+    <string name="ai_settings_language">Language</string>
+    <string name="ai_settings_translation_mode">Translation display</string>
+    <string name="ai_translation_mode_replace">Replace original</string>
+    <string name="ai_translation_mode_parallel">Side-by-side</string>
+    <string name="ai_settings_prompts">Prompts</string>
+    <string name="ai_settings_summary_prompt">Summary prompt</string>
+    <string name="ai_settings_translation_prompt">Translation prompt</string>
+    <string name="ai_settings_key_points_prompt">Key points prompt</string>
+    <string name="ai_settings_prompt_variables">Available variables: {language}, {title}, {url}, {content}. If {content} is omitted, the app appends the article title, URL, and content automatically.</string>
+    <string name="article_ai_title">AI</string>
+    <string name="article_ai_privacy_notice">This sends the article content to your configured AI provider. Cached results are reused unless you regenerate.</string>
+    <string name="article_ai_translate">Translate</string>
+    <string name="article_ai_summarize">Summarize</string>
+    <string name="article_ai_key_points">Key Points</string>
+    <string name="article_ai_loading">Requesting AI…</string>
+    <string name="article_ai_loading_short">Working…</string>
+    <string name="article_ai_regenerate">Regenerate</string>
 
     <string name="article_bottom_bar_next_article">Go to next article</string>
     <string name="settings_gestures_reader_swipe_down">Swipe Down</string>

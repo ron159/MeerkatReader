@@ -17,6 +17,7 @@ import com.jocmp.capy.preferences.Preference
 import com.jocmp.capy.preferences.PreferenceStore
 import com.jocmp.capy.preferences.getEnum
 import kotlinx.serialization.json.Json
+import java.util.Locale
 
 class AppPreferences(context: Context) {
     private val preferenceStore: PreferenceStore = AndroidPreferenceStore(
@@ -26,6 +27,8 @@ class AppPreferences(context: Context) {
     val readerOptions = ReaderOptions(preferenceStore)
 
     val articleListOptions = ArticleListOptions(preferenceStore)
+
+    val aiOptions = AiOptions(preferenceStore)
 
     val isLoggedIn
         get() = accountID.get().isNotBlank()
@@ -211,5 +214,49 @@ class AppPreferences(context: Context) {
         val markReadOnScroll: Preference<Boolean>
             get() = preferenceStore.getBoolean("article_list_mark_read_on_scroll", false)
 
+    }
+
+    class AiOptions(private val preferenceStore: PreferenceStore) {
+        val enabled: Preference<Boolean>
+            get() = preferenceStore.getBoolean("ai_enabled", false)
+
+        val provider: Preference<AiProvider>
+            get() = preferenceStore.getEnum("ai_provider", AiProvider.default)
+
+        val baseUrl: Preference<String>
+            get() = preferenceStore.getString("ai_base_url", AiProvider.default.defaultBaseUrl)
+
+        val apiKey: Preference<String>
+            get() = preferenceStore.getString("ai_api_key")
+
+        val model: Preference<String>
+            get() = preferenceStore.getString("ai_model", AiProvider.default.defaultModel)
+
+        val language: Preference<String>
+            get() = preferenceStore.getString(
+                "ai_language",
+                Locale.getDefault().displayLanguage.ifBlank { "English" },
+            )
+
+        val translationMode: Preference<AiTranslationMode>
+            get() = preferenceStore.getEnum("ai_translation_mode", AiTranslationMode.default)
+
+        val translatePrompt: Preference<String>
+            get() = preferenceStore.getString(
+                "ai_translate_prompt",
+                com.capyreader.app.ai.ArticleAiPrompts.TRANSLATE,
+            )
+
+        val summarizePrompt: Preference<String>
+            get() = preferenceStore.getString(
+                "ai_summarize_prompt",
+                com.capyreader.app.ai.ArticleAiPrompts.SUMMARIZE,
+            )
+
+        val keyPointsPrompt: Preference<String>
+            get() = preferenceStore.getString(
+                "ai_key_points_prompt",
+                com.capyreader.app.ai.ArticleAiPrompts.KEY_POINTS,
+            )
     }
 }

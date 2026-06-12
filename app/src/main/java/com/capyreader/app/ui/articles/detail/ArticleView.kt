@@ -21,8 +21,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,11 +33,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import androidx.paging.compose.LazyPagingItems
 import com.capyreader.app.common.AudioEnclosure
 import com.capyreader.app.common.Media
+import com.capyreader.app.ai.ArticleAiAction
+import com.capyreader.app.ai.ArticleAiDisplayState
+import com.capyreader.app.ai.ArticleAiRepository
+import com.capyreader.app.ai.withAiDisplayContent
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleVerticalSwipe
 import com.capyreader.app.preferences.ArticleVerticalSwipe.DISABLED
@@ -48,6 +54,7 @@ import com.capyreader.app.ui.collectChangesWithDefault
 import com.capyreader.app.ui.components.pullrefresh.SwipeRefresh
 import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.jocmp.capy.Article
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Composable
@@ -70,8 +77,10 @@ fun ArticleView(
     isAudioPlaying: Boolean = false,
     isFullscreen: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
-    appPreferences: AppPreferences = koinInject()
+    appPreferences: AppPreferences = koinInject(),
+    articleAiRepository: ArticleAiRepository = koinInject(),
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val enableHorizontalPager by appPreferences.readerOptions.enableHorizontaPagination.collectChangesWithDefault()
     val fullContent = LocalFullContent.current
     val openLink = articleOpenLink(article)
@@ -131,8 +140,61 @@ fun ArticleView(
     }
 
     val pinToolbars by appPreferences.readerOptions.pinToolbars.collectChangesWithDefault()
+    val aiEnabled by appPreferences.aiOptions.enabled.collectChangesWithDefault()
+    val aiTranslationMode by appPreferences.aiOptions.translationMode.collectChangesWithDefault()
     val scrollState = rememberArticleScrollState()
     val showToolBar = pinToolbars || !scrollState.isScrollingDown
+    var isAiSheetOpen by rememberSaveable(article.id) { mutableStateOf(false) }
+    var topAiState by remember(article.id) { mutableStateOf<ArticleAiDisplayState?>(null) }
+    var translationAiState by remember(article.id) { mutableStateOf<ArticleAiDisplayState?>(null) }
+
+    fun runAiAction(action: ArticleAiAction, forceRefresh: Boolean) {
+        isAiSheetOpen = false
+
+        val loadingState = ArticleAiDisplayState(
+            action = action,
+            isLoading = true,
+        )
+
+        if (action == ArticleAiAction.TRANSLATE) {
+            translationAiState = loadingState
+        } else {
+            topAiState = loadingState
+        }
+
+        coroutineScope.launch {
+            articleAiRepository.run(action, article, forceRefresh)
+                .fold(
+                    onSuccess = {
+                        val resultState = ArticleAiDisplayState(action = action, result = it)
+                        if (action == ArticleAiAction.TRANSLATE) {
+                            translationAiState = resultState
+                        } else {
+                            topAiState = resultState
+                        }
+                    },
+                    onFailure = {
+                        val errorState = ArticleAiDisplayState(
+                            action = action,
+                            error = it.message ?: it::class.simpleName ?: "AI request failed",
+                        )
+                        if (action == ArticleAiAction.TRANSLATE) {
+                            translationAiState = errorState
+                        } else {
+                            topAiState = errorState
+                        }
+                    }
+                )
+        }
+    }
+
+    val displayArticle = remember(article, topAiState, translationAiState, aiTranslationMode, aiEnabled) {
+        article.withAiDisplayContent(
+            topState = topAiState.takeIf { aiEnabled },
+            translationState = translationAiState.takeIf { aiEnabled },
+            translationMode = aiTranslationMode,
+        )
+    }
 
     LaunchedEffect(article.id) {
         scrollState.reset()
@@ -168,15 +230,14 @@ fun ArticleView(
                         onSelectNext = { selectNext() },
                     ) {
                         ArticleReaderPool(
-                            article = article,
-                            previousArticle = previousArticleId?.let(preloadedArticles::get),
-                            nextArticle = nextArticleId?.let(preloadedArticles::get),
+                            article = displayArticle,
                             pinToolbars = pinToolbars,
                             onSelectMedia = onSelectMedia,
                             onSelectAudio = onSelectAudio,
                             onPauseAudio = onPauseAudio,
                             currentAudioUrl = currentAudioUrl,
                             isAudioPlaying = isAudioPlaying,
+                            onScrollChanged = scrollState::updateFromScroll,
                         )
                     }
                 }
@@ -202,7 +263,19 @@ fun ArticleView(
                 onToggleRead = onToggleRead,
                 onToggleStar = onToggleStar,
                 onSelectNext = { selectNext() },
+                showAiAction = aiEnabled,
+                isAiLoading = topAiState?.isLoading == true || translationAiState?.isLoading == true,
+                onOpenAi = { isAiSheetOpen = true },
             )
+
+            if (isAiSheetOpen) {
+                ArticleAiSheet(
+                    topState = topAiState,
+                    translationState = translationAiState,
+                    onRunAction = ::runAiAction,
+                    onDismiss = { isAiSheetOpen = false },
+                )
+            }
 
             SnackbarHost(
                 hostState = snackbarHostState,
@@ -225,38 +298,27 @@ fun ArticleView(
 @Composable
 private fun ArticleReaderPool(
     article: Article,
-    previousArticle: Article?,
-    nextArticle: Article?,
     pinToolbars: Boolean,
     onSelectMedia: (media: Media) -> Unit,
     onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
+    onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
 ) {
-    val readerArticles = remember(article, previousArticle, nextArticle) {
-        listOfNotNull(previousArticle, article, nextArticle).distinctBy { it.id }
-    }
-
     Box(Modifier.fillMaxSize()) {
-        readerArticles.forEach { targetArticle ->
-            val isCurrent = targetArticle.id == article.id
-
-            key(targetArticle.id) {
-                ArticleReader(
-                    article = targetArticle,
-                    pinToolbars = pinToolbars,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(if (isCurrent) 1f else 0f)
-                        .zIndex(if (isCurrent) 1f else 0f),
-                    onSelectMedia = onSelectMedia,
-                    onSelectAudio = onSelectAudio,
-                    onPauseAudio = onPauseAudio,
-                    currentAudioUrl = currentAudioUrl,
-                    isAudioPlaying = isAudioPlaying,
-                )
-            }
+        key(article.id) {
+            ArticleReader(
+                article = article,
+                pinToolbars = pinToolbars,
+                modifier = Modifier.fillMaxSize(),
+                onSelectMedia = onSelectMedia,
+                onSelectAudio = onSelectAudio,
+                onPauseAudio = onPauseAudio,
+                currentAudioUrl = currentAudioUrl,
+                isAudioPlaying = isAudioPlaying,
+                onScrollChanged = onScrollChanged,
+            )
         }
     }
 }

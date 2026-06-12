@@ -25,6 +25,14 @@ internal class ArticleScrollState(
 
     val showTopDivider: Boolean by derivedStateOf { _contentOffset.floatValue > dividerThreshold }
 
+    fun updateFromScroll(scrollY: Int, oldScrollY: Int) {
+        val delta = scrollY - oldScrollY
+        if (abs(delta) > 2) {
+            _isScrollingDown.value = delta > 0
+        }
+        _contentOffset.floatValue = scrollY.toFloat()
+    }
+
     val connection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
             if (abs(available.y) > 2f) {

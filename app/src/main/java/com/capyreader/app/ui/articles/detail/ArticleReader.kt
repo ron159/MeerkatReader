@@ -1,26 +1,16 @@
 package com.capyreader.app.ui.articles.detail
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.capyreader.app.R
@@ -33,10 +23,8 @@ import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.ui.ConnectivityType
 import com.capyreader.app.ui.LocalConnectivity
 import com.capyreader.app.ui.LocalLinkOpener
-import com.capyreader.app.ui.articles.ColumnScrollbar
 import com.capyreader.app.ui.articles.media.ImageSaver
 import com.capyreader.app.ui.components.WebView
-import com.capyreader.app.ui.components.WebViewState
 import com.capyreader.app.ui.components.rememberSaveableShareLink
 import com.capyreader.app.ui.components.rememberWebViewState
 import com.capyreader.app.ui.components.LocalSnackbarHost
@@ -57,6 +45,7 @@ fun ArticleReader(
     onPauseAudio: () -> Unit = {},
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
+    onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
 ) {
     val (shareLink, setShareLink) = rememberSaveableShareLink()
     val (shareImageUrl, setImageUrl) = rememberSaveable { mutableStateOf<String?>(null) }
@@ -111,13 +100,13 @@ fun ArticleReader(
     }
 
     val webViewState = rememberWebViewState(
-        key = article.id,
         onNavigateToMedia = onSelectMedia,
         onRequestLinkDialog = { setShareLink(it) },
         onRequestImageDialog = { setImageUrl(it) },
         onOpenLink = { linkOpener.open(it) },
         onOpenAudioPlayer = onSelectAudio,
         onPauseAudio = onPauseAudio,
+        onScrollChanged = onScrollChanged,
         currentAudioUrl = currentAudioUrl,
         isAudioPlaying = isAudioPlaying,
     )
@@ -128,6 +117,8 @@ fun ArticleReader(
 
     val showImages = rememberImageVisibility()
     val improveTalkback by rememberTalkbackPreference()
+    val articleTopMarginPx =
+        if (pinToolbars) 0 else ArticleBarDefaults.topBarOffset.value.roundToInt()
 
     if (improveTalkback) {
         Column(
@@ -138,10 +129,17 @@ fun ArticleReader(
                 state = webViewState,
                 article = article,
                 showImages = showImages,
+                articleTopMarginPx = articleTopMarginPx,
             )
         }
     } else {
-        ScrollableWebView(webViewState, article, showImages, pinToolbars, modifier)
+        WebView(
+            modifier = modifier.fillMaxSize(),
+            state = webViewState,
+            article = article,
+            showImages = showImages,
+            articleTopMarginPx = articleTopMarginPx,
+        )
     }
 
     ArticleStyleListener(webView = webViewState.webView)
@@ -164,66 +162,6 @@ fun ArticleReader(
             onSave = { saveImage(shareImageUrl) },
             onShare = { shareImage(shareImageUrl) },
         )
-    }
-}
-
-@Composable
-fun ScrollableWebView(
-    webViewState: WebViewState,
-    article: Article,
-    showImages: Boolean,
-    pinToolbars: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    var maxHeight by remember { mutableFloatStateOf(0f) }
-    val scrollState = rememberSaveable(article.id, saver = ScrollState.Saver) {
-        ScrollState(initial = 0)
-    }
-
-    var lastScrollYPercent by rememberSaveable(article.id) { mutableFloatStateOf(0f) }
-
-    CornerTapGestureScroll(
-        maxArticleHeight = maxHeight,
-        scrollState = scrollState,
-        pinToolbars = pinToolbars,
-    ) {
-        ColumnScrollbar(state = scrollState) {
-            Column(
-                modifier = Modifier
-                    .then(modifier)
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .onGloballyPositioned { coordinates ->
-                        maxHeight = coordinates.size.height.toFloat()
-                    }
-            ) {
-                if (!pinToolbars) {
-                    Spacer(Modifier.height(ArticleBarDefaults.topBarOffset))
-                }
-                WebView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    state = webViewState,
-                    article = article,
-                    showImages = showImages,
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        snapshotFlow { scrollState.value to maxHeight }
-            .collect { (value, height) ->
-                if (value > 0 && height > 0f) {
-                    lastScrollYPercent = value / height
-                }
-            }
-    }
-    LaunchedEffect(scrollState.maxValue, maxHeight) {
-        if (scrollState.maxValue > 0 && maxHeight > 0) {
-            scrollState.scrollTo((lastScrollYPercent * maxHeight).roundToInt())
-        }
     }
 }
 

@@ -37,6 +37,7 @@ import com.capyreader.app.common.GetOPMLContent
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.common.titleKey
 import com.capyreader.app.preferences.AppTheme
+import com.capyreader.app.transfers.CapyBackupFile
 import com.capyreader.app.transfers.OPMLExporter
 import com.capyreader.app.transfers.StarredExporter
 import com.capyreader.app.ui.components.FormSection
@@ -62,11 +63,25 @@ fun AccountSettingsPanel(
         viewModel.startOPMLImport(uri = uri)
     }
 
+    val backupImporter = rememberLauncherForActivityResult(
+        GetOPMLContent()
+    ) { uri ->
+        viewModel.startBackupImport(uri = uri)
+    }
+
     val opmlExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/xml")
     ) { uri ->
         coroutineScope.launch {
             OPMLExporter(context).export(viewModel.account, target = uri)
+        }
+    }
+
+    val backupExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        coroutineScope.launch {
+            CapyBackupFile(context).export(viewModel.account, target = uri)
         }
     }
 
@@ -86,13 +101,20 @@ fun AccountSettingsPanel(
         onRequestImport = {
             importer.launch(listOf("text/xml", "text/x-opml", "application/*"))
         },
+        onRequestBackupImport = {
+            backupImporter.launch(listOf("application/json", "text/*", "application/octet-stream"))
+        },
         onRequestExport = {
             opmlExporter.launch(OPMLExporter.DEFAULT_FILE_NAME)
+        },
+        onRequestBackupExport = {
+            backupExporter.launch(CapyBackupFile.DEFAULT_FILE_NAME)
         },
         onRequestStarredExport = {
             starredExporter.launch(StarredExporter.DEFAULT_FILE_NAME)
         },
         importProgress = viewModel.importProgress,
+        backupImportInProgress = viewModel.backupImportInProgress,
         accountSource = viewModel.accountSource,
         accountURL = viewModel.accountURL,
         accountName = viewModel.accountName,
@@ -104,13 +126,16 @@ fun AccountSettingsPanel(
 fun AccountSettingsPanelView(
     onRequestRemoveAccount: () -> Unit,
     onRequestImport: () -> Unit,
+    onRequestBackupImport: () -> Unit,
     onRequestExport: () -> Unit,
+    onRequestBackupExport: () -> Unit,
     onRequestStarredExport: () -> Unit,
     accountSource: Source,
     accountURL: String,
     accountName: String,
     lastRefreshedAt: LastRefreshed,
     importProgress: ImportProgress?,
+    backupImportInProgress: Boolean,
 ) {
     val strings = AccountSettingsStrings.build(accountSource)
     val (isRemoveDialogOpen, setRemoveDialogOpen) = remember { mutableStateOf(false) }
@@ -161,8 +186,8 @@ fun AccountSettingsPanelView(
             }
         }
 
-        if (showImportButton(accountSource)) {
-            FormSection(title = stringResource(R.string.settings_section_import)) {
+        FormSection(title = stringResource(R.string.settings_section_import)) {
+            if (showImportButton(accountSource)) {
                 RowItem {
                     OPMLImportButton(
                         onClick = {
@@ -171,6 +196,12 @@ fun AccountSettingsPanelView(
                         importProgress = importProgress
                     )
                 }
+            }
+            RowItem {
+                BackupImportButton(
+                    onClick = onRequestBackupImport,
+                    inProgress = backupImportInProgress,
+                )
             }
         }
 
@@ -183,6 +214,11 @@ fun AccountSettingsPanelView(
             RowItem {
                 StarredExportButton(
                     onClick = onRequestStarredExport,
+                )
+            }
+            RowItem {
+                BackupExportButton(
+                    onClick = onRequestBackupExport,
                 )
             }
         }
@@ -240,6 +276,38 @@ fun RemoveAccountButton(
     }
 }
 
+@Composable
+fun BackupImportButton(
+    onClick: () -> Unit,
+    inProgress: Boolean,
+) {
+    Button(
+        enabled = !inProgress,
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            if (inProgress) {
+                stringResource(R.string.backup_import_button_text_in_progress)
+            } else {
+                stringResource(R.string.backup_import_button_text)
+            }
+        )
+    }
+}
+
+@Composable
+fun BackupExportButton(
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(stringResource(R.string.backup_export_button_text))
+    }
+}
+
 fun showAccountName(source: Source): Boolean {
     return source != Source.LOCAL
 }
@@ -264,13 +332,16 @@ private fun AccountSettingsPanelViewPreview() {
         AccountSettingsPanelView(
             onRequestRemoveAccount = {},
             onRequestImport = {},
+            onRequestBackupImport = {},
             onRequestExport = {},
+            onRequestBackupExport = {},
             onRequestStarredExport = {},
             accountSource = Source.FEEDBIN,
             accountURL = "",
             accountName = "test@example.com",
             lastRefreshedAt = LastRefreshed.from(1700000000L),
-            importProgress = null
+            importProgress = null,
+            backupImportInProgress = false,
         )
     }
 }
@@ -282,13 +353,16 @@ private fun AccountSettingsPanelViewLocalPreview() {
         AccountSettingsPanelView(
             onRequestRemoveAccount = {},
             onRequestImport = {},
+            onRequestBackupImport = {},
             onRequestExport = {},
+            onRequestBackupExport = {},
             onRequestStarredExport = {},
             accountURL = "",
             accountSource = Source.LOCAL,
             accountName = "test@example.com",
             lastRefreshedAt = LastRefreshed.Never,
-            importProgress = ImportProgress(currentCount = 3, total = 9001)
+            importProgress = ImportProgress(currentCount = 3, total = 9001),
+            backupImportInProgress = true,
         )
     }
 }

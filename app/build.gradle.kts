@@ -158,6 +158,7 @@ dependencies {
     implementation(libs.koin.androidx.workmanager)
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
+    implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)

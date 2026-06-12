@@ -23,7 +23,6 @@ import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.AudioEnclosure
 import com.capyreader.app.common.Media
 import com.capyreader.app.common.WebViewInterface
-import com.capyreader.app.common.rememberTalkbackPreference
 import com.capyreader.app.ui.LocalTimeFormats
 import com.capyreader.app.ui.articles.detail.articleTemplateColors
 import com.capyreader.app.ui.articles.detail.byline
@@ -44,6 +43,7 @@ fun WebView(
     state: WebViewState,
     article: Article? = null,
     showImages: Boolean = true,
+    articleTopMarginPx: Int = 0,
 ) {
     val timeFormats = LocalTimeFormats.current
     AndroidView(
@@ -51,7 +51,7 @@ fun WebView(
         factory = { state.webView },
         update = {
             article?.let {
-                state.loadHtml(article, showImages, timeFormats)
+                state.loadHtml(article, showImages, timeFormats, articleTopMarginPx)
             }
         }
     )
@@ -167,9 +167,14 @@ class WebViewState(
         loadEmpty()
     }
 
-    fun loadHtml(article: Article, showImages: Boolean, timeFormats: DisplayTimeFormats) {
+    fun loadHtml(
+        article: Article,
+        showImages: Boolean,
+        timeFormats: DisplayTimeFormats,
+        articleTopMarginPx: Int,
+    ) {
         val id = article.id
-        val hash = article.content.hashCode()
+        val hash = listOf(article.content, showImages, articleTopMarginPx).hashCode()
 
         if (id == htmlId && hash == contentHash) {
             return
@@ -178,6 +183,7 @@ class WebViewState(
         webView.isVerticalScrollBarEnabled = enableNativeScroll
         htmlId = id
         contentHash = hash
+        webView.scrollTo(0, 0)
 
         val client = webView.webViewClient as? AccompanistWebViewClient
         client?.pageUrl = article.url?.toString()
@@ -188,6 +194,7 @@ class WebViewState(
             byline = article.byline(context = webView.context, formats = timeFormats),
             colors = colors,
             feedName = article.displayFeedName(webView.context),
+            articleTopMargin = "${articleTopMarginPx}px",
         )
 
         webView.loadDataWithBaseURL(
@@ -239,21 +246,15 @@ fun rememberWebViewState(
     onOpenLink: (url: Uri) -> Unit,
     onOpenAudioPlayer: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
+    onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
-    key: String? = null,
 ): WebViewState {
-    val enableNativeScroll by rememberTalkbackPreference()
     val colors = articleTemplateColors()
     val context = LocalContext.current
     val currentAudioUrlState by rememberUpdatedState(currentAudioUrl)
     val isAudioPlayingState by rememberUpdatedState(isAudioPlaying)
-
-    val reset = if (enableNativeScroll) {
-        key
-    } else {
-        null
-    }
+    val scrollChangedState by rememberUpdatedState(onScrollChanged)
 
     val client = remember {
         AccompanistWebViewClient(
@@ -294,12 +295,16 @@ fun rememberWebViewState(
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
             webViewClient = client
+
+            setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                scrollChangedState(scrollY, oldScrollY)
+            }
         }
 
         WebViewState(
             renderer,
             colors,
-            enableNativeScroll = enableNativeScroll,
+            enableNativeScroll = true,
             webView,
         ).also {
             client.state = it

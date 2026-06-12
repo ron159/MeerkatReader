@@ -2,7 +2,12 @@ package com.capyreader.app.ui.articles.detail
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.FiberManualRecord
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
@@ -27,6 +33,7 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -54,6 +61,9 @@ fun ArticleBottomBar(
     onToggleRead: () -> Unit,
     onToggleStar: () -> Unit,
     onSelectNext: () -> Unit,
+    showAiAction: Boolean = false,
+    isAiLoading: Boolean = false,
+    onOpenAi: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -134,6 +144,20 @@ fun ArticleBottomBar(
                         }
                     }
                 }
+                if (showAiAction) {
+                    ToolbarTooltip(
+                        positioning = TooltipAnchorPosition.Above,
+                        message = stringResource(R.string.article_ai_title)
+                    ) {
+                        IconButton(onClick = onOpenAi) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome,
+                                contentDescription = stringResource(R.string.article_ai_title),
+                                modifier = aiIconModifier(isAiLoading)
+                            )
+                        }
+                    }
+                }
                 ToolbarTooltip(
                     positioning = TooltipAnchorPosition.Above,
                     message = stringResource(R.string.article_share)
@@ -149,6 +173,40 @@ fun ArticleBottomBar(
             }
         }
     }
+}
+
+@Composable
+private fun aiIconModifier(isLoading: Boolean): Modifier {
+    if (!isLoading) {
+        return Modifier.size(24.dp)
+    }
+
+    val transition = rememberInfiniteTransition(label = "AiLoading")
+    val pulse = transition.animateFloat(
+        initialValue = 0.86f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 700),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "AiPulse",
+    )
+    val rotation = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600),
+        ),
+        label = "AiRotation",
+    )
+
+    return Modifier
+        .size(24.dp)
+        .graphicsLayer {
+            scaleX = pulse.value
+            scaleY = pulse.value
+            rotationZ = rotation.value
+        }
 }
 
 @Composable

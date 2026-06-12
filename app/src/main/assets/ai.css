@@ -1,0 +1,109 @@
+.ai-card {
+  position: relative;
+  margin: 0 0 1.5rem;
+  padding: 1rem 1rem 1rem 1.15rem;
+  border: 1px solid var(--color-surface-container-highest);
+  border-left: .35rem solid var(--color-primary);
+  border-radius: .75rem;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  box-shadow: 0 .4rem 1.25rem rgb(0 0 0 / 8%);
+}
+
+.ai-card__eyebrow {
+  margin-bottom: .5rem;
+  color: var(--color-on-surface);
+  font-size: .78em;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.ai-card__title {
+  font-weight: 700;
+}
+
+.ai-card__content p:first-child {
+  margin-top: 0;
+}
+
+.ai-card__content p:last-child,
+.ai-card__content ul:last-child {
+  margin-bottom: 0;
+}
+
+.ai-card--error {
+  border-color: var(--color-surface-container-highest);
+  border-left-color: var(--color-on-surface-variant);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+}
+
+.ai-card--loading {
+  overflow: hidden;
+}
+
+.ai-shimmer {
+  height: .85rem;
+  margin: .75rem 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-container-highest),
+    var(--color-surface-variant),
+    var(--color-surface-container-highest)
+  );
+  background-size: 200% 100%;
+  animation: ai-shimmer 1.15s ease-in-out infinite;
+}
+
+.ai-shimmer--wide {
+  width: 96%;
+}
+
+.ai-shimmer--short {
+  width: 58%;
+}
+
+@keyframes ai-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.ai-translation {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+
+.ai-translation-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .5rem;
+  padding: .85rem;
+  border-radius: .85rem;
+  background: var(--color-surface-container);
+}
+
+.ai-translation-row__original {
+  color: var(--color-on-surface-variant);
+  font-size: .92em;
+}
+
+.ai-translation-row__translated {
+  color: var(--color-on-surface);
+  font-weight: 500;
+}
+
+@media only screen and (min-width: 769px) {
+  .ai-translation-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}
