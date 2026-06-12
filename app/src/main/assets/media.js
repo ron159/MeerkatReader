@@ -1,4 +1,6 @@
 const EAGER_IMAGE_COUNT = 3;
+const LONG_PRESS_DELAY_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 12;
 
 function configureVideoTags() {
   [...document.getElementsByTagName("video")].forEach((v) => {
@@ -260,24 +262,85 @@ function cleanAttributes(element) {
 function longPress(element, callback) {
   /** @type {number | undefined} */
   let timer;
+  let startX = 0;
+  let startY = 0;
+  let suppressNextClick = false;
+
+  const clearTimer = () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+
+  const pointFromEvent = (/** @type {MouseEvent | TouchEvent} */ event) => {
+    if ("touches" in event && event.touches.length > 0) {
+      return event.touches[0];
+    }
+
+    if ("changedTouches" in event && event.changedTouches.length > 0) {
+      return event.changedTouches[0];
+    }
+
+    return /** @type {MouseEvent} */ (event);
+  };
 
   const start = (/** @type {Event} */ event) => {
+    const point = pointFromEvent(/** @type {MouseEvent | TouchEvent} */ (event));
+    startX = point.clientX;
+    startY = point.clientY;
+    suppressNextClick = false;
+
+    clearTimer();
     timer = setTimeout(() => {
+      suppressNextClick = true;
       callback(event);
-    }, 500);
+      timer = undefined;
+    }, LONG_PRESS_DELAY_MS);
+  };
+
+  const move = (/** @type {Event} */ event) => {
+    if (timer === undefined) {
+      return;
+    }
+
+    const point = pointFromEvent(/** @type {MouseEvent | TouchEvent} */ (event));
+    const deltaX = Math.abs(point.clientX - startX);
+    const deltaY = Math.abs(point.clientY - startY);
+
+    if (
+      deltaX > LONG_PRESS_MOVE_TOLERANCE_PX ||
+      deltaY > LONG_PRESS_MOVE_TOLERANCE_PX
+    ) {
+      clearTimer();
+    }
   };
 
   const stop = () => {
-    clearTimeout(timer);
+    clearTimer();
   };
 
   element.addEventListener("mousedown", start);
+  element.addEventListener("mousemove", move);
   element.addEventListener("mouseup", stop);
   element.addEventListener("mouseleave", stop);
 
   element.addEventListener("touchstart", start);
+  element.addEventListener("touchmove", move);
   element.addEventListener("touchend", stop);
   element.addEventListener("touchcancel", stop);
+
+  element.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressNextClick) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressNextClick = false;
+    },
+    true,
+  );
 }
 
 window.addEventListener("DOMContentLoaded", () => {
