@@ -35,6 +35,7 @@ import com.capyreader.app.preferences.AppTheme
 import com.capyreader.app.preferences.ArticleImageCacheCleanupInterval
 import com.capyreader.app.preferences.ArticleImageCacheSize
 import com.capyreader.app.preferences.ArticleImageDownloadMode
+import com.capyreader.app.preferences.ArticleStatusListDisplay
 import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
 import com.capyreader.app.ui.articles.MarkReadPosition
@@ -80,6 +81,10 @@ fun DisplaySettingsPanel(
         clearArticleImageCache = viewModel::clearArticleImageCache,
         markReadButtonPosition = markReadButtonPosition,
         updateMarkReadButtonPosition = viewModel::updateMarkReadButtonPosition,
+        unreadDisplay = viewModel.unreadDisplay,
+        updateUnreadDisplay = viewModel::updateUnreadDisplay,
+        starredDisplay = viewModel.starredDisplay,
+        updateStarredDisplay = viewModel::updateStarredDisplay,
         onNavigateToUnreadBadges = onNavigateToUnreadBadges,
         onNavigateToArticleList = onNavigateToArticleList,
     )
@@ -109,6 +114,10 @@ fun DisplaySettingsPanelView(
     updateArticleImageCacheCleanupInterval: (interval: ArticleImageCacheCleanupInterval) -> Unit,
     clearArticleImageCache: () -> Unit,
     updateMarkReadButtonPosition: (position: MarkReadPosition) -> Unit,
+    unreadDisplay: ArticleStatusListDisplay,
+    updateUnreadDisplay: (display: ArticleStatusListDisplay) -> Unit,
+    starredDisplay: ArticleStatusListDisplay,
+    updateStarredDisplay: (display: ArticleStatusListDisplay) -> Unit,
     onNavigateToUnreadBadges: () -> Unit = {},
     onNavigateToArticleList: () -> Unit = {},
 ) {
@@ -234,6 +243,24 @@ fun DisplaySettingsPanelView(
 
         FormSection(title = stringResource(R.string.settings_display_miscellaneous_title)) {
             PreferenceSelect(
+                selected = unreadDisplay,
+                update = updateUnreadDisplay,
+                options = ArticleStatusListDisplay.entries,
+                label = R.string.settings_unread_display,
+                optionText = {
+                    stringResource(it.translationKey)
+                }
+            )
+            PreferenceSelect(
+                selected = starredDisplay,
+                update = updateStarredDisplay,
+                options = ArticleStatusListDisplay.entries,
+                label = R.string.settings_starred_display,
+                optionText = {
+                    stringResource(it.translationKey)
+                }
+            )
+            PreferenceSelect(
                 selected = markReadButtonPosition,
                 update = updateMarkReadButtonPosition,
                 options = MarkReadPosition.entries,
@@ -318,7 +345,11 @@ private fun DisplaySettingsPanelViewPreview() {
                 clearArticleImageCache = {},
                 enablePinArticleBars = false,
                 markReadButtonPosition = MarkReadPosition.TOOLBAR,
-                updateMarkReadButtonPosition = {}
+                updateMarkReadButtonPosition = {},
+                unreadDisplay = ArticleStatusListDisplay.ALL_ARTICLES,
+                updateUnreadDisplay = {},
+                starredDisplay = ArticleStatusListDisplay.GROUPED_BY_FEED,
+                updateStarredDisplay = {},
             )
         }
     }

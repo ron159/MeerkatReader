@@ -214,6 +214,18 @@ class AppPreferences(context: Context) {
         val markReadOnScroll: Preference<Boolean>
             get() = preferenceStore.getBoolean("article_list_mark_read_on_scroll", false)
 
+        val unreadDisplay: Preference<ArticleStatusListDisplay>
+            get() = preferenceStore.getEnum(
+                "article_list_unread_display",
+                ArticleStatusListDisplay.default
+            )
+
+        val starredDisplay: Preference<ArticleStatusListDisplay>
+            get() = preferenceStore.getEnum(
+                "article_list_starred_display",
+                ArticleStatusListDisplay.default
+            )
+
     }
 
     class AiOptions(private val preferenceStore: PreferenceStore) {

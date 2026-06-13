@@ -46,6 +46,10 @@ fun ArticleReader(
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    enableTopSwipe: Boolean = false,
+    enableBottomSwipe: Boolean = false,
+    onSwipeDownFromTop: () -> Unit = {},
+    onSwipeUpFromBottom: () -> Unit = {},
 ) {
     val (shareLink, setShareLink) = rememberSaveableShareLink()
     val (shareImageUrl, setImageUrl) = rememberSaveable { mutableStateOf<String?>(null) }
@@ -107,6 +111,10 @@ fun ArticleReader(
         onOpenAudioPlayer = onSelectAudio,
         onPauseAudio = onPauseAudio,
         onScrollChanged = onScrollChanged,
+        enableTopSwipe = enableTopSwipe,
+        enableBottomSwipe = enableBottomSwipe,
+        onSwipeDownFromTop = onSwipeDownFromTop,
+        onSwipeUpFromBottom = onSwipeUpFromBottom,
         currentAudioUrl = currentAudioUrl,
         isAudioPlaying = isAudioPlaying,
     )

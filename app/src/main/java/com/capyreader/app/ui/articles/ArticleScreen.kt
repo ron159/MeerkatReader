@@ -5,10 +5,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -19,7 +19,6 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +53,7 @@ import com.capyreader.app.common.asState
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
+import com.capyreader.app.preferences.ArticleStatusListDisplay
 import com.capyreader.app.ui.LocalBadgeStyle
 import com.capyreader.app.ui.LocalConnectivity
 import com.capyreader.app.ui.LocalLinkOpener
@@ -72,6 +72,8 @@ import com.capyreader.app.ui.articles.feeds.LocalFeedActions
 import com.capyreader.app.ui.articles.feeds.LocalFolderActions
 import com.capyreader.app.ui.articles.feeds.LocalSavedSearchActions
 import com.capyreader.app.ui.articles.feeds.SavedSearchActions
+import com.capyreader.app.ui.articles.list.ArticleHomeDestination
+import com.capyreader.app.ui.articles.list.ArticleHomeNavigationBar
 import com.capyreader.app.ui.articles.list.ArticleListTopBar
 import com.capyreader.app.ui.articles.list.EmptyOnboardingView
 import com.capyreader.app.ui.articles.list.LabelBottomSheet
@@ -101,7 +103,6 @@ import com.jocmp.capy.common.launchIO
 import com.jocmp.capy.common.launchUI
 import com.jocmp.capy.logging.CapyLog
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -152,22 +153,31 @@ fun ArticleScreen(
     val savedSearchActions = rememberSavedSearchActions(viewModel)
     val labelsActions = rememberLabelsActions(viewModel, allSavedSearches)
     val connectivity = rememberLocalConnectivity()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val showOnboarding by viewModel.showOnboarding.collectAsState(false)
     val markAllReadButtonPosition by appPreferences
         .articleListOptions
         .markReadButtonPosition
         .collectChangesWithCurrent()
+    val unreadDisplay by appPreferences
+        .articleListOptions
+        .unreadDisplay
+        .collectChangesWithCurrent()
+    val starredDisplay by appPreferences
+        .articleListOptions
+        .starredDisplay
+        .collectChangesWithCurrent()
     val badgeStyle by appPreferences.badgeStyle.collectChangesWithDefault()
+    var selectedHomeDestination by rememberSaveable {
+        mutableStateOf(filter.homeDestination())
+    }
 
     val articles = viewModel.articles.collectAsLazyPagingItems()
 
     val onMarkAllRead = { range: MarkRead ->
         viewModel.markAllRead(
             onArticlesCleared = {
-                scope.launchUI {
-                    drawerState.open()
-                }
+                selectedHomeDestination = ArticleHomeDestination.FEEDS
+                viewModel.selectArticleFilter(ArticleStatus.ALL)
             },
             range = range,
         )
@@ -352,7 +362,6 @@ fun ArticleScreen(
         fun openNextList(action: suspend () -> Unit) {
             coroutineScope.launchUI {
                 openNextStatus(action)
-                drawerState.close()
             }
         }
 
@@ -361,28 +370,6 @@ fun ArticleScreen(
                 scaffoldNavigator.navigateTo(ListDetailPaneScaffoldRole.List)
             }
             viewModel.clearArticle()
-        }
-
-        val toggleDrawer = {
-            coroutineScope.launch {
-                if (drawerState.isOpen) {
-                    drawerState.close()
-                } else {
-                    drawerState.open()
-                }
-            }
-        }
-
-        fun closeDrawer() {
-            coroutineScope.launchUI {
-                drawerState.close()
-            }
-        }
-
-        fun openDrawer() {
-            coroutineScope.launchUI {
-                drawerState.open()
-            }
         }
 
         val showSnackbar = { message: String ->
@@ -430,46 +417,83 @@ fun ArticleScreen(
         val selectFilter = {
             if (!filter.hasArticlesSelected()) {
                 openNextList { viewModel.selectArticleFilter() }
-            } else {
-                closeDrawer()
             }
         }
 
-        val selectStatus = { status: ArticleStatus ->
-            viewModel.selectStatus(status)
-        }
+        val selectStatus = { status: ArticleStatus -> viewModel.selectStatus(status) }
 
         val selectFeed = { feed: Feed, folderTitle: String? ->
             if (!filter.isFeedSelected(feed)) {
                 openNextList { viewModel.selectFeed(feed.id, folderTitle) }
-            } else {
-                closeDrawer()
             }
         }
 
         val selectFolder = { folder: Folder ->
             if (!filter.isFolderSelected(folder)) {
                 openNextList { viewModel.selectFolder(folder.title) }
-            } else {
-                closeDrawer()
             }
         }
 
         val selectSavedSearch = { savedSearch: SavedSearch ->
             if (!filter.isSavedSearchSelected(savedSearch)) {
                 openNextList { viewModel.selectSavedSearch(savedSearch.id) }
-            } else {
-                closeDrawer()
             }
         }
 
         val selectToday = {
             if (!filter.hasTodaySelected()) {
                 openNextList { viewModel.selectToday() }
-            } else {
-                closeDrawer()
             }
         }
+
+        val feedNavigationContent: @Composable () -> Unit = {
+            FeedList(
+                source = viewModel.source,
+                folders = folders,
+                feeds = feeds,
+                readLaterFeed = readLaterFeed,
+                onSelectFolder = selectFolder,
+                onSelectFeed = selectFeed,
+                onMarkAllRead = { viewModel.markAllRead(filter = it) },
+                onFeedAdded = { onFeedAdded(it) },
+                savedSearches = savedSearches,
+                onSelectSavedSearch = selectSavedSearch,
+                onNavigateToSettings = onNavigateToSettings,
+                onFilterSelect = selectFilter,
+                onSelectToday = { selectToday() },
+                onSelectStatus = { selectStatus(it) },
+                refreshState = refreshAllState,
+                onRefresh = {
+                    refreshAll()
+                },
+                filter = filter,
+                statusCount = statusCount,
+                todayCount = todayCount,
+                showHeader = false,
+                showArticleShortcuts = false,
+                showStatusBar = false,
+            )
+        }
+
+        fun selectHomeDestination(destination: ArticleHomeDestination, status: ArticleStatus) {
+            selectedHomeDestination = destination
+            viewModel.selectArticleFilter(status)
+        }
+
+        val isHomeFilter = filter is ArticleFilter.Articles && when (selectedHomeDestination) {
+            ArticleHomeDestination.FEEDS -> filter.status == ArticleStatus.ALL
+            ArticleHomeDestination.UNREAD -> filter.status == ArticleStatus.UNREAD
+            ArticleHomeDestination.STARRED -> filter.status == ArticleStatus.STARRED
+        }
+
+        val showGroupedStatusHome = isHomeFilter && when (selectedHomeDestination) {
+            ArticleHomeDestination.UNREAD -> unreadDisplay == ArticleStatusListDisplay.GROUPED_BY_FEED
+            ArticleHomeDestination.STARRED -> starredDisplay == ArticleStatusListDisplay.GROUPED_BY_FEED
+            ArticleHomeDestination.FEEDS -> false
+        }
+
+        val showFeedNavigation = selectedHomeDestination == ArticleHomeDestination.FEEDS && isHomeFilter ||
+            showGroupedStatusHome
 
         LaunchedEffect(pendingArticleID) {
             val id = pendingArticleID ?: return@LaunchedEffect
@@ -478,40 +502,8 @@ fun ArticleScreen(
         }
 
         ArticleScaffold(
-            drawerState = drawerState,
             scaffoldNavigator = scaffoldNavigator,
             paneExpansion = paneExpansion,
-            drawerPane = {
-                FeedList(
-                    source = viewModel.source,
-                    folders = folders,
-                    feeds = feeds,
-                    readLaterFeed = readLaterFeed,
-                    onSelectFolder = selectFolder,
-                    onSelectFeed = selectFeed,
-                    onMarkAllRead = { viewModel.markAllRead(filter = it) },
-                    onFeedAdded = { onFeedAdded(it) },
-                    savedSearches = savedSearches,
-                    onSelectSavedSearch = selectSavedSearch,
-                    onNavigateToSettings = {
-                        onNavigateToSettings()
-                        coroutineScope.launchUI {
-                            delay(100)
-                            drawerState.close()
-                        }
-                    },
-                    onFilterSelect = selectFilter,
-                    onSelectToday = { selectToday() },
-                    onSelectStatus = { selectStatus(it) },
-                    refreshState = refreshAllState,
-                    onRefresh = {
-                        refreshAll()
-                    },
-                    filter = filter,
-                    statusCount = statusCount,
-                    todayCount = todayCount,
-                )
-            },
             listPane = {
                 val keyboardManager = LocalSoftwareKeyboardController.current
                 val markReadPosition = LocalMarkAllReadButtonPosition.current
@@ -538,7 +530,7 @@ fun ArticleScreen(
                         topBar = {
                             ArticleListTopBar(
                                 onRequestJumpToTop = { scrollToTop() },
-                                onNavigateToDrawer = { openDrawer() },
+                                onNavigateToSettings = onNavigateToSettings,
                                 onRemoveFolder = { folderTitle, completion ->
                                     viewModel.removeFolder(
                                         folderTitle,
@@ -558,7 +550,9 @@ fun ArticleScreen(
                         snackbarHost = {
                             SnackbarHost(
                                 hostState = snackbarHostState,
-                                modifier = Modifier.padding(bottom = 56.dp),
+                                modifier = Modifier.padding(
+                                    bottom = if (article == null) 96.dp else 56.dp,
+                                ),
                             )
                         },
                         floatingActionButton = {
@@ -569,20 +563,46 @@ fun ArticleScreen(
                             }
                         },
                         bottomBar = {
-                            audioEnclosure?.let { audio ->
-                                FloatingAudioPlayer(
-                                    audio = audio,
-                                    controller = audioController,
-                                    onDismiss = {
-                                        audioController.dismiss()
-                                    },
-                                )
+                            Column {
+                                audioEnclosure?.let { audio ->
+                                    FloatingAudioPlayer(
+                                        audio = audio,
+                                        controller = audioController,
+                                        onDismiss = {
+                                            audioController.dismiss()
+                                        },
+                                    )
+                                }
+                                if (article == null) {
+                                    ArticleHomeNavigationBar(
+                                        selectedDestination = selectedHomeDestination,
+                                        unreadCount = unreadCount,
+                                        onSelectFeeds = {
+                                            selectHomeDestination(
+                                                ArticleHomeDestination.FEEDS,
+                                                ArticleStatus.ALL
+                                            )
+                                        },
+                                        onSelectUnread = {
+                                            selectHomeDestination(
+                                                ArticleHomeDestination.UNREAD,
+                                                ArticleStatus.UNREAD
+                                            )
+                                        },
+                                        onSelectStarred = {
+                                            selectHomeDestination(
+                                                ArticleHomeDestination.STARRED,
+                                                ArticleStatus.STARRED
+                                            )
+                                        },
+                                    )
+                                }
                             }
                         }
                     ) { innerPadding ->
                         ArticleListScaffold(
                             padding = innerPadding,
-                            showOnboarding = showOnboarding,
+                            showOnboarding = showOnboarding && !showFeedNavigation,
                             onboarding = {
                                 EmptyOnboardingView {
                                     AddFeedButton(
@@ -593,37 +613,41 @@ fun ArticleScreen(
                                 }
                             },
                         ) {
-                            PullToRefreshBox(
-                                isRefreshing = isPullToRefreshing,
-                                onRefresh = {
-                                    refreshFeeds()
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                SwipeUpActionBox(
-                                    modifier = Modifier.fillMaxSize(),
-                                    enabled = canSwipeBottom,
-                                    onRequestNext = {
-                                        onSwipeUp()
+                            if (showFeedNavigation) {
+                                feedNavigationContent()
+                            } else {
+                                PullToRefreshBox(
+                                    isRefreshing = isPullToRefreshing,
+                                    onRefresh = {
+                                        refreshFeeds()
                                     },
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
-                                    if (isRefreshInitialized && articles.itemCount == 0) {
-                                        ArticleListEmptyView()
-                                    } else {
-                                        ArticleList(
-                                            articles = articles,
-                                            selectedArticleKey = article?.id,
-                                            listState = listState,
-                                            enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
-                                            dimReadArticles = filter.status != ArticleStatus.STARRED,
-                                            scrollToTop = { scrollToTop() },
-                                            onMarkAllRead = { range ->
-                                                onMarkAllRead(range)
-                                            },
-                                            onSelect = { articleID ->
-                                                selectArticle(articleID)
-                                            },
-                                        )
+                                    SwipeUpActionBox(
+                                        modifier = Modifier.fillMaxSize(),
+                                        enabled = canSwipeBottom,
+                                        onRequestNext = {
+                                            onSwipeUp()
+                                        },
+                                    ) {
+                                        if (isRefreshInitialized && articles.itemCount == 0) {
+                                            ArticleListEmptyView()
+                                        } else {
+                                            ArticleList(
+                                                articles = articles,
+                                                selectedArticleKey = article?.id,
+                                                listState = listState,
+                                                enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
+                                                dimReadArticles = filter.status != ArticleStatus.STARRED,
+                                                scrollToTop = { scrollToTop() },
+                                                onMarkAllRead = { range ->
+                                                    onMarkAllRead(range)
+                                                },
+                                                onSelect = { articleID ->
+                                                    selectArticle(articleID)
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -767,14 +791,13 @@ fun ArticleScreen(
             filter,
             onRequestFilter = selectFilter,
             onRequestFolder = selectFolder,
-            enabled = isFeedActive(media, article, search),
-            isDrawerOpen = drawerState.isOpen,
-            toggleDrawer = {
-                toggleDrawer()
+            onRequestFeeds = {
+                selectHomeDestination(
+                    ArticleHomeDestination.FEEDS,
+                    ArticleStatus.ALL
+                )
             },
-            closeDrawer = {
-                closeDrawer()
-            }
+            enabled = isFeedActive(media, article, search),
         )
 
         LayoutNavigationHandler(
@@ -895,6 +918,14 @@ fun isFeedActive(
     return media == null &&
             article == null &&
             !search.isActive
+}
+
+private fun ArticleFilter.homeDestination(): ArticleHomeDestination {
+    return when (status) {
+        ArticleStatus.ALL -> ArticleHomeDestination.FEEDS
+        ArticleStatus.UNREAD -> ArticleHomeDestination.UNREAD
+        ArticleStatus.STARRED -> ArticleHomeDestination.STARRED
+    }
 }
 
 @OptIn(FlowPreview::class)

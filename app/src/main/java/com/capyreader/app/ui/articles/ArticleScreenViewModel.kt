@@ -326,8 +326,8 @@ class ArticleScreenViewModel(
         }
     }
 
-    fun selectArticleFilter() {
-        updateFilter(ArticleFilter.Articles(articleStatus = currentStatus))
+    fun selectArticleFilter(status: ArticleStatus = currentStatus) {
+        updateFilter(ArticleFilter.Articles(articleStatus = status))
     }
 
     fun selectToday() {

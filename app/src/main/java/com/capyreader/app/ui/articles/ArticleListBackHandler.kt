@@ -15,11 +15,9 @@ fun ArticleListBackHandler(
     filter: ArticleFilter,
     onRequestFilter: () -> Unit,
     onRequestFolder: (folder: Folder) -> Unit,
+    onRequestFeeds: () -> Unit,
     appPreferences: AppPreferences = koinInject(),
-    closeDrawer: () -> Unit,
-    toggleDrawer: () -> Unit,
     enabled: Boolean,
-    isDrawerOpen: Boolean,
 ) {
     val backAction by appPreferences.articleListOptions.backAction.asState()
 
@@ -28,11 +26,7 @@ fun ArticleListBackHandler(
     }
 
     BackHandler(backAction == BackAction.OPEN_DRAWER) {
-        toggleDrawer()
-    }
-
-    BackHandler(backAction != BackAction.OPEN_DRAWER && isDrawerOpen) {
-        closeDrawer()
+        onRequestFeeds()
     }
 
     BackHandler(backAction == BackAction.NAVIGATE_TO_PARENT && filter !is ArticleFilter.Articles) {

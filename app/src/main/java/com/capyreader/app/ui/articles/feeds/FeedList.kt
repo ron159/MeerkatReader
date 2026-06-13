@@ -70,6 +70,9 @@ fun FeedList(
     onFeedAdded: (feedID: String) -> Unit,
     onBeforeFeedAdd: () -> Unit = {},
     onNavigateToSettings: () -> Unit,
+    showHeader: Boolean = true,
+    showArticleShortcuts: Boolean = true,
+    showStatusBar: Boolean = true,
 ) {
     val scrollState = rememberScrollState()
     val buttonState = rememberRefreshButtonState(refreshState)
@@ -84,93 +87,97 @@ fun FeedList(
                 .weight(1f)
                 .fillMaxSize()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CapyIcon()
+            if (showHeader) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { onNavigateToSettings() }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = stringResource(R.string.settings)
+                    CapyIcon()
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { onNavigateToSettings() }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = stringResource(R.string.settings)
+                            )
+                        }
+                        IconButton(onClick = { onRefresh() }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = stringResource(R.string.feed_nav_drawer_refresh_all),
+                                modifier = Modifier.graphicsLayer {
+                                    rotationZ = buttonState.iconRotation
+                                }
+                            )
+                        }
+                        AddFeedButton(
+                            iconOnly = true,
+                            onComplete = { onFeedAdded(it) },
+                            onBeforeAdd = onBeforeFeedAdd,
                         )
                     }
-                    IconButton(onClick = { onRefresh() }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.feed_nav_drawer_refresh_all),
-                            modifier = Modifier.graphicsLayer {
-                                rotationZ = buttonState.iconRotation
-                            }
-                        )
-                    }
-                    AddFeedButton(
-                        iconOnly = true,
-                        onComplete = { onFeedAdded(it) },
-                        onBeforeAdd = onBeforeFeedAdd,
-                    )
                 }
             }
 
-            Box {
-                val (showArticlesMenu, setShowArticlesMenu) = remember { mutableStateOf(false) }
+            if (showArticleShortcuts) {
+                Box {
+                    val (showArticlesMenu, setShowArticlesMenu) = remember { mutableStateOf(false) }
 
-                DrawerItem(
-                    icon = { ArticleStatusIcon(status = filter.status) },
-                    label = {
-                        ListTitle(
-                            stringResource(filter.status.navigationTitle),
-                        )
-                    },
-                    badge = { CountBadge(count = statusCount) },
-                    selected = filter.hasArticlesSelected(),
-                    onClick = { onFilterSelect() },
-                    onLongClick = { setShowArticlesMenu(true) },
-                )
+                    DrawerItem(
+                        icon = { ArticleStatusIcon(status = filter.status) },
+                        label = {
+                            ListTitle(
+                                stringResource(filter.status.navigationTitle),
+                            )
+                        },
+                        badge = { CountBadge(count = statusCount) },
+                        selected = filter.hasArticlesSelected(),
+                        onClick = { onFilterSelect() },
+                        onLongClick = { setShowArticlesMenu(true) },
+                    )
 
-                MarkAllReadMenu(
-                    expanded = showArticlesMenu,
-                    onDismiss = { setShowArticlesMenu(false) },
-                    onMarkAllRead = {
-                        onMarkAllRead(ArticleFilter.Articles(articleStatus = filter.status))
-                    },
-                )
-            }
+                    MarkAllReadMenu(
+                        expanded = showArticlesMenu,
+                        onDismiss = { setShowArticlesMenu(false) },
+                        onMarkAllRead = {
+                            onMarkAllRead(ArticleFilter.Articles(articleStatus = filter.status))
+                        },
+                    )
+                }
 
-            Box {
-                val (showTodayMenu, setShowTodayMenu) = remember { mutableStateOf(false) }
+                Box {
+                    val (showTodayMenu, setShowTodayMenu) = remember { mutableStateOf(false) }
 
-                DrawerItem(
-                    icon = {
-                        Icon(
-                            Icons.Rounded.Today,
-                            contentDescription = null
-                        )
-                    },
-                    label = {
-                        ListTitle(
-                            stringResource(R.string.filter_today),
-                        )
-                    },
-                    badge = { CountBadge(count = todayCount) },
-                    selected = filter.hasTodaySelected(),
-                    onClick = { onSelectToday() },
-                    onLongClick = { setShowTodayMenu(true) },
-                )
+                    DrawerItem(
+                        icon = {
+                            Icon(
+                                Icons.Rounded.Today,
+                                contentDescription = null
+                            )
+                        },
+                        label = {
+                            ListTitle(
+                                stringResource(R.string.filter_today),
+                            )
+                        },
+                        badge = { CountBadge(count = todayCount) },
+                        selected = filter.hasTodaySelected(),
+                        onClick = { onSelectToday() },
+                        onLongClick = { setShowTodayMenu(true) },
+                    )
 
-                MarkAllReadMenu(
-                    expanded = showTodayMenu,
-                    onDismiss = { setShowTodayMenu(false) },
-                    onMarkAllRead = {
-                        onMarkAllRead(ArticleFilter.Today(filter.status))
-                    },
-                )
+                    MarkAllReadMenu(
+                        expanded = showTodayMenu,
+                        onDismiss = { setShowTodayMenu(false) },
+                        onMarkAllRead = {
+                            onMarkAllRead(ArticleFilter.Today(filter.status))
+                        },
+                    )
+                }
             }
 
             if (readLaterFeed != null) {
@@ -281,18 +288,20 @@ fun FeedList(
             Spacer(Modifier.height(16.dp))
         }
 
-        HorizontalDivider()
+        if (showStatusBar) {
+            HorizontalDivider()
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            ArticleStatusBar(
-                status = filter.status,
-                onSelectStatus = onSelectStatus,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                ArticleStatusBar(
+                    status = filter.status,
+                    onSelectStatus = onSelectStatus,
+                )
+            }
         }
     }
 }

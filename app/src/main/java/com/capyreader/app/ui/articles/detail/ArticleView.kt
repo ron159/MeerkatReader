@@ -140,6 +140,13 @@ fun ArticleView(
     }
 
     val pinToolbars by appPreferences.readerOptions.pinToolbars.collectChangesWithDefault()
+    val (topSwipe, bottomSwipe) = rememberSwipePreferences()
+    val enableTopSwipe = topSwipe.enabled &&
+            (topSwipe != PREVIOUS_ARTICLE || (topSwipe.openArticle && hasPrevious))
+
+    val enableBottomSwipe = bottomSwipe.enabled &&
+            (bottomSwipe != NEXT_ARTICLE || (bottomSwipe.openArticle && hasNext))
+
     val aiEnabled by appPreferences.aiOptions.enabled.collectChangesWithDefault()
     val aiTranslationMode by appPreferences.aiOptions.translationMode.collectChangesWithDefault()
     val scrollState = rememberArticleScrollState()
@@ -218,9 +225,11 @@ fun ArticleView(
             ) {
                 ArticlePullRefresh(
                     onSwipe = onSwipe,
-                    hasPreviousArticle = hasPrevious,
                     pinToolbars = pinToolbars,
-                    hasNextArticle = hasNext,
+                    topSwipe = topSwipe,
+                    bottomSwipe = bottomSwipe,
+                    enableTopSwipe = enableTopSwipe,
+                    enableBottomSwipe = enableBottomSwipe,
                 ) {
                     HorizontalReaderPager(
                         enabled = enableHorizontalPager,
@@ -238,6 +247,10 @@ fun ArticleView(
                             currentAudioUrl = currentAudioUrl,
                             isAudioPlaying = isAudioPlaying,
                             onScrollChanged = scrollState::updateFromScroll,
+                            enableTopSwipe = enableTopSwipe,
+                            enableBottomSwipe = enableBottomSwipe,
+                            onSwipeDownFromTop = { onSwipe(topSwipe) },
+                            onSwipeUpFromBottom = { onSwipe(bottomSwipe) },
                         )
                     }
                 }
@@ -305,6 +318,10 @@ private fun ArticleReaderPool(
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    enableTopSwipe: Boolean = false,
+    enableBottomSwipe: Boolean = false,
+    onSwipeDownFromTop: () -> Unit = {},
+    onSwipeUpFromBottom: () -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize()) {
         key(article.id) {
@@ -318,6 +335,10 @@ private fun ArticleReaderPool(
                 currentAudioUrl = currentAudioUrl,
                 isAudioPlaying = isAudioPlaying,
                 onScrollChanged = onScrollChanged,
+                enableTopSwipe = enableTopSwipe,
+                enableBottomSwipe = enableBottomSwipe,
+                onSwipeDownFromTop = onSwipeDownFromTop,
+                onSwipeUpFromBottom = onSwipeUpFromBottom,
             )
         }
     }
@@ -325,24 +346,19 @@ private fun ArticleReaderPool(
 
 @Composable
 fun ArticlePullRefresh(
-    hasNextArticle: Boolean,
-    hasPreviousArticle: Boolean,
     pinToolbars: Boolean,
+    topSwipe: ArticleVerticalSwipe,
+    bottomSwipe: ArticleVerticalSwipe,
+    enableTopSwipe: Boolean,
+    enableBottomSwipe: Boolean,
     onSwipe: (swipe: ArticleVerticalSwipe) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val (topSwipe, bottomSwipe) = rememberSwipePreferences()
     val haptics = LocalHapticFeedback.current
 
     val triggerThreshold = {
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
-
-    val enableTopSwipe = topSwipe.enabled &&
-            (topSwipe != PREVIOUS_ARTICLE || (topSwipe.openArticle && hasPreviousArticle))
-
-    val enableBottomSwipe = bottomSwipe.enabled &&
-            (bottomSwipe != NEXT_ARTICLE || (bottomSwipe.openArticle && hasNextArticle))
 
     SwipeRefresh(
         onRefresh = { onSwipe(topSwipe) },

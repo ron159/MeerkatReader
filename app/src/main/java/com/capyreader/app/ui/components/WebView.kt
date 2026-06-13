@@ -2,6 +2,10 @@ package com.capyreader.app.ui.components
 
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -14,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
@@ -35,6 +41,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.koin.compose.koinInject
 import org.koin.core.component.KoinComponent
+import kotlin.math.abs
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -247,14 +254,24 @@ fun rememberWebViewState(
     onOpenAudioPlayer: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    enableTopSwipe: Boolean = false,
+    enableBottomSwipe: Boolean = false,
+    onSwipeDownFromTop: () -> Unit = {},
+    onSwipeUpFromBottom: () -> Unit = {},
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
 ): WebViewState {
     val colors = articleTemplateColors()
     val context = LocalContext.current
+    val edgeSwipeTriggerDistancePx = with(LocalDensity.current) { 80.dp.toPx() }
     val currentAudioUrlState by rememberUpdatedState(currentAudioUrl)
     val isAudioPlayingState by rememberUpdatedState(isAudioPlaying)
     val scrollChangedState by rememberUpdatedState(onScrollChanged)
+    val enableTopSwipeState = rememberUpdatedState(enableTopSwipe)
+    val enableBottomSwipeState = rememberUpdatedState(enableBottomSwipe)
+    val swipeDownFromTopState = rememberUpdatedState(onSwipeDownFromTop)
+    val swipeUpFromBottomState = rememberUpdatedState(onSwipeUpFromBottom)
+    val edgeSwipeTriggerDistanceState = rememberUpdatedState(edgeSwipeTriggerDistancePx)
 
     val client = remember {
         AccompanistWebViewClient(
@@ -299,6 +316,17 @@ fun rememberWebViewState(
             setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
                 scrollChangedState(scrollY, oldScrollY)
             }
+
+            setOnTouchListener(
+                WebViewEdgeSwipeTouchListener(
+                    touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop.toFloat(),
+                    triggerDistancePx = { edgeSwipeTriggerDistanceState.value },
+                    isTopSwipeEnabled = { enableTopSwipeState.value },
+                    isBottomSwipeEnabled = { enableBottomSwipeState.value },
+                    onSwipeDownFromTop = { swipeDownFromTopState.value.invoke() },
+                    onSwipeUpFromBottom = { swipeUpFromBottomState.value.invoke() },
+                )
+            )
         }
 
         WebViewState(
@@ -312,5 +340,107 @@ fun rememberWebViewState(
                 it.updateAudioPlayState(currentAudioUrlState, isAudioPlayingState)
             }
         }
+    }
+}
+
+private enum class EdgeSwipeDirection {
+    Top,
+    Bottom,
+}
+
+private class WebViewEdgeSwipeTouchListener(
+    private val touchSlopPx: Float,
+    private val triggerDistancePx: () -> Float,
+    private val isTopSwipeEnabled: () -> Boolean,
+    private val isBottomSwipeEnabled: () -> Boolean,
+    private val onSwipeDownFromTop: () -> Unit,
+    private val onSwipeUpFromBottom: () -> Unit,
+) : View.OnTouchListener {
+    private var startX = 0f
+    private var startY = 0f
+    private var edgeStartY = 0f
+    private var startedAtTop = false
+    private var startedAtBottom = false
+    private var activeDirection: EdgeSwipeDirection? = null
+    private var thresholdReached = false
+
+    override fun onTouch(view: View, event: MotionEvent): Boolean {
+        val webView = view as? WebView ?: return false
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                startX = event.x
+                startY = event.y
+                edgeStartY = event.y
+                startedAtTop = !webView.canScrollVertically(-1)
+                startedAtBottom = !webView.canScrollVertically(1)
+                activeDirection = null
+                thresholdReached = false
+            }
+
+            MotionEvent.ACTION_MOVE -> updateSwipe(webView, event)
+
+            MotionEvent.ACTION_UP -> {
+                triggerSwipeIfNeeded()
+                reset()
+            }
+
+            MotionEvent.ACTION_CANCEL -> reset()
+        }
+
+        return false
+    }
+
+    private fun updateSwipe(webView: WebView, event: MotionEvent) {
+        val totalDeltaX = event.x - startX
+        val totalDeltaY = event.y - startY
+
+        if (abs(totalDeltaY) < touchSlopPx || abs(totalDeltaX) > abs(totalDeltaY)) {
+            return
+        }
+
+        if (activeDirection == null) {
+            activeDirection = when {
+                totalDeltaY > 0f && isTopSwipeEnabled() && !webView.canScrollVertically(-1) -> {
+                    edgeStartY = if (startedAtTop) startY else event.y
+                    EdgeSwipeDirection.Top
+                }
+
+                totalDeltaY < 0f && isBottomSwipeEnabled() && !webView.canScrollVertically(1) -> {
+                    edgeStartY = if (startedAtBottom) startY else event.y
+                    EdgeSwipeDirection.Bottom
+                }
+
+                else -> null
+            }
+        }
+
+        val pullDistance = when (activeDirection) {
+            EdgeSwipeDirection.Top -> event.y - edgeStartY
+            EdgeSwipeDirection.Bottom -> edgeStartY - event.y
+            null -> 0f
+        }
+
+        if (!thresholdReached && pullDistance >= triggerDistancePx()) {
+            thresholdReached = true
+            webView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        }
+    }
+
+    private fun triggerSwipeIfNeeded() {
+        if (!thresholdReached) {
+            return
+        }
+
+        when (activeDirection) {
+            EdgeSwipeDirection.Top -> onSwipeDownFromTop()
+            EdgeSwipeDirection.Bottom -> onSwipeUpFromBottom()
+            null -> {}
+        }
+    }
+
+    private fun reset() {
+        activeDirection = null
+        thresholdReached = false
     }
 }

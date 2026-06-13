@@ -12,6 +12,7 @@ import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleImageCacheCleanupInterval
 import com.capyreader.app.preferences.ArticleImageCacheSize
 import com.capyreader.app.preferences.ArticleImageDownloadMode
+import com.capyreader.app.preferences.ArticleStatusListDisplay
 import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
 import com.capyreader.app.ui.articles.ArticleListFontScale
@@ -83,6 +84,12 @@ class DisplaySettingsViewModel(
     val improveTalkback = appPreferences.readerOptions.improveTalkback
 
     val markReadButtonPosition = appPreferences.articleListOptions.markReadButtonPosition
+
+    var unreadDisplay by mutableStateOf(appPreferences.articleListOptions.unreadDisplay.get())
+        private set
+
+    var starredDisplay by mutableStateOf(appPreferences.articleListOptions.starredDisplay.get())
+        private set
 
     fun updateThemeMode(themeMode: ThemeMode) {
         appPreferences.themeMode.set(themeMode)
@@ -170,6 +177,16 @@ class DisplaySettingsViewModel(
 
     fun updateMarkReadButtonPosition(position: MarkReadPosition) {
         appPreferences.articleListOptions.markReadButtonPosition.set(position)
+    }
+
+    fun updateUnreadDisplay(display: ArticleStatusListDisplay) {
+        appPreferences.articleListOptions.unreadDisplay.set(display)
+        unreadDisplay = display
+    }
+
+    fun updateStarredDisplay(display: ArticleStatusListDisplay) {
+        appPreferences.articleListOptions.starredDisplay.set(display)
+        starredDisplay = display
     }
 
     fun updateFeedIcons(show: Boolean) {
