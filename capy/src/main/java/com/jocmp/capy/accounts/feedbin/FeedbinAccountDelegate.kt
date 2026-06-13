@@ -2,6 +2,8 @@ package com.jocmp.capy.accounts.feedbin
 
 import com.jocmp.capy.AccountDelegate
 import com.jocmp.capy.AccountPreferences
+import com.jocmp.capy.ArticleAutomation
+import com.jocmp.capy.ArticleAutomationArticle
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
@@ -54,6 +56,7 @@ internal class FeedbinAccountDelegate(
     private val feedRecords = FeedRecords(database)
     private val taggingRecords = TaggingRecords(database)
     private val savedSearchRecords = SavedSearchRecords(database)
+    private val articleAutomation = ArticleAutomation(database, preferences)
 
     override suspend fun refresh(filter: ArticleFilter, cutoffDate: ZonedDateTime?): Result<Unit> {
         return try {
@@ -339,7 +342,7 @@ internal class FeedbinAccountDelegate(
         }
 
         coroutineScope {
-            savedSearchRecords.allIDs()
+            savedSearchRecords.remoteIDs()
                 .forEach { savedSearchID ->
                     launch {
                         fetchSavedSearchArticles(savedSearchID = savedSearchID)
@@ -445,22 +448,49 @@ internal class FeedbinAccountDelegate(
         )
     }
 
-    private fun saveEntries(
+    private suspend fun saveEntries(
         entries: List<Entry>,
         savedSearchID: String? = null,
         read: Boolean = true,
     ) {
+        val articleIDsToMarkRead = mutableSetOf<String>()
+        val articleIDsToStar = mutableSetOf<String>()
+
         database.transactionWithErrorHandling {
             entries.forEach { entry ->
                 val updated = TimeHelpers.nowUTC()
                 val articleID = entry.id.toString()
                 val enclosure = entry.enclosure
                 val enclosureType = enclosure?.enclosure_type
+                val feed = database.feedsQueries
+                    .find(entry.feed_id.toString())
+                    .executeAsOneOrNull()
+                val title = entry.title?.let { Jsoup.parse(it).text() }
+                val automation = articleAutomation.evaluate(
+                    ArticleAutomationArticle(
+                        title = title,
+                        author = entry.author,
+                        summary = entry.summary,
+                        contentHTML = entry.content,
+                        feedTitle = feed?.title.orEmpty(),
+                        feedURL = feed?.feed_url.orEmpty(),
+                    )
+                )
+
+                if (automation.mute) {
+                    articleAutomation.clearMutedArticle(articleID)
+                    articleIDsToMarkRead.add(articleID)
+                    return@forEach
+                }
+
+                val isNewArticle = !database.articlesQueries
+                    .articleExists(articleID)
+                    .executeAsOne()
 
                 database.articlesQueries.create(
                     id = articleID,
                     feed_id = entry.feed_id.toString(),
-                    title = entry.title?.let { Jsoup.parse(it).text() },
+                    title = title,
                     author = entry.author,
                     content_html = entry.content,
                     extracted_content_url = entry.extracted_content_url,
@@ -499,7 +529,31 @@ internal class FeedbinAccountDelegate(
                         savedSearchID = savedSearchID,
                     )
                 }
+
+                if (isNewArticle) {
+                    articleAutomation.applyLocalActions(
+                        articleID = articleID,
+                        result = automation,
+                        updatedAt = updated,
+                    )
+
+                    if (automation.shouldMarkReadRemotely) {
+                        articleIDsToMarkRead.add(articleID)
+                    }
+
+                    if (automation.star) {
+                        articleIDsToStar.add(articleID)
+                    }
+                }
             }
+        }
+
+        if (articleIDsToMarkRead.isNotEmpty()) {
+            markRead(articleIDsToMarkRead.toList())
+        }
+
+        if (articleIDsToStar.isNotEmpty()) {
+            addStar(articleIDsToStar.toList())
         }
     }
 

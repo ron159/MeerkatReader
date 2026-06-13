@@ -189,7 +189,7 @@ class LocalAccountDelegateTest {
             .executeAsList()
         val savedSearchArticles = database
             .saved_searchesQueries
-            .articlesBySavedSearchID("local:Apple")
+            .articlesBySavedSearchID("automation:Apple")
             .executeAsList()
 
         assertTrue(article.read)

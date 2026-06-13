@@ -171,9 +171,7 @@ fun GeneralSettingsPanelView(
                     onNavigate = onNavigateToNotifications,
                     refreshInterval = refreshInterval,
                 )
-                if (source == Source.LOCAL) {
-                    FiltersItem()
-                }
+                FiltersItem()
             }
         }
 

@@ -2,6 +2,8 @@ package com.jocmp.capy.accounts.reader
 
 import com.jocmp.capy.AccountDelegate
 import com.jocmp.capy.AccountPreferences
+import com.jocmp.capy.ArticleAutomation
+import com.jocmp.capy.ArticleAutomationArticle
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
@@ -61,6 +63,7 @@ internal class ReaderAccountDelegate(
     private val enclosureRecords = EnclosureRecords(database)
     private val taggingRecords = TaggingRecords(database)
     private val savedSearchRecords = SavedSearchRecords(database)
+    private val articleAutomation = ArticleAutomation(database, preferences)
 
     override suspend fun refresh(filter: ArticleFilter, cutoffDate: ZonedDateTime?): Result<Unit> {
         return withErrorHandling {
@@ -507,14 +510,18 @@ internal class ReaderAccountDelegate(
         saveArticles(result.items)
     }
 
-    private fun saveArticles(items: List<Item>) {
+    private suspend fun saveArticles(items: List<Item>) {
         val summaries = mutableMapOf<String, String?>()
         items.forEach { item ->
             summaries[item.hexID] = item.summary.content?.let { Jsoup.parse(it).text() }
         }
 
+        val articleIDsToMarkRead = mutableSetOf<String>()
+        val articleIDsToStar = mutableSetOf<String>()
+
         database.transactionWithErrorHandling {
-            val labels = savedSearchRecords.allIDs()
+            val labels = savedSearchRecords.remoteIDs()
+            val automationIDs = savedSearchRecords.automationIDs()
 
             items.forEach { item ->
                 val updated = TimeHelpers.nowUTC()
@@ -522,6 +529,26 @@ internal class ReaderAccountDelegate(
                 val enclosureType = enclosures.firstOrNull()?.type
                 val contentHTML = item.content?.content ?: item.summary.content
                 val articleURL = item.canonical.firstOrNull()?.href
+                val automation = articleAutomation.evaluate(
+                    ArticleAutomationArticle(
+                        title = item.title,
+                        author = item.author,
+                        summary = summaries[item.hexID],
+                        contentHTML = contentHTML,
+                        feedTitle = item.origin.title,
+                        feedURL = item.origin.streamId,
+                    )
+                )
+
+                if (automation.mute) {
+                    articleAutomation.clearMutedArticle(item.hexID)
+                    articleIDsToMarkRead.add(item.hexID)
+                    return@forEach
+                }
+
+                val isNewArticle = !database.articlesQueries
+                    .articleExists(item.hexID)
+                    .executeAsOne()
 
                 database.articlesQueries.create(
                     id = item.hexID,
@@ -562,7 +589,7 @@ internal class ReaderAccountDelegate(
                 item.categories?.let { categories ->
                     savedSearchRecords.removeArticleBySavedSearchIDs(
                         articleID = item.hexID,
-                        excludedIDs = categories
+                        excludedIDs = categories + automationIDs
                     )
                 }
 
@@ -573,7 +600,31 @@ internal class ReaderAccountDelegate(
                         articleID = item.hexID,
                     )
                 }
+
+                if (isNewArticle) {
+                    articleAutomation.applyLocalActions(
+                        articleID = item.hexID,
+                        result = automation,
+                        updatedAt = updated,
+                    )
+
+                    if (automation.shouldMarkReadRemotely && !item.read) {
+                        articleIDsToMarkRead.add(item.hexID)
+                    }
+
+                    if (automation.star && !item.starred) {
+                        articleIDsToStar.add(item.hexID)
+                    }
+                }
             }
+        }
+
+        if (articleIDsToMarkRead.isNotEmpty()) {
+            markRead(articleIDsToMarkRead.toList())
+        }
+
+        if (articleIDsToStar.isNotEmpty()) {
+            addStar(articleIDsToStar.toList())
         }
     }
 

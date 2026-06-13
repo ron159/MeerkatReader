@@ -2,6 +2,8 @@ package com.jocmp.capy.accounts.miniflux
 
 import com.jocmp.capy.AccountDelegate
 import com.jocmp.capy.AccountPreferences
+import com.jocmp.capy.ArticleAutomation
+import com.jocmp.capy.ArticleAutomationArticle
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
@@ -49,6 +51,7 @@ internal class MinifluxAccountDelegate(
     private val enclosureRecords = EnclosureRecords(database)
     private val feedRecords = FeedRecords(database)
     private val taggingRecords = TaggingRecords(database)
+    private val articleAutomation = ArticleAutomation(database, preferences)
 
     override suspend fun refresh(filter: ArticleFilter, cutoffDate: ZonedDateTime?): Result<Unit> {
         return try {
@@ -386,13 +389,40 @@ internal class MinifluxAccountDelegate(
             .awaitAll()
     }
 
-    private fun saveEntries(entries: List<Entry>) {
+    private suspend fun saveEntries(entries: List<Entry>) {
+        val articleIDsToMarkRead = mutableSetOf<String>()
+        val articleIDsToStar = mutableSetOf<String>()
+
         database.transactionWithErrorHandling {
             entries.forEach { entry ->
                 val updated = TimeHelpers.nowUTC()
                 val articleID = entry.id.toString()
                 val imageURL = MinifluxEnclosureParsing.parsedImageURL(entry)
                 val enclosures = entry.enclosures.orEmpty()
+                val feed = database.feedsQueries
+                    .find(entry.feed_id.toString())
+                    .executeAsOneOrNull()
+                val summary = ContentFormatter.summary(entry.content)
+                val automation = articleAutomation.evaluate(
+                    ArticleAutomationArticle(
+                        title = Jsoup.parse(entry.title).text(),
+                        author = entry.author,
+                        summary = summary,
+                        contentHTML = entry.content,
+                        feedTitle = feed?.title.orEmpty(),
+                        feedURL = feed?.feed_url.orEmpty(),
+                    )
+                )
+
+                if (automation.mute) {
+                    articleAutomation.clearMutedArticle(articleID)
+                    articleIDsToMarkRead.add(articleID)
+                    return@forEach
+                }
+
+                val isNewArticle = !database.articlesQueries
+                    .articleExists(articleID)
+                    .executeAsOne()
 
                 database.articlesQueries.create(
                     id = articleID,
@@ -402,7 +432,7 @@ internal class MinifluxAccountDelegate(
                     content_html = entry.content,
                     extracted_content_url = null,
                     url = entry.url,
-                    summary = ContentFormatter.summary(entry.content),
+                    summary = summary,
                     image_url = imageURL,
                     published_at = entry.published_at.toDateTime?.toEpochSecond() ?: updated.toEpochSecond(),
                     enclosure_type = enclosures.firstOrNull()?.mime_type,
@@ -429,7 +459,31 @@ internal class MinifluxAccountDelegate(
                         itunesImage = null,
                     )
                 }
+
+                if (isNewArticle) {
+                    articleAutomation.applyLocalActions(
+                        articleID = articleID,
+                        result = automation,
+                        updatedAt = updated,
+                    )
+
+                    if (automation.shouldMarkReadRemotely && entry.status != EntryStatus.READ) {
+                        articleIDsToMarkRead.add(articleID)
+                    }
+
+                    if (automation.star && !entry.starred) {
+                        articleIDsToStar.add(articleID)
+                    }
+                }
             }
+        }
+
+        if (articleIDsToMarkRead.isNotEmpty()) {
+            markRead(articleIDsToMarkRead.toList())
+        }
+
+        if (articleIDsToStar.isNotEmpty()) {
+            addStar(articleIDsToStar.toList())
         }
     }
 

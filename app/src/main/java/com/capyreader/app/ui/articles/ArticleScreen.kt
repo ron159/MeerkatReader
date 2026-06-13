@@ -170,6 +170,9 @@ fun ArticleScreen(
     var selectedHomeDestination by rememberSaveable {
         mutableStateOf(filter.homeDestination())
     }
+    var articleReturnDestination by rememberSaveable {
+        mutableStateOf<ArticleHomeDestination?>(null)
+    }
 
     val articles = viewModel.articles.collectAsLazyPagingItems()
 
@@ -366,9 +369,24 @@ fun ArticleScreen(
         }
 
         fun clearArticle() {
+            val returnDestination = articleReturnDestination
+
+            if (returnDestination != null) {
+                selectedHomeDestination = returnDestination
+                viewModel.selectArticleFilter(returnDestination.status())
+            } else {
+                viewModel.clearArticle()
+            }
+
+            articleReturnDestination = null
+
             coroutineScope.launchUI {
                 scaffoldNavigator.navigateTo(ListDetailPaneScaffoldRole.List)
             }
+        }
+
+        fun dismissArticle() {
+            articleReturnDestination = null
             viewModel.clearArticle()
         }
 
@@ -397,6 +415,8 @@ fun ArticleScreen(
         val linkOpener = LocalLinkOpener.current
 
         fun selectArticle(articleID: String) {
+            articleReturnDestination = selectedHomeDestination
+
             setArticle(articleID) { nextArticle ->
                 if (search.isActive) {
                     focusManager.clearFocus()
@@ -404,7 +424,7 @@ fun ArticleScreen(
 
                 val url = nextArticle.url
                 if (nextArticle.openInBrowser && url != null) {
-                    clearArticle()
+                    dismissArticle()
                     linkOpener.open(url.toString().toUri())
                 } else {
                     coroutineScope.launch {
@@ -478,6 +498,12 @@ fun ArticleScreen(
         fun selectHomeDestination(destination: ArticleHomeDestination, status: ArticleStatus) {
             selectedHomeDestination = destination
             viewModel.selectArticleFilter(status)
+        }
+
+        LaunchedEffect(filter) {
+            if (filter is ArticleFilter.Articles) {
+                selectedHomeDestination = filter.homeDestination()
+            }
         }
 
         val isHomeFilter = filter is ArticleFilter.Articles && when (selectedHomeDestination) {
@@ -614,7 +640,15 @@ fun ArticleScreen(
                             },
                         ) {
                             if (showFeedNavigation) {
-                                feedNavigationContent()
+                                PullToRefreshBox(
+                                    isRefreshing = isPullToRefreshing,
+                                    onRefresh = {
+                                        refreshFeeds()
+                                    },
+                                    modifier = Modifier.fillMaxSize(),
+                                ) {
+                                    feedNavigationContent()
+                                }
                             } else {
                                 PullToRefreshBox(
                                     isRefreshing = isPullToRefreshing,
@@ -709,7 +743,7 @@ fun ArticleScreen(
             val isOnList =
                 scaffoldNavigator.currentDestination?.pane != ListDetailPaneScaffoldRole.Detail
             if (isOnList && article != null) {
-                viewModel.clearArticle()
+                clearArticle()
             }
         }
 
@@ -925,6 +959,14 @@ private fun ArticleFilter.homeDestination(): ArticleHomeDestination {
         ArticleStatus.ALL -> ArticleHomeDestination.FEEDS
         ArticleStatus.UNREAD -> ArticleHomeDestination.UNREAD
         ArticleStatus.STARRED -> ArticleHomeDestination.STARRED
+    }
+}
+
+private fun ArticleHomeDestination.status(): ArticleStatus {
+    return when (this) {
+        ArticleHomeDestination.FEEDS -> ArticleStatus.ALL
+        ArticleHomeDestination.UNREAD -> ArticleStatus.UNREAD
+        ArticleHomeDestination.STARRED -> ArticleStatus.STARRED
     }
 }
 

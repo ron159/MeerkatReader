@@ -20,6 +20,14 @@ internal class SavedSearchRecords(private val database: Database) {
         return savedSearchQueries.allIDs().executeAsList()
     }
 
+    internal fun remoteIDs(): List<String> {
+        return allIDs().filterNot(::isAutomationID)
+    }
+
+    internal fun automationIDs(): List<String> {
+        return allIDs().filter(::isAutomationID)
+    }
+
     internal fun savedSearchIDsByArticle(articleID: String): Flow<List<String>> {
         return savedSearchQueries
             .savedSearchIDsByArticle(articleID)
@@ -61,7 +69,7 @@ internal class SavedSearchRecords(private val database: Database) {
     }
 
     internal fun deleteOrphaned(excludedIDs: List<String>) {
-        savedSearchQueries.deleteOrphaned(excludedIDs = excludedIDs)
+        savedSearchQueries.deleteOrphaned(excludedIDs = excludedIDs + automationIDs())
     }
 
     internal fun deleteOrphanedEntries(savedSearchID: String, excludedIDs: List<String>) {
@@ -94,4 +102,12 @@ internal class SavedSearchRecords(private val database: Database) {
 
     private val savedSearchQueries
         get() = database.saved_searchesQueries
+
+    companion object {
+        private const val AUTOMATION_PREFIX = "automation:"
+
+        fun automationID(name: String) = "$AUTOMATION_PREFIX$name"
+
+        fun isAutomationID(id: String) = id.startsWith(AUTOMATION_PREFIX)
+    }
 }
