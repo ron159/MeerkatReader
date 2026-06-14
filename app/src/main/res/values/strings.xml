@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Capy Reader</string>
+    <string name="app_name" translatable="false">Meerkat Reader</string>
     <string name="add_feed_url_title">Feed or Website URL</string>
     <string name="add_feed_name_title">Name</string>
     <string name="add_feed_new_folder_title">New Folder</string>
@@ -238,6 +238,9 @@
     <string name="settings_clear_all_articles_button">Clear all articles</string>
     <string name="settings_support_button">Support</string>
     <string name="settings_donate_button">Donate</string>
+    <string name="settings_original_project_title">Original project</string>
+    <string name="settings_original_project_summary">Meerkat Reader builds on Capy Reader. Thanks to the original project and contributors.</string>
+    <string name="settings_project_attribution">Based on Capy Reader</string>
     <string name="settings_article_list_title">Article List</string>
     <string name="opml_exporter_success">Export complete</string>
     <string name="opml_exporter_failure">Export failed</string>

@@ -81,7 +81,7 @@ class NotificationHelper(
                 NotificationCompat.BigTextStyle()
                     .bigText(notification.title)
             )
-            .setSmallIcon(R.drawable.capy_icon_small)
+            .setSmallIcon(R.drawable.meerkat_silhouette)
             .setGroup(ARTICLE_REFRESH_GROUP)
             .setSubText(notification.feedTitle)
             .setContentInfo(notification.title)
@@ -103,7 +103,7 @@ class NotificationHelper(
             applicationContext,
             Notifications.FEED_UPDATE.channelID
         )
-            .setSmallIcon(R.drawable.capy_icon_small)
+            .setSmallIcon(R.drawable.meerkat_silhouette)
             .setGroup(ARTICLE_REFRESH_GROUP)
             .setGroupSummary(true)
 

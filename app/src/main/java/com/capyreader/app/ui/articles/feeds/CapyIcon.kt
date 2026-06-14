@@ -27,9 +27,9 @@ fun CapyIcon() {
     val (surprised, setSurprised) = remember { mutableStateOf(false) }
 
     val icon = if (surprised) {
-        R.drawable.capy_surprised
+        R.drawable.meerkat_silhouette
     } else {
-        R.drawable.capy_resting
+        R.drawable.meerkat_silhouette
     }
 
     Box(

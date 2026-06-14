@@ -126,7 +126,7 @@ get "/" do
 end
 
 puts ""
-puts "=== Capy Reader Asset Forge ==="
+puts "=== Meerkat Reader Asset Forge ==="
 puts "Local:    http://localhost:#{PORT}"
 puts "Emulator: http://10.0.2.2:#{PORT}"
 puts ""

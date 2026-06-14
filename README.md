@@ -1,87 +1,66 @@
-# Capy Reader
+# Meerkat Reader
 
-<img src="./site/capy.png" width="100px">
+<img src="./site/meerkat.png" width="120px">
 
-_A smallish RSS reader with support for Feedbin, FreshRSS, Miniflux and local feeds._
+Meerkat Reader is an Android RSS reader evolved from
+[Capy Reader](https://github.com/jocmp/capyreader). It keeps the friendly
+animal-themed spirit while continuing in a new direction with a different name,
+visual identity, and feature set.
 
-![Tests](https://github.com/jocmp/capyreader/actions/workflows/test.yml/badge.svg) <a href="https://hosted.weblate.org/engage/capy-reader/">
- <img src="https://hosted.weblate.org/widget/capy-reader/strings/svg-badge.svg" alt="Translation status" />
-</a>
+## Highlights
 
-## Download
+- Sync with Feedbin, FreshRSS, Miniflux, Google Reader API-compatible services,
+  or local on-device feeds.
+- Fast article navigation with unread, starred, saved-for-later, today, folder,
+  feed, and saved-search views.
+- Full-content extraction for reading complete articles inside the app.
+- Article image caching and adjacent preloading for smoother reader navigation.
+- Backup and restore for subscriptions, account settings, and app preferences.
+- Customizable reader typography, themes, gestures, image visibility, and list
+  density.
+- Home screen widgets, feed update notifications, and media/audio playback
+  support.
+- OPML import/export and starred bookmark export.
 
-- [Google Play][gplay_link]
-- [F-Droid][fdroid_link]
-- [IzzyOnDroid][izzy_link]
-- [GitHub Releases][github_link]
+## Thanks
 
-Capy Reader is free across all sources. It is available for devices running Android 11 or later.
-
-### Releases
-
-- Google Play and F-Droid releases happen every week or so depending on new features, bugfixes and translations.
-- Nightly releases are a separate package marked with a "-nightly" suffix. These are unstable, untested builds.
-
-## Reporting a bug
-
-Bug reports are always welcome and are a top priority. Please search the [discussions](https://github.com/jocmp/capyreader/discussions) first and issues to make sure the bug is new and hasn't been reported yet.
-
-If you're in doubt or run into an unreported issue, go ahead and submit a bug report. Please include details like app version, OS version, and steps to reproduce the bug. Screenshots are also useful!
-
-[Report a bug](https://github.com/jocmp/capyreader/discussions/new?category=bugs)
-
-## Feature Requests
-
-If you have questions or a general feature request, please post them to discussions as a [feature request](https://github.com/jocmp/capyreader/discussions/new?category=feature-requests).
-
-### Full Content Support
-
-Sometimes Capy's full content mode doesn't work as expected on a site due to the chaos of the web.
-
-When this happens, please submit a separate issue to support full content for that site: [Full Content Request form](https://github.com/jocmp/capyreader/issues/new?template=2-full-content-request.yml)
-
-Writing and verifying full content parsers can be time consuming. If you find this useful, [consider donating](https://ko-fi.com/capyreader) to show your support.
-
-## Roadmap
-
-Check out the [project roadmap](https://github.com/users/jocmp/projects/3) to see what's currently in progress and on deck.
-
-## Contributing
-
-### Translations
-
-Translations are hosted on [Weblate](https://hosted.weblate.org/projects/capy-reader) and are open to everyone to add or update translations. If you don't see your language, feel free to add it!
-
-### Pull Requests
-
-If you want to create a pull request **please ask first.** This will save time in review, and save your time writing code if it doesn't fit for the app.
+Meerkat Reader is based on the excellent Capy Reader project by
+[jocmp](https://github.com/jocmp) and its contributors. This fork is intended to
+continue evolving independently so users can distinguish it from the original
+project.
 
 ## Building the app
 
 ### Getting Started
 
-1. Clone this repository
-2. Install [Android Studio](https://developer.android.com/studio) if you don't have it already
-3. Sync Gradle
-4. In the toolbar, go to Run > Run 'app'
+1. Clone this repository.
+2. Install [Android Studio](https://developer.android.com/studio) if you do not
+   have it already.
+3. Sync Gradle.
+4. In the toolbar, go to Run > Run 'app'.
 
-#### Build a signed release (Optional)
+### Build a debug APK
 
-By default the app will build with a debug keystore. Follow the instructions below to build a signed release.
+From the project root:
 
-1. Ensure you have a keystore with the name `release.keystore` in the root directory.
-2. Next, create a file called `secrets.properties`, also in the root directory, with the following values
+```sh
+./gradlew :app:assembleFreeDebug
+```
 
-    ```properties
-    key_alias=
-    store_password=
-    key_password=
-    ```
+The debug APK is written to:
 
+```text
+app/build/outputs/apk/free/debug/app-free-debug.apk
+```
 
-[gplay_link]: https://play.google.com/store/apps/details?id=com.capyreader.app
-[fdroid_link]: https://f-droid.org/packages/com.capyreader.app/
-[izzy_link]: https://apt.izzysoft.de/fdroid/index/apk/com.capyreader.app
-[izzy_img]: https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/com.capyreader.app&label=IzzyOnDroid
-[github_link]: https://github.com/jocmp/capyreader/releases/latest
-[github_img]: https://img.shields.io/github/v/release/jocmp/capyreader?logo=GitHub
+### Build a signed release
+
+By default the app will build with a debug keystore. To build a signed release,
+place `release.keystore` in the root directory, then create `secrets.properties`
+with:
+
+```properties
+key_alias=
+store_password=
+key_password=
+```

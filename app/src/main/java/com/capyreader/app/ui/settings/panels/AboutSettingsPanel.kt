@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.VolunteerActivism
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -45,10 +44,11 @@ import kotlinx.coroutines.launch
 fun AboutSettingsPanel() {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    val appName = stringResource(R.string.app_name)
     val copyVersionToClipboard = {
         scope.launch {
             clipboard.setClipEntry(
-                ClipEntry(ClipData.newPlainText("", "Capy Reader $VERSION_NAME"))
+                ClipEntry(ClipData.newPlainText("", "$appName $VERSION_NAME"))
             )
         }
     }
@@ -62,27 +62,15 @@ fun AboutSettingsPanel() {
         Column {
             Box(
                 modifier = Modifier.clickable {
-                    linkOpener.open(Support.URL.toUri())
+                    linkOpener.open(Project.ORIGINAL_URL.toUri())
                 }
             ) {
                 ListItem(
                     leadingContent = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
-                    headlineContent = { Text(stringResource(R.string.settings_support_button)) }
-                )
-            }
-            Box(
-                modifier = Modifier.clickable {
-                    linkOpener.open(Support.DONATE_URL.toUri())
-                }
-            ) {
-                ListItem(
-                    leadingContent = {
-                        Icon(
-                            Icons.Rounded.VolunteerActivism,
-                            contentDescription = null
-                        )
-                    },
-                    headlineContent = { Text(stringResource(R.string.settings_donate_button)) }
+                    headlineContent = { Text(stringResource(R.string.settings_original_project_title)) },
+                    supportingContent = {
+                        Text(stringResource(R.string.settings_original_project_summary))
+                    }
                 )
             }
         }
@@ -116,9 +104,9 @@ fun AboutSettingsPanel() {
         FormSection {
             Box(Modifier.padding(horizontal = 4.dp)) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    TextButton(onClick = { linkOpener.open(Support.ABOUT_URL.toUri()) }) {
+                    TextButton(onClick = { linkOpener.open(Project.ORIGINAL_URL.toUri()) }) {
                         Text(
-                            text = "Made with ♥ in ✶✶✶✶",
+                            text = stringResource(R.string.settings_project_attribution),
                         )
                     }
                 }
@@ -128,12 +116,8 @@ fun AboutSettingsPanel() {
     }
 }
 
-private object Support {
-    const val DONATE_URL = "https://capyreader.com/donate"
-
-    const val URL = "https://capyreader.com/support"
-
-    const val ABOUT_URL = "https://jocmp.com"
+private object Project {
+    const val ORIGINAL_URL = "https://github.com/jocmp/capyreader"
 }
 
 @Preview

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="nav_headline_folders">Етикети</string>
-    <string name="app_name">Capy Reader</string>
+    <string name="app_name" translatable="false">Meerkat Reader</string>
     <string name="add_account_title">Добавяне на профил</string>
     <string name="transfers_export_subscriptions">Изнасяне на абонаменти</string>
     <string name="opml_import_button_text">Внасяне от файл</string>

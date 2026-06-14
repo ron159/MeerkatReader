@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Capy Reader"
+rootProject.name = "Meerkat Reader"
 include(":app")
 include(":feedbinclient")
 include(":feedfinder")

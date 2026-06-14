@@ -125,7 +125,7 @@ private fun Context.openArticle(article: Article): Action {
 
 
 private fun uniqueUri(article: Article): Uri {
-    val fallbackUri = "https://capyreader.com/${article.id}".toUri()
+    val fallbackUri = "meerkat-reader://article/${article.id}".toUri()
     val url = article.url
 
     return try {

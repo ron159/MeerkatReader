@@ -118,7 +118,7 @@ fun SpotlightLayout(
                 modifier = GlanceModifier.fillMaxSize()
             ) {
                 Image(
-                    provider = ImageProvider(R.drawable.capy_icon_small),
+                    provider = ImageProvider(R.drawable.meerkat_silhouette),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(textColor),
                     modifier = GlanceModifier

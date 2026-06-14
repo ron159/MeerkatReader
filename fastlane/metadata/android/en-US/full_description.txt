@@ -1,13 +1,16 @@
-Just like its namesake, Capy Reader is a small RSS reader focused on approachability and simplicity.
+Meerkat Reader is a fast, friendly RSS reader for Android. It is based on Capy Reader and continues as an independently evolved app with a new name, visual identity, and feature set.
 
 Some features include:
 
-• Syncing via Feedbin, FreshRSS, or directly to your device
+• Syncing via Feedbin, FreshRSS, Miniflux, Google Reader API-compatible services, or directly to your device
 • Track read and starred articles
+• Save articles for later
 • Article search
+• Full content extraction
+• Article image caching and reader preloading
+• Backup and restore for subscriptions and settings
 • Headlines widget
 • Notifications
-• Full content mode
 • Dark mode
 • Big screen support
 • Import and export your saved feeds

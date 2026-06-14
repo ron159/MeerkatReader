@@ -1,6 +1,6 @@
 # Reader Assets
 
-Build pipeline for the article reader stylesheet and HTML template used by [Capy Reader](https://github.com/jocmp/capyreader).
+Build pipeline for the article reader stylesheet and HTML template used by Meerkat Reader.
 
 ## Building
 

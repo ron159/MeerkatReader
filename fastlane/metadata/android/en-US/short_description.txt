@@ -1,1 +1,1 @@
-A smallish RSS reader
+A fast, friendly RSS reader

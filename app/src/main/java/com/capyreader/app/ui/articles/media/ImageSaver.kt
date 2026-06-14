@@ -50,7 +50,7 @@ object ImageSaver {
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                     put(
                         MediaStore.MediaColumns.RELATIVE_PATH,
-                        "${Environment.DIRECTORY_PICTURES}/Capy Reader"
+                        "${Environment.DIRECTORY_PICTURES}/Meerkat Reader"
                     )
                 }
 

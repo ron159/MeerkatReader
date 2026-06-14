@@ -14,7 +14,7 @@ fun CapyPlaceholder() {
     val tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
     Icon(
-        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+        painter = painterResource(id = R.drawable.meerkat_silhouette),
         contentDescription = null,
         tint = tint
     )

@@ -130,7 +130,7 @@ fun ArticleListTopBar(
             } else {
                 IconButton(onClick = onRequestJumpToTop) {
                     Icon(
-                        painter = painterResource(R.drawable.capy_resting),
+                        painter = painterResource(R.drawable.meerkat_silhouette),
                         contentDescription = stringResource(R.string.app_name),
                         modifier = Modifier.size(32.dp),
                     )

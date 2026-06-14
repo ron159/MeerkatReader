@@ -9,7 +9,7 @@
 
 ## Project Architecture
 
-Capy Reader is an RSS reader for Android split into several gradle modules
+Meerkat Reader is an RSS reader for Android split into several gradle modules
 
 ### Key Gradle Modules
 
