@@ -27,6 +27,7 @@ enum class ArticleVerticalSwipe {
     companion object {
         val topOptions = listOf(
             DISABLED,
+            OPEN_ARTICLE_IN_BROWSER,
             LOAD_FULL_CONTENT,
             PREVIOUS_ARTICLE,
         )

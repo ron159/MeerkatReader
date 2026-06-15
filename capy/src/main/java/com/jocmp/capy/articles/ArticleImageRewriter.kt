@@ -29,9 +29,19 @@ class ArticleImageRewriter {
             image.removeAttr("data-original")
             image.removeAttr("data-lazy-src")
             image.removeAttr("data-srcset")
+            image.removePictureSources()
         }
 
         return document.body().html()
+    }
+
+    private fun Element.removePictureSources() {
+        val picture = parent() ?: return
+        if (!picture.tagName().equals("picture", ignoreCase = true)) {
+            return
+        }
+
+        picture.select("> source").remove()
     }
 
     private fun Element.sourceCandidates(): List<String> {

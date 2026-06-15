@@ -44,7 +44,7 @@ fun Article.plainTextContent(): String {
 private fun ArticleAiDisplayState.toTopCardHtml(): String {
     return when {
         isLoading -> """
-            <section class="ai-card ai-card--loading">
+            <section class="ai-card ai-card--loading" data-capy-ai-preserve="true">
               <div class="ai-card__eyebrow">${action.labelHtml()}</div>
               <div class="ai-card__title">Working on it</div>
               <div class="ai-shimmer ai-shimmer--wide"></div>
@@ -54,7 +54,7 @@ private fun ArticleAiDisplayState.toTopCardHtml(): String {
         """.trimIndent()
         error != null -> toErrorCardHtml()
         result != null -> """
-            <section class="ai-card">
+            <section class="ai-card" data-capy-ai-preserve="true">
               <div class="ai-card__eyebrow">${action.labelHtml()}</div>
               <div class="ai-card__content">${result.toArticleHtml()}</div>
             </section>
@@ -65,7 +65,7 @@ private fun ArticleAiDisplayState.toTopCardHtml(): String {
 
 private fun ArticleAiDisplayState.toErrorCardHtml(): String {
     return """
-        <section class="ai-card ai-card--error">
+        <section class="ai-card ai-card--error" data-capy-ai-preserve="true">
           <div class="ai-card__eyebrow">${action.labelHtml()}</div>
           <div class="ai-card__content">${error.orEmpty().escapeHtml()}</div>
         </section>
@@ -80,7 +80,7 @@ private fun parallelTranslationHtml(originalHtml: String, translatedText: String
     }
 
     return """
-        <section class="ai-translation">
+        <section class="ai-translation" data-capy-ai-preserve="true">
           <div class="ai-card__eyebrow">AI Translation</div>
           $rows
         </section>

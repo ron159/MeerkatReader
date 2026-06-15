@@ -96,4 +96,36 @@ class ArticleImageRewriterTest {
         )
         assertFalse(image.hasAttr("data-src"))
     }
+
+    @Test
+    fun removesPictureSourcesWhenImageIsRewritten() {
+        val rewritten = rewriter.rewrite(
+            html = """
+                <picture>
+                    <source type="image/webp" srcset="https://example.com/animated.webp">
+                    <img src="https://example.com/animated.gif">
+                </picture>
+            """.trimIndent(),
+            cachedImages = listOf(
+                CachedArticleImage(
+                    assetID = "abc123",
+                    originalSrc = "https://example.com/animated.gif",
+                    resolvedURL = "https://example.com/animated.gif",
+                    ordinal = 0,
+                    altText = null,
+                    relativePath = "ab/abc123.gif",
+                    mimeType = "image/gif",
+                )
+            )
+        )
+
+        val picture = Jsoup.parseBodyFragment(rewritten).body().selectFirst("picture")!!
+        val image = picture.selectFirst("img")!!
+
+        assertEquals(expected = 0, actual = picture.select("source").size)
+        assertEquals(
+            expected = "https://appassets.androidplatform.net/article-images/ab/abc123.gif",
+            actual = image.attr("src"),
+        )
+    }
 }

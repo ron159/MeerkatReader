@@ -23,6 +23,19 @@
         --pre-white-space: {{pre_white_space}};
         --table-overflow-x: {{table_overflow_x}};
       }
+
+      #article-body-content .image-load-error {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 0.5rem 0 1rem;
+        padding: 0.75rem;
+        border-radius: var(--corner-radius);
+        background: var(--color-surface-container);
+        color: var(--color-on-surface-variant);
+        font-family: monospace;
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
     </style>
     {{font_preload}}
     {{image_preload}}

@@ -42,7 +42,7 @@ function addImageClickListeners() {
   });
 }
 
-function addImageDebugLabels() {
+function addImageLoadFailureListeners() {
   const content = document.getElementById("article-body-content");
   if (!content) return;
 
@@ -51,18 +51,87 @@ function addImageDebugLabels() {
       return;
     }
 
-    if (img.nextElementSibling?.classList.contains("image-debug-label")) {
+    if (img.dataset.capyLoadFailureListener === "true") {
       return;
     }
 
-    const source = img.dataset.capyImageId ? "cached" : "remote";
-    const loading = img.loading || "auto";
-    const label = document.createElement("div");
-    label.className = `image-debug-label image-debug-label--${source}`;
-    label.textContent = `${source} / ${loading}`;
+    img.dataset.capyLoadFailureListener = "true";
+    img.addEventListener("load", () => removeImageLoadFailure(img));
+    img.addEventListener("error", (event) =>
+      showImageLoadFailure(img, event),
+    );
 
-    img.insertAdjacentElement("afterend", label);
+    if (img.complete && img.naturalWidth === 0) {
+      showImageLoadFailure(img);
+    }
   });
+}
+
+/**
+ * @param {HTMLImageElement} img
+ * @param {Event=} event
+ */
+function showImageLoadFailure(img, event) {
+  let label = img.nextElementSibling;
+
+  if (!label?.classList.contains("image-load-error")) {
+    label = document.createElement("div");
+    label.className = "image-load-error";
+    img.insertAdjacentElement("afterend", label);
+  }
+
+  label.textContent = imageLoadFailureMessage(img, event);
+}
+
+/**
+ * @param {HTMLImageElement} img
+ */
+function removeImageLoadFailure(img) {
+  const label = img.nextElementSibling;
+  if (label?.classList.contains("image-load-error")) {
+    label.remove();
+  }
+}
+
+/**
+ * @param {HTMLImageElement} img
+ * @param {Event=} event
+ * @returns string
+ */
+function imageLoadFailureMessage(img, event) {
+  const source = img.dataset.capyImageId ? "cached" : "remote";
+  const url = img.currentSrc || img.src || img.getAttribute("src") || "";
+  const details = [
+    "Image failed to load",
+    `source: ${source}`,
+  ];
+
+  if (!url) {
+    details.push("reason: missing image URL");
+  } else if (source === "cached") {
+    details.push("reason: cached file is unavailable or unreadable");
+    details.push(`url: ${url}`);
+  } else if (navigator.onLine === false) {
+    details.push("reason: device is offline");
+    details.push(`url: ${url}`);
+  } else {
+    details.push("reason: remote request failed or returned invalid image data");
+    details.push(`url: ${url}`);
+  }
+
+  if (img.dataset.capyImageId) {
+    details.push(`cache id: ${img.dataset.capyImageId}`);
+  }
+
+  if (img.dataset.capyOriginalSrc && img.dataset.capyOriginalSrc !== url) {
+    details.push(`original: ${img.dataset.capyOriginalSrc}`);
+  }
+
+  if (event?.type) {
+    details.push(`event: ${event.type}`);
+  }
+
+  return details.join("\n");
 }
 
 function primeArticleImages() {
@@ -241,7 +310,7 @@ function postProcessContent(baseUrl, hideImages) {
     wrapper.appendChild(table);
   });
 
-  addImageDebugLabels();
+  addImageLoadFailureListeners();
   primeArticleImages();
 }
 
@@ -433,7 +502,7 @@ window.onload = () => {
   addImageClickListeners();
   addEmbedListeners();
   configureVideoTags();
-  addImageDebugLabels();
+  addImageLoadFailureListeners();
   primeArticleImages();
   Android.requestAudioState();
 };

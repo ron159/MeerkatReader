@@ -30,6 +30,12 @@ async function displayFullContent(article) {
 
     const content = document.getElementById("article-body-content");
     if (content) {
+      const preservedNodes = Array.from(
+        content.querySelectorAll("[data-capy-ai-preserve]")
+      );
+      preservedNodes.reverse().forEach((node) => {
+        extracted.prepend(node);
+      });
       content.replaceWith(extracted);
     }
 
@@ -52,4 +58,3 @@ async function parseWithParser(article) {
     content: result.content,
   };
 }
-
