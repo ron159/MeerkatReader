@@ -179,6 +179,7 @@
     <string name="article_list_row_swipe_toggle_read">Veksle lest</string>
     <string name="article_list_row_swipe_toggle_starred">Veksle stjernemerking</string>
     <string name="settings_mark_read_on_scroll">Merk som lest ved skrolling</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">Marker alle som lest</string>
     <string name="article_list_sort_title">Artikkelrekkefølge</string>
     <string name="settings_section_browser">Nettleser</string>

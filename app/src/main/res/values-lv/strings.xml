@@ -185,6 +185,7 @@
     <string name="article_view_open_externally">Atvērt ar citu lietotni</string>
     <string name="settings_confirm_mark_all_read">Pieprasīt apstiprinājumu, kad atzīmē visus rakstus kā lasītus</string>
     <string name="settings_mark_read_on_scroll">Atzīmēt rakstu kā lasītu, to ritinot</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_gestures_enable_horizontal_pagination_title">Iespējot horizontālo ritināšanu</string>
     <string name="end_of_feed_text">Visi raksti izlasīti!</string>
     <string name="settings_section_browser">Pārlūks</string>

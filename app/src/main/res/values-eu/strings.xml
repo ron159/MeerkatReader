@@ -296,6 +296,7 @@
     <string name="settings_options_reader_pin_top_toolbar">Finkatu tresna-barrak</string>
     <string name="settings_gestures_list_back_navigation_action">Atzera nabigatzeko ekintza</string>
     <string name="settings_mark_read_on_scroll">Markatu irakurritakotzat korritzean</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_gestures_enable_horizontal_pagination_title">Gaitu korritze horizontala</string>
     <string name="settings_gestures_enable_horizontal_pagination_subtitle">Irristatu ezkerrera edo eskuinera artikuluen artean nabigatzeko</string>
     <string name="settings_gestures_reader_tap_to_page_subtitle">Ukitu beheko izkinak artikuluaren edukian nabigatzeko</string>

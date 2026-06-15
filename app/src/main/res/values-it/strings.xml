@@ -207,6 +207,7 @@
     <string name="settings_gestures_reader_tap_to_page_title">Dispositivi E-Ink tocca per scorrere</string>
     <string name="settings_enable_high_contrast_dark_theme">Abilita il tema scuro ad alto contrasto</string>
     <string name="settings_mark_read_on_scroll">Scorrendo verso il basso</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">Marca tutto come letto</string>
     <string name="settings_section_browser">Browser</string>
     <string name="reader_image_visibility_always_show">Mostra sempre</string>

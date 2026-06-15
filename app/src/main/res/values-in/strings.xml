@@ -212,6 +212,7 @@
     <string name="crash_log_export_item_title">Bagikan catatan kerusakan</string>
     <string name="article_view_open_externally">Buka secara eksternal</string>
     <string name="settings_mark_read_on_scroll">Tandai sebagai sudah dibaca saat digulir</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_enable_high_contrast_dark_theme">Aktifkan tema gelap dengan kontras tinggi</string>
     <string name="settings_section_mark_all_as_read">Tandai Semua Sudah Dibaca</string>
     <string name="after_read_all_behavior_default">Bawaan</string>

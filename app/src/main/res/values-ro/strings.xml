@@ -146,6 +146,7 @@
     <string name="article_list_row_swipe_open_externally">Deschide articolul în browser</string>
     <string name="article_view_open_externally">Deschide extern</string>
     <string name="settings_mark_read_on_scroll">Marchează ca citit la derulare</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_gestures_reader_tap_to_page_subtitle">Atinge colțurile de jos pentru a naviga prin conținutul articolului</string>
     <string name="reader_image_visibility_show_on_wifi">Arată imagini doar prin Wi-Fi</string>
     <string name="reader_image_visibility_label">Imagini</string>

@@ -163,6 +163,12 @@ class AppPreferences(context: Context) {
                 SortOrder.default
             )
 
+        val defaultHomeTab: Preference<DefaultHomeTab>
+            get() = preferenceStore.getEnum(
+                "article_list_default_home_tab",
+                DefaultHomeTab.default
+            )
+
         val showFeedName: Preference<Boolean>
             get() = preferenceStore.getBoolean("article_display_feed_name", true)
 

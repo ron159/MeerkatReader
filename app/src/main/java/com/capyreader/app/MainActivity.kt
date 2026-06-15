@@ -10,6 +10,7 @@ import com.capyreader.app.notifications.NotificationHelper
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.ui.App
 import com.capyreader.app.ui.Route
+import com.jocmp.capy.ArticleFilter
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 
@@ -20,11 +21,16 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val initialRoute = startDestination()
+        val openedFromNotification = intent.hasNotificationTarget()
         pendingArticleID = NotificationHelper.openFromIntent(intent, appPreferences = appPreferences)
+        if (savedInstanceState == null && !openedFromNotification && initialRoute == Route.Articles) {
+            appPreferences.openDefaultHomeTab()
+        }
 
         setContent {
             App(
-                startDestination = startDestination(),
+                startDestination = initialRoute,
                 appPreferences = appPreferences,
                 pendingArticleID = pendingArticleID,
                 onPendingArticleSelected = { pendingArticleID = null },
@@ -48,4 +54,16 @@ class MainActivity : BaseActivity() {
             Route.Articles
         }
     }
+}
+
+private fun Intent.hasNotificationTarget(): Boolean {
+    return hasExtra(NotificationHelper.UNREAD_ONLY_KEY) ||
+        hasExtra(NotificationHelper.SHOW_ALL_KEY) ||
+        hasExtra(NotificationHelper.ARTICLE_ID_KEY) ||
+        hasExtra(NotificationHelper.FEED_ID_KEY)
+}
+
+private fun AppPreferences.openDefaultHomeTab() {
+    val defaultHomeTab = articleListOptions.defaultHomeTab.get()
+    filter.set(ArticleFilter.Articles(articleStatus = defaultHomeTab.articleStatus))
 }

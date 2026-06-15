@@ -204,6 +204,7 @@
     <string name="settings_enable_high_contrast_dark_theme">Kasuta suure kontrastsusega tumedat kujundust</string>
     <string name="settings_section_mark_all_as_read">Märgi kõik loetuks</string>
     <string name="settings_mark_read_on_scroll">Märgi kerimisega loetuks</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_browser">Brauser</string>
     <string name="reader_image_visibility_show_on_wifi">Näita pilte vaid WiFi võrgu kasutamisel</string>
     <string name="reader_image_visibility_always_hide">Blokeeri pildid</string>

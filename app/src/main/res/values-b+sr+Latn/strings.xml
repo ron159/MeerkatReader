@@ -199,6 +199,7 @@
     <string name="settings_section_account_server">Server</string>
     <string name="auth_fields_api_url">Server</string>
     <string name="settings_mark_read_on_scroll">Označi kao pročitano na skrolovanju</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">Označi sve kao pročitano</string>
     <string name="settings_section_browser">Brovser</string>
     <string name="reader_image_visibility_show_on_wifi">Prikaži slike samo na Wi-Fi</string>

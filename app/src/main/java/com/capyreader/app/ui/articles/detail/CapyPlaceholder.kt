@@ -1,22 +1,16 @@
 package com.capyreader.app.ui.articles.detail
 
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import com.capyreader.app.R
+import com.capyreader.app.ui.components.MeerkatSilhouetteIcon
 
 @Composable
 fun CapyPlaceholder() {
-    val tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-
-    Icon(
-        painter = painterResource(id = R.drawable.meerkat_silhouette),
+    MeerkatSilhouetteIcon(
         contentDescription = null,
-        tint = tint
+        alpha = 0.6f,
     )
 }
 

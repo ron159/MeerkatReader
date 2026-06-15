@@ -45,6 +45,7 @@ import com.capyreader.app.R
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.notifications.Notifications
 import com.capyreader.app.preferences.AfterReadAllBehavior
+import com.capyreader.app.preferences.DefaultHomeTab
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.ui.CrashReporting
 import com.capyreader.app.ui.components.FormSection
@@ -98,6 +99,8 @@ fun GeneralSettingsPanel(
             onClearArticles = viewModel::clearAllArticles,
             updateSortOrder = viewModel::updateSortOrder,
             sortOrder = viewModel.sortOrder,
+            defaultHomeTab = viewModel.defaultHomeTab,
+            updateDefaultHomeTab = viewModel::updateDefaultHomeTab,
             updateConfirmMarkAllRead = viewModel::updateConfirmMarkAllRead,
             confirmMarkAllRead = viewModel.confirmMarkAllRead,
             afterReadAll = viewModel.afterReadAll,
@@ -125,6 +128,8 @@ fun GeneralSettingsPanelView(
     autoDelete: AutoDelete,
     updateSortOrder: (SortOrder) -> Unit,
     sortOrder: SortOrder,
+    defaultHomeTab: DefaultHomeTab,
+    updateDefaultHomeTab: (DefaultHomeTab) -> Unit,
     updateStickyFullContent: (enable: Boolean) -> Unit,
     enableStickyFullContent: Boolean,
     updateConfirmMarkAllRead: (enable: Boolean) -> Unit,
@@ -152,6 +157,15 @@ fun GeneralSettingsPanelView(
         SortOrderSelect(
             sortOrder,
             updateSortOrder
+        )
+        PreferenceSelect(
+            selected = defaultHomeTab,
+            update = updateDefaultHomeTab,
+            options = DefaultHomeTab.entries,
+            label = R.string.settings_default_home_tab,
+            optionText = {
+                stringResource(it.translationKey)
+            }
         )
 
         FormSection(title = stringResource(R.string.settings_section_refresh)) {
@@ -376,6 +390,8 @@ private fun GeneralSettingsPanelPreview() {
                 autoDelete = AutoDelete.WEEKLY,
                 sortOrder = SortOrder.NEWEST_FIRST,
                 updateSortOrder = {},
+                defaultHomeTab = DefaultHomeTab.FEEDS,
+                updateDefaultHomeTab = {},
                 onNavigateToNotifications = {},
                 updateConfirmMarkAllRead = {},
                 confirmMarkAllRead = true,

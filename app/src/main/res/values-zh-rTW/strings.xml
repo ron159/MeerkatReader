@@ -205,6 +205,7 @@
     <string name="settings_gestures_reader_tap_to_page_title">E Ink 手勢</string>
     <string name="settings_enable_high_contrast_dark_theme">高對比度深色主題</string>
     <string name="settings_mark_read_on_scroll">滾動時標為已讀</string>
+    <string name="settings_default_home_tab">啟動後預設開啟的分頁</string>
     <string name="settings_section_mark_all_as_read">全部標為已讀</string>
     <string name="settings_section_browser">瀏覽器</string>
     <string name="reader_image_visibility_label">圖片</string>

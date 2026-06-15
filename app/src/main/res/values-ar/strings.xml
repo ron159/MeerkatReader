@@ -204,6 +204,7 @@
     <string name="add_account_freshrss_signup_prompt">ليس لديك نسخة FreshRSS ؟</string>
     <string name="add_account_freshrss_signup_link_text">اكتشف المزيد.</string>
     <string name="settings_mark_read_on_scroll">ضع علامة كمقروء تلقائيًا خلال التمرير</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">وضع علامة كمقروء على الكل</string>
     <string name="settings_section_browser">المتصفح</string>
     <string name="reader_image_visibility_show_on_wifi">اعرض الصور فقط عبر الـWi-Fi</string>

@@ -24,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -99,7 +100,6 @@ import com.jocmp.capy.Feed
 import com.jocmp.capy.Folder
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.SavedSearch
-import com.jocmp.capy.common.launchIO
 import com.jocmp.capy.common.launchUI
 import com.jocmp.capy.logging.CapyLog
 import kotlinx.coroutines.FlowPreview
@@ -135,7 +135,6 @@ fun ArticleScreen(
     val nextFilter by viewModel.nextFilter.collectAsStateWithLifecycle(initialValue = null)
     val swipeBottom by viewModel.listSwipeBottom.collectAsStateWithLifecycle()
     val afterReadAll by viewModel.afterReadAll.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
 
     val canSwipeBottom = when (swipeBottom) {
         ArticleListVerticalSwipe.DISABLED -> false
@@ -170,11 +169,10 @@ fun ArticleScreen(
     var selectedHomeDestination by rememberSaveable {
         mutableStateOf(filter.homeDestination())
     }
-    var articleReturnDestination by rememberSaveable {
-        mutableStateOf<ArticleHomeDestination?>(null)
-    }
 
-    val articles = viewModel.articles.collectAsLazyPagingItems()
+    val articles = key(filter) {
+        viewModel.articles.collectAsLazyPagingItems()
+    }
 
     val onMarkAllRead = { range: MarkRead ->
         viewModel.markAllRead(
@@ -311,7 +309,7 @@ fun ArticleScreen(
         )
 
         suspend fun openNextStatus(action: suspend () -> Unit) {
-            scope.launchIO { action() }
+            action()
             scaffoldNavigator.navigateTo(ListDetailPaneScaffoldRole.List)
         }
 
@@ -369,16 +367,7 @@ fun ArticleScreen(
         }
 
         fun clearArticle() {
-            val returnDestination = articleReturnDestination
-
-            if (returnDestination != null) {
-                selectedHomeDestination = returnDestination
-                viewModel.selectArticleFilter(returnDestination.status())
-            } else {
-                viewModel.clearArticle()
-            }
-
-            articleReturnDestination = null
+            viewModel.clearArticle()
 
             coroutineScope.launchUI {
                 scaffoldNavigator.navigateTo(ListDetailPaneScaffoldRole.List)
@@ -386,7 +375,6 @@ fun ArticleScreen(
         }
 
         fun dismissArticle() {
-            articleReturnDestination = null
             viewModel.clearArticle()
         }
 
@@ -415,8 +403,6 @@ fun ArticleScreen(
         val linkOpener = LocalLinkOpener.current
 
         fun selectArticle(articleID: String) {
-            articleReturnDestination = selectedHomeDestination
-
             setArticle(articleID) { nextArticle ->
                 if (search.isActive) {
                     focusManager.clearFocus()
@@ -501,9 +487,7 @@ fun ArticleScreen(
         }
 
         LaunchedEffect(filter) {
-            if (filter is ArticleFilter.Articles) {
-                selectedHomeDestination = filter.homeDestination()
-            }
+            selectedHomeDestination = filter.homeDestination()
         }
 
         val isHomeFilter = filter is ArticleFilter.Articles && when (selectedHomeDestination) {
@@ -512,11 +496,12 @@ fun ArticleScreen(
             ArticleHomeDestination.STARRED -> filter.status == ArticleStatus.STARRED
         }
 
-        val showGroupedStatusHome = isHomeFilter && when (selectedHomeDestination) {
+        val usesGroupedStatusHome = when (selectedHomeDestination) {
             ArticleHomeDestination.UNREAD -> unreadDisplay == ArticleStatusListDisplay.GROUPED_BY_FEED
             ArticleHomeDestination.STARRED -> starredDisplay == ArticleStatusListDisplay.GROUPED_BY_FEED
             ArticleHomeDestination.FEEDS -> false
         }
+        val showGroupedStatusHome = isHomeFilter && usesGroupedStatusHome
 
         val showFeedNavigation = selectedHomeDestination == ArticleHomeDestination.FEEDS && isHomeFilter ||
             showGroupedStatusHome
@@ -823,6 +808,7 @@ fun ArticleScreen(
 
         ArticleListBackHandler(
             filter,
+            returnFeedsToStatusHome = usesGroupedStatusHome,
             onRequestFilter = selectFilter,
             onRequestFolder = selectFolder,
             onRequestFeeds = {
@@ -959,14 +945,6 @@ private fun ArticleFilter.homeDestination(): ArticleHomeDestination {
         ArticleStatus.ALL -> ArticleHomeDestination.FEEDS
         ArticleStatus.UNREAD -> ArticleHomeDestination.UNREAD
         ArticleStatus.STARRED -> ArticleHomeDestination.STARRED
-    }
-}
-
-private fun ArticleHomeDestination.status(): ArticleStatus {
-    return when (this) {
-        ArticleHomeDestination.FEEDS -> ArticleStatus.ALL
-        ArticleHomeDestination.UNREAD -> ArticleStatus.UNREAD
-        ArticleHomeDestination.STARRED -> ArticleStatus.STARRED
     }
 }
 

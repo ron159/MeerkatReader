@@ -13,6 +13,7 @@ import org.koin.compose.koinInject
 @Composable
 fun ArticleListBackHandler(
     filter: ArticleFilter,
+    returnFeedsToStatusHome: Boolean,
     onRequestFilter: () -> Unit,
     onRequestFolder: (folder: Folder) -> Unit,
     onRequestFeeds: () -> Unit,
@@ -25,15 +26,15 @@ fun ArticleListBackHandler(
         return
     }
 
-    BackHandler(backAction == BackAction.OPEN_DRAWER) {
+    BackHandler(backAction == BackAction.OPEN_DRAWER && filter is ArticleFilter.Articles) {
         onRequestFeeds()
     }
 
-    BackHandler(backAction == BackAction.NAVIGATE_TO_PARENT && filter !is ArticleFilter.Articles) {
-        when(filter) {
+    BackHandler(filter !is ArticleFilter.Articles) {
+        when (filter) {
             is ArticleFilter.Feeds -> {
                 val folderTitle = filter.folderTitle
-                if (folderTitle != null) {
+                if (folderTitle != null && !returnFeedsToStatusHome) {
                     onRequestFolder(Folder(folderTitle))
                 } else {
                     onRequestFilter()

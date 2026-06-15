@@ -62,7 +62,7 @@ fun HeadlinesLayout(articles: List<Article>) {
             Image(
                 provider = ImageProvider(R.drawable.meerkat_silhouette),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary),
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurface),
                 modifier = GlanceModifier
                     .size(24.dp)
             )

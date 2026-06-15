@@ -204,6 +204,7 @@
     <string name="add_account_freshrss_signup_prompt">Du hast keine FreshRSS Instanz?</string>
     <string name="settings_section_mark_all_as_read">Alles als gelesen markieren</string>
     <string name="settings_mark_read_on_scroll">Beim Scrollen als gelesen markieren</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_browser">Browser</string>
     <string name="reader_image_visibility_show_on_wifi">Bilder nur bei einer Wi-Fi-Verbindung anzeigen</string>
     <string name="reader_image_visibility_always_hide">Bilder niemals anzeigen</string>

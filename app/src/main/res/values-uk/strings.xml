@@ -224,6 +224,7 @@
     <string name="article_view_open_externally">Відкрити в програмі</string>
     <string name="settings_confirm_mark_all_read">Перепитувати, чи позначати всі прочитаними</string>
     <string name="settings_mark_read_on_scroll">Позначати прочитаною при гортанні</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_enable_high_contrast_dark_theme">Контрастна темна тема</string>
     <string name="settings_section_mark_all_as_read">Позначити всі прочитаними</string>
     <string name="settings_section_browser">Браузер</string>

@@ -256,6 +256,7 @@
     <string name="settings_select_none">すべて選択解除</string>
     <string name="settings_confirm_mark_all_read">すべてを既読としてマークすることを確認</string>
     <string name="settings_mark_read_on_scroll">スクロール時に既読としてマーク</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="article_image_download_mode_label">画像の先読み</string>
     <string name="article_image_download_mode_off">オフ</string>
     <string name="article_image_download_mode_wifi_only">Wi-Fi のみ</string>

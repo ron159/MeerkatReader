@@ -208,6 +208,7 @@
     <string name="settings_enable_high_contrast_dark_theme">Включить высококонтрастную темную тему</string>
     <string name="settings_gestures_reader_tap_to_page_subtitle">Коснитесь нижних углов, чтобы перемещаться по содержимому статьи</string>
     <string name="settings_mark_read_on_scroll">Отметить как прочитанное при прокрутке</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">Отметить всё как прочитанное</string>
     <string name="settings_section_browser">Браузер</string>
     <string name="reader_image_visibility_show_on_wifi">Показывать только при Wi-Fi</string>

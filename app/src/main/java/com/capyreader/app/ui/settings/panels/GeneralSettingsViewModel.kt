@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
+import com.capyreader.app.preferences.DefaultHomeTab
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.refresher.RefreshScheduler
 import com.jocmp.capy.Account
@@ -37,6 +38,9 @@ class GeneralSettingsViewModel(
         private set
 
     var sortOrder by mutableStateOf(appPreferences.articleListOptions.sortOrder.get())
+        private set
+
+    var defaultHomeTab by mutableStateOf(appPreferences.articleListOptions.defaultHomeTab.get())
         private set
 
     var confirmMarkAllRead by mutableStateOf(appPreferences.articleListOptions.confirmMarkAllRead.get())
@@ -79,6 +83,12 @@ class GeneralSettingsViewModel(
         appPreferences.articleListOptions.sortOrder.set(sort)
 
         this.sortOrder = sort
+    }
+
+    fun updateDefaultHomeTab(tab: DefaultHomeTab) {
+        appPreferences.articleListOptions.defaultHomeTab.set(tab)
+
+        defaultHomeTab = tab
     }
 
     fun updateAutoDelete(autoDelete: AutoDelete) {

@@ -204,6 +204,7 @@
     <string name="article_list_row_swipe_toggle_starred">Dodaj/usuń gwiazdkę</string>
     <string name="article_list_row_swipe_toggle_read">Oznacz jako przeczytane/nieprzeczytane</string>
     <string name="settings_mark_read_on_scroll">Oznacz jako przeczytane podczas przewijania</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_mark_all_as_read">Oznacz wszystkie jako przeczytane</string>
     <string name="nav_headline_saved_searches">Wyszukiwania</string>
     <string name="empty_onboarding_prompt">Rozpocznij dodając kanał</string>

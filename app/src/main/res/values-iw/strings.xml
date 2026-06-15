@@ -224,6 +224,7 @@
     <string name="article_view_open_externally">פתח חיצונית</string>
     <string name="settings_confirm_mark_all_read">אשר סימון כולם כנקרא</string>
     <string name="settings_mark_read_on_scroll">סמן כנקרא בזמן גלילה</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_gestures_enable_horizontal_pagination_title">הפעל גלילה רוחבית</string>
     <string name="settings_gestures_enable_horizontal_pagination_subtitle">דפדף שמאלה או ימינה כדי לנווט בין מאמרים</string>
     <string name="settings_gestures_reader_tap_to_page_subtitle">לחץ על הפינות התחתונות כדי לנווט בתוכן המאמר</string>

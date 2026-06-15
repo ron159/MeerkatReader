@@ -6,17 +6,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.capyreader.app.R
+import com.capyreader.app.ui.components.MeerkatSilhouetteIcon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -24,13 +22,7 @@ import kotlinx.coroutines.launch
 fun CapyIcon() {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
-    val (surprised, setSurprised) = remember { mutableStateOf(false) }
-
-    val icon = if (surprised) {
-        R.drawable.meerkat_silhouette
-    } else {
-        R.drawable.meerkat_silhouette
-    }
+    val (_, setSurprised) = remember { mutableStateOf(false) }
 
     Box(
         Modifier
@@ -39,11 +31,10 @@ fun CapyIcon() {
                 horizontal = 16.dp
             ),
     ) {
-        Icon(
-            painterResource(icon),
+        MeerkatSilhouetteIcon(
             contentDescription = null,
             modifier = Modifier
-                .size(32.dp)
+                .size(36.dp)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },

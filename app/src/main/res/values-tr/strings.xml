@@ -193,6 +193,7 @@
     <string name="account_source_freshrss">FreshRSS</string>
     <string name="article_vertical_open_article_in_browser">Makaleyi tarayıcıda aç</string>
     <string name="settings_mark_read_on_scroll">Kaydırınca okundu olarak işaretle</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_enable_high_contrast_dark_theme">Yüksek karşıtlıklı karanlık temayı etkinleştir</string>
     <string name="settings_section_mark_all_as_read">Tümünü Okundu Olarak İşaretle</string>
     <string name="article_actions_copy_link">Bağlantıyı kopyala</string>

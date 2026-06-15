@@ -206,6 +206,7 @@
     <string name="settings_enable_high_contrast_dark_theme">启用高对比度深色主题</string>
     <string name="settings_section_mark_all_as_read">全部标记为已读</string>
     <string name="settings_mark_read_on_scroll">滚动时标记为已读</string>
+    <string name="settings_default_home_tab">启动后默认打开的标签页</string>
     <string name="settings_section_browser">浏览器</string>
     <string name="reader_image_visibility_show_on_wifi">仅在 Wi-Fi 连接下显示图片</string>
     <string name="reader_image_visibility_always_hide">拦截图片</string>

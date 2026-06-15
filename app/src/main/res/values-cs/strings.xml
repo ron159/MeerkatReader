@@ -210,6 +210,7 @@
     <string name="reader_image_visibility_always_show">Vždy načítat obrázky</string>
     <string name="reader_image_visibility_label">Obrázky</string>
     <string name="settings_mark_read_on_scroll">Označit jako přečtené při posunutí</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_donate_button">Přispět</string>
     <string name="after_read_all_behavior_default">Výchozí</string>
     <string name="after_read_all_behavior_open_drawer">Otevřít navigační šuplík</string>

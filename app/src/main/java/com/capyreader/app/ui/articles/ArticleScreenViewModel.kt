@@ -53,6 +53,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -91,7 +92,8 @@ class ArticleScreenViewModel(
         refreshSkipReason = null
     }
 
-    val filter = appPreferences.filter.stateIn(viewModelScope)
+    private val _filter = MutableStateFlow(appPreferences.filter.get())
+    val filter = _filter.asStateFlow()
 
     val listSwipeBottom =
         appPreferences.articleListOptions.swipeBottom.stateIn(viewModelScope)
@@ -349,21 +351,15 @@ class ArticleScreenViewModel(
     }
 
     fun selectSavedSearch(savedSearchID: String) {
-        viewModelScope.launchIO {
-            val savedSearch = account.findSavedSearch(savedSearchID) ?: return@launchIO
-            updateFilter(
-                ArticleFilter.SavedSearches(savedSearch.id, savedSearchStatus = currentStatus)
-            )
-        }
+        updateFilter(
+            ArticleFilter.SavedSearches(savedSearchID, savedSearchStatus = currentStatus)
+        )
     }
 
     fun selectFolder(title: String) {
-        viewModelScope.launchIO {
-            val folder = account.findFolder(title) ?: return@launchIO
-            updateFilter(
-                ArticleFilter.Folders(folderTitle = folder.title, folderStatus = currentStatus)
-            )
-        }
+        updateFilter(
+            ArticleFilter.Folders(folderTitle = title, folderStatus = currentStatus)
+        )
     }
 
     fun markAllRead(
@@ -753,6 +749,7 @@ class ArticleScreenViewModel(
     }
 
     private fun updateFilter(filter: ArticleFilter) {
+        _filter.value = filter
         appPreferences.filter.set(filter)
 
         clearArticle()

@@ -201,6 +201,7 @@
     <string name="article_view_open_externally">வெளிப்புறமாக திறக்கவும்</string>
     <string name="settings_confirm_mark_all_read">அனைத்தையும் படித்ததாகக் குறிப்பதை உறுதிப்படுத்தவும்</string>
     <string name="settings_mark_read_on_scroll">சுருளில் படிக்க மார்க்</string>
+    <string name="settings_default_home_tab">Default startup tab</string>
     <string name="settings_section_browser">உலாவி</string>
     <string name="feed_nav_drawer_title">ஊட்டங்கள்</string>
     <string name="end_of_feed_text">அனைவரும் பிடிபட்டார்கள்!</string>
