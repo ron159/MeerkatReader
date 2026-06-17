@@ -1,0 +1,32 @@
+findByArticleID:
+SELECT id, article_id, rule_id, rule_name, actions_json, matched_at, explanation
+FROM article_rule_matches
+WHERE article_id = :articleID
+ORDER BY matched_at DESC;
+
+insert:
+INSERT INTO article_rule_matches(
+  id,
+  article_id,
+  rule_id,
+  rule_name,
+  actions_json,
+  matched_at,
+  explanation
+)
+VALUES (
+  :id,
+  :articleID,
+  :ruleID,
+  :ruleName,
+  :actionsJSON,
+  :matchedAt,
+  :explanation
+);
+
+deleteByArticleID:
+DELETE FROM article_rule_matches
+WHERE article_id = :articleID;
+
+deleteAll:
+DELETE FROM article_rule_matches;

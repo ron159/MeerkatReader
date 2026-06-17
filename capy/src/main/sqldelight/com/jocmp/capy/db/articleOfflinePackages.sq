@@ -1,0 +1,64 @@
+find:
+SELECT article_id, state, include_full_content, include_images, include_audio, bytes, error_message, updated_at
+FROM article_offline_packages
+WHERE article_id = :articleID
+LIMIT 1;
+
+findByState:
+SELECT article_id, state, include_full_content, include_images, include_audio, bytes, error_message, updated_at
+FROM article_offline_packages
+WHERE state = :state
+ORDER BY updated_at ASC;
+
+upsert:
+INSERT INTO article_offline_packages(
+  article_id,
+  state,
+  include_full_content,
+  include_images,
+  include_audio,
+  bytes,
+  error_message,
+  updated_at
+)
+VALUES (
+  :articleID,
+  :state,
+  :includeFullContent,
+  :includeImages,
+  :includeAudio,
+  :bytes,
+  :errorMessage,
+  :updatedAt
+)
+ON CONFLICT(article_id)
+DO UPDATE SET
+  state = excluded.state,
+  include_full_content = excluded.include_full_content,
+  include_images = excluded.include_images,
+  include_audio = excluded.include_audio,
+  bytes = excluded.bytes,
+  error_message = excluded.error_message,
+  updated_at = excluded.updated_at;
+
+updateState:
+UPDATE article_offline_packages
+SET
+  state = :state,
+  bytes = :bytes,
+  error_message = :errorMessage,
+  updated_at = :updatedAt
+WHERE article_id = :articleID;
+
+delete:
+DELETE FROM article_offline_packages
+WHERE article_id = :articleID;
+
+deleteAll:
+DELETE FROM article_offline_packages;
+
+deleteWithoutArticle:
+DELETE FROM article_offline_packages
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);

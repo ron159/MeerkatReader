@@ -300,6 +300,11 @@ internal class LocalAccountDelegate(
                 )
 
                 if (parsedItem.id != null && withinCutoff && automation.mute) {
+                    articleAutomation.logMatches(
+                        articleID = parsedItem.id,
+                        result = automation,
+                        matchedAt = updatedAt,
+                    )
                     articleAutomation.clearMutedArticle(parsedItem.id)
                     return@forEach
                 }

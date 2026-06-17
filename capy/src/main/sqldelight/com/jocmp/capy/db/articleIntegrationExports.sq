@@ -1,0 +1,63 @@
+find:
+SELECT id, article_id, integration_id, state, remote_id, error_message, updated_at
+FROM article_integration_exports
+WHERE id = :id
+LIMIT 1;
+
+findByArticleAndIntegration:
+SELECT id, article_id, integration_id, state, remote_id, error_message, updated_at
+FROM article_integration_exports
+WHERE article_id = :articleID
+AND integration_id = :integrationID
+LIMIT 1;
+
+findByState:
+SELECT id, article_id, integration_id, state, remote_id, error_message, updated_at
+FROM article_integration_exports
+WHERE state = :state
+ORDER BY updated_at ASC;
+
+upsert:
+INSERT INTO article_integration_exports(
+  id,
+  article_id,
+  integration_id,
+  state,
+  remote_id,
+  error_message,
+  updated_at
+)
+VALUES (
+  :id,
+  :articleID,
+  :integrationID,
+  :state,
+  :remoteID,
+  :errorMessage,
+  :updatedAt
+)
+ON CONFLICT(article_id, integration_id)
+DO UPDATE SET
+  state = excluded.state,
+  remote_id = excluded.remote_id,
+  error_message = excluded.error_message,
+  updated_at = excluded.updated_at;
+
+updateState:
+UPDATE article_integration_exports
+SET
+  state = :state,
+  remote_id = :remoteID,
+  error_message = :errorMessage,
+  updated_at = :updatedAt
+WHERE id = :id;
+
+delete:
+DELETE FROM article_integration_exports
+WHERE id = :id;
+
+deleteWithoutArticle:
+DELETE FROM article_integration_exports
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);

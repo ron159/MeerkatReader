@@ -1,0 +1,29 @@
+CREATE TABLE article_ai_results (
+  id TEXT NOT NULL PRIMARY KEY,
+  article_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  base_url TEXT NOT NULL,
+  model TEXT NOT NULL,
+  language TEXT NOT NULL,
+  prompt_hash TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  result_text TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX article_ai_results_unique_input
+  ON article_ai_results(
+    article_id,
+    action,
+    provider,
+    base_url,
+    model,
+    language,
+    prompt_hash,
+    content_hash
+  );
+
+CREATE INDEX article_ai_results_article_id_index
+  ON article_ai_results(article_id);

@@ -16,6 +16,9 @@ class ArticleFixture(private val database: Database = InMemoryDatabaseProvider()
         title: String = "Test Title",
         summary: String = "Test article here",
         feed: Feed = feedFixture.create(feedURL = "https://example.com/${RandomUUID.generate()}"),
+        author: String? = "John Writer",
+        imageURL: String? = null,
+        enclosureType: String? = null,
         read: Boolean = true,
         starred: Boolean = false,
         url: String = "https://example.com/test-article",
@@ -26,14 +29,14 @@ class ArticleFixture(private val database: Database = InMemoryDatabaseProvider()
                 id = id,
                 feed_id = feed.id,
                 title = title,
-                author = "John Writer",
+                author = author,
                 content_html = "<div>Test</div>",
                 extracted_content_url = null,
-                image_url = null,
+                image_url = imageURL,
                 published_at = publishedAt,
                 summary = summary,
                 url = url,
-                enclosure_type = null
+                enclosure_type = enclosureType
             )
             database.articlesQueries.createStatus(
                 article_id = id,

@@ -91,6 +91,10 @@ class ArticleImageRecords(
         ).executeAsList()
     }
 
+    suspend fun readyBytesForArticle(articleID: String): Long = withIOContext {
+        database.articleImagesQueries.sumReadyBytesByArticleID(articleID).executeAsOne().toLong()
+    }
+
     fun downloadCandidates(limit: Long = DEFAULT_DOWNLOAD_LIMIT): List<ArticleImageDownloadCandidate> {
         return database.articleImagesQueries.findDownloadCandidates(
             staleBefore = nowUTC().toEpochSecond() - DOWNLOADING_STALE_SECONDS,

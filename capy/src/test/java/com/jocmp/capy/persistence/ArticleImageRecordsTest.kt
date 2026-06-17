@@ -127,6 +127,34 @@ class ArticleImageRecordsTest {
     }
 
     @Test
+    fun readyBytesForArticleSumsReadyAssetsOnly() = runTest {
+        val article = articleFixture.create(url = "https://example.com/articles/post.html")
+
+        records.replaceArticleRefs(
+            articleID = article.id,
+            contentHTML = """
+                <img src="/ready.jpg">
+                <img src="/pending.jpg">
+            """.trimIndent(),
+            articleURL = article.url.toString(),
+            siteURL = null,
+        )
+
+        val readyAssetID = ArticleImageRecords.assetID("https://example.com/ready.jpg")
+        records.markReady(
+            assetID = readyAssetID,
+            finalURL = "https://example.com/ready.jpg",
+            relativePath = "aa/$readyAssetID.jpg",
+            mimeType = "image/jpeg",
+            byteSize = 123,
+            etag = null,
+            lastModified = null,
+        )
+
+        assertEquals(expected = 123, actual = records.readyBytesForArticle(article.id))
+    }
+
+    @Test
     fun downloadCandidatesRetriesStaleDownloads() = runTest {
         val article = articleFixture.create(url = "https://example.com/articles/post.html")
 

@@ -1,0 +1,5 @@
+CREATE TABLE article_reading_progress (
+  article_id TEXT NOT NULL PRIMARY KEY,
+  scroll_percent REAL NOT NULL,
+  updated_at INTEGER NOT NULL
+);

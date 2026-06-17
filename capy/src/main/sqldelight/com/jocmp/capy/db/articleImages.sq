@@ -21,6 +21,17 @@ WHERE article_image_refs.article_id = :articleID
   AND article_image_assets.relative_path IS NOT NULL
 ORDER BY article_image_refs.ordinal ASC;
 
+sumReadyBytesByArticleID:
+SELECT COALESCE(SUM(article_image_assets.byte_size), 0)
+FROM article_image_assets
+WHERE article_image_assets.id IN (
+  SELECT article_image_refs.asset_id
+  FROM article_image_refs
+  WHERE article_image_refs.article_id = :articleID
+)
+AND article_image_assets.status = 'ready'
+AND article_image_assets.relative_path IS NOT NULL;
+
 findDownloadCandidates:
 SELECT
   article_image_assets.id,

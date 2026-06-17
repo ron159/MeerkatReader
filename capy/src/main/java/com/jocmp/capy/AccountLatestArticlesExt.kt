@@ -11,7 +11,6 @@ fun Account.latestArticles(limit: Long = 30): Flow<List<Article>> {
         .byStatus
         .all(
             status = ArticleStatus.UNREAD,
-            query = null,
             since = null,
             limit = limit,
             sortOrder = SortOrder.NEWEST_FIRST,

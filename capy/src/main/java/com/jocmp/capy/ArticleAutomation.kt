@@ -2,6 +2,7 @@ package com.jocmp.capy
 
 import com.jocmp.capy.common.TimeHelpers
 import com.jocmp.capy.db.Database
+import com.jocmp.capy.persistence.ArticleRuleMatchRecords
 import com.jocmp.capy.persistence.SavedSearchRecords
 import java.time.ZonedDateTime
 
@@ -10,6 +11,7 @@ class ArticleAutomation(
     private val preferences: AccountPreferences,
 ) {
     private val savedSearchRecords = SavedSearchRecords(database)
+    private val ruleMatchRecords = ArticleRuleMatchRecords(database)
 
     fun evaluate(article: ArticleAutomationArticle): ArticleAutomationResult {
         val legacyMuted = preferences.filterKeywords.get().any { keyword ->
@@ -19,8 +21,8 @@ class ArticleAutomation(
         }
 
         return preferences.automationRules.get()
-            .filter { it.enabled && it.pattern.isNotBlank() && it.actions.isNotEmpty() }
-            .filter { it.matches(article) }
+            .filter { it.enabled && it.automationConditions().isNotEmpty() && it.actions.isNotEmpty() }
+            .filter { it.matchesAutomationArticle(article) }
             .fold(ArticleAutomationResult(mute = legacyMuted)) { result, rule ->
                 val keep = ArticleRuleAction.KEEP in rule.actions
 
@@ -30,6 +32,7 @@ class ArticleAutomation(
                     star = result.star || ArticleRuleAction.STAR in rule.actions,
                     categoryName = result.categoryName ?: rule.categoryName(),
                     notify = result.notify || ArticleRuleAction.NOTIFY in rule.actions,
+                    matches = result.matches + rule.toMatch(),
                 )
             }
     }
@@ -70,38 +73,32 @@ class ArticleAutomation(
         if (result.notify) {
             database.article_notificationsQueries.createNotification(article_id = articleID)
         }
+
+        logMatches(
+            articleID = articleID,
+            result = result,
+            matchedAt = updatedAt,
+        )
+    }
+
+    fun logMatches(
+        articleID: String,
+        result: ArticleAutomationResult,
+        matchedAt: ZonedDateTime = TimeHelpers.nowUTC(),
+    ) {
+        if (result.matches.isEmpty()) {
+            return
+        }
+
+        ruleMatchRecords.insert(
+            articleID = articleID,
+            matches = result.matches,
+            matchedAt = matchedAt,
+        )
     }
 
     fun clearMutedArticle(articleID: String) {
         database.articlesQueries.deletePageByID(articleID)
-    }
-
-    private fun ArticleAutomationRule.matches(article: ArticleAutomationArticle): Boolean {
-        return fieldsFor(field, article).any { value ->
-            matchesPattern(value, pattern)
-        }
-    }
-
-    private fun fieldsFor(
-        field: ArticleRuleField,
-        article: ArticleAutomationArticle,
-    ): List<String> {
-        val content = "${article.summary.orEmpty()}\n${article.contentHTML.orEmpty()}"
-
-        return when (field) {
-            ArticleRuleField.ANY -> listOf(
-                article.feedTitle,
-                article.feedURL,
-                article.title.orEmpty(),
-                article.author.orEmpty(),
-                content,
-            )
-
-            ArticleRuleField.FEED -> listOf(article.feedTitle, article.feedURL)
-            ArticleRuleField.AUTHOR -> listOf(article.author.orEmpty())
-            ArticleRuleField.TITLE -> listOf(article.title.orEmpty())
-            ArticleRuleField.CONTENT -> listOf(content)
-        }
     }
 
     private fun ArticleAutomationRule.categoryName(): String? {
@@ -110,6 +107,24 @@ class ArticleAutomation(
         }
 
         return categoryName.trim().ifBlank { name.trim() }.ifBlank { null }
+    }
+
+    private fun ArticleAutomationRule.toMatch(): ArticleAutomationMatch {
+        val activeConditions = automationConditions()
+        val displayName = name.trim().ifBlank { pattern.trim() }.ifBlank { id }
+        val explanation = if (activeConditions.size == 1) {
+            val condition = activeConditions.single()
+            "Matched ${condition.field.name.lowercase()} rule \"$displayName\" with ${condition.operator.name.lowercase()} \"${condition.value.trim()}\"."
+        } else {
+            "Matched ${matchMode.name.lowercase()} rule \"$displayName\" with ${activeConditions.size} conditions."
+        }
+
+        return ArticleAutomationMatch(
+            ruleID = id,
+            ruleName = displayName,
+            actions = actions,
+            explanation = explanation,
+        )
     }
 
     private fun matchesPattern(value: String, pattern: String): Boolean {
@@ -128,6 +143,7 @@ class ArticleAutomation(
             value.contains(query, ignoreCase = true)
         }
     }
+
 }
 
 data class ArticleAutomationArticle(
@@ -145,7 +161,15 @@ data class ArticleAutomationResult(
     val star: Boolean = false,
     val categoryName: String? = null,
     val notify: Boolean = false,
+    val matches: List<ArticleAutomationMatch> = emptyList(),
 ) {
     val shouldMarkReadRemotely: Boolean
         get() = mute || markRead
 }
+
+data class ArticleAutomationMatch(
+    val ruleID: String,
+    val ruleName: String,
+    val actions: Set<ArticleRuleAction>,
+    val explanation: String,
+)

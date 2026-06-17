@@ -478,6 +478,11 @@ internal class FeedbinAccountDelegate(
                 )
 
                 if (automation.mute) {
+                    articleAutomation.logMatches(
+                        articleID = articleID,
+                        result = automation,
+                        matchedAt = updated,
+                    )
                     articleAutomation.clearMutedArticle(articleID)
                     articleIDsToMarkRead.add(articleID)
                     return@forEach

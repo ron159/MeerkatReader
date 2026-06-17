@@ -23,7 +23,15 @@ WHERE saved_search_id = :savedSearchID
 AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
 AND ((article_statuses.starred = :starred AND article_statuses.last_unstarred_at IS NULL OR article_statuses.last_unstarred_at >= :lastUnstarredAt) OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
+AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
+AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
+AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
+AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
+AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
+AND (:hasAudio IS NULL OR (:hasAudio = 1 AND articles.enclosure_type LIKE 'audio/%') OR (:hasAudio = 0 AND (articles.enclosure_type IS NULL OR articles.enclosure_type NOT LIKE 'audio/%')))
+AND (:saved IS NULL OR feeds.read_later = :saved)
 ORDER BY articles.published_at DESC, articles.id DESC
 LIMIT :limit OFFSET :offset;
 
@@ -52,19 +60,36 @@ WHERE saved_search_id = :savedSearchID
 AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
 AND ((article_statuses.starred = :starred AND article_statuses.last_unstarred_at IS NULL OR article_statuses.last_unstarred_at >= :lastUnstarredAt) OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
+AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
+AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
+AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
+AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
+AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
+AND (:hasAudio IS NULL OR (:hasAudio = 1 AND articles.enclosure_type LIKE 'audio/%') OR (:hasAudio = 0 AND (articles.enclosure_type IS NULL OR articles.enclosure_type NOT LIKE 'audio/%')))
+AND (:saved IS NULL OR feeds.read_later = :saved)
 ORDER BY articles.published_at ASC, articles.id ASC
 LIMIT :limit OFFSET :offset;
 
 countAll:
 SELECT COUNT(*)
 FROM articles
+JOIN feeds ON articles.feed_id = feeds.id
 JOIN article_statuses ON articles.id = article_statuses.article_id
 JOIN saved_search_articles ON articles.id = saved_search_articles.article_id
 WHERE saved_search_id = :savedSearchID
 AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
+AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
+AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
+AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
+AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
+AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
+AND (:hasAudio IS NULL OR (:hasAudio = 1 AND articles.enclosure_type LIKE 'audio/%') OR (:hasAudio = 0 AND (articles.enclosure_type IS NULL OR articles.enclosure_type NOT LIKE 'audio/%')))
+AND (:saved IS NULL OR feeds.read_later = :saved)
 AND ((article_statuses.starred = :starred AND article_statuses.last_unstarred_at IS NULL OR article_statuses.last_unstarred_at >= :lastUnstarredAt) OR :starred IS NULL);
 
 findArticleIDs:
@@ -78,7 +103,15 @@ LEFT JOIN articles AS before_articles ON before_articles.id = :beforeArticleID
 WHERE article_statuses.read = 0
 AND (article_statuses.starred = :starred OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
+AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
+AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
+AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
+AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
+AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
+AND (:hasAudio IS NULL OR (:hasAudio = 1 AND articles.enclosure_type LIKE 'audio/%') OR (:hasAudio = 0 AND (articles.enclosure_type IS NULL OR articles.enclosure_type NOT LIKE 'audio/%')))
+AND (:saved IS NULL OR feeds.read_later = :saved)
 AND saved_search_id = :savedSearchID
 AND (
     :afterArticleID IS NULL

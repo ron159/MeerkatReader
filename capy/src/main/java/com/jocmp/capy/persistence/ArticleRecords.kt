@@ -6,6 +6,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrDefault
 import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.ArticleNotification
+import com.jocmp.capy.ArticleSearchQuery
 import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.FeedPriority
 import com.jocmp.capy.MarkRead
@@ -258,18 +259,19 @@ class ArticleRecords(
         query: String?,
     ): Flow<Long> {
         val since = null
+        val searchQuery = ArticleSearchQuery.parse(query)
 
         val count = when (filter) {
             is ArticleFilter.Articles -> byStatus.count(
                 status = filter.articleStatus,
-                query = query,
+                searchQuery = searchQuery,
                 since = null
             )
 
             is ArticleFilter.Feeds -> byFeed.count(
                 feedIDs = listOf(filter.feedID),
                 status = filter.feedStatus,
-                query = query,
+                searchQuery = searchQuery,
                 since = since,
                 priority = FeedPriority.FEED,
             )
@@ -277,7 +279,7 @@ class ArticleRecords(
             is ArticleFilter.Folders -> byFeed.count(
                 feedIDs = folderFeedIDs(filter),
                 status = filter.status,
-                query = query,
+                searchQuery = searchQuery,
                 since = since,
                 priority = FeedPriority.CATEGORY,
             )
@@ -285,13 +287,13 @@ class ArticleRecords(
             is ArticleFilter.SavedSearches -> bySavedSearch.count(
                 savedSearchID = filter.savedSearchID,
                 status = filter.status,
-                query = query,
+                searchQuery = searchQuery,
                 since = since,
             )
 
             is ArticleFilter.Today -> byToday.count(
                 status = filter.status,
-                query = query,
+                searchQuery = searchQuery,
                 since = null
             )
         }
@@ -302,7 +304,7 @@ class ArticleRecords(
     suspend fun countToday(status: ArticleStatus): Long = withIOContext {
         byToday.count(
             status = status,
-            query = null,
+            searchQuery = ArticleSearchQuery(),
             since = null
         ).executeAsOneOrNull() ?: 0L
     }
@@ -326,12 +328,13 @@ class ArticleRecords(
         sortOrder: SortOrder,
         query: String?,
     ): List<String> {
+        val searchQuery = ArticleSearchQuery.parse(query)
         val ids = when (filter) {
             is ArticleFilter.Articles -> byStatus.unreadArticleIDs(
                 filter.articleStatus,
                 range = range,
                 sortOrder = sortOrder,
-                query = query,
+                searchQuery = searchQuery,
             )
 
             is ArticleFilter.Feeds -> byFeed.unreadArticleIDs(
@@ -339,7 +342,7 @@ class ArticleRecords(
                 feedIDs = listOf(filter.feedID),
                 range = range,
                 sortOrder = sortOrder,
-                query = query,
+                searchQuery = searchQuery,
                 priority = FeedPriority.FEED,
             )
 
@@ -349,7 +352,7 @@ class ArticleRecords(
                     feedIDs = folderFeedIDs(filter),
                     range = range,
                     sortOrder = sortOrder,
-                    query = query,
+                    searchQuery = searchQuery,
                     priority = FeedPriority.CATEGORY,
                 )
             }
@@ -359,14 +362,14 @@ class ArticleRecords(
                 savedSearchID = filter.savedSearchID,
                 range = range,
                 sortOrder = sortOrder,
-                query = query,
+                searchQuery = searchQuery,
             )
 
             is ArticleFilter.Today -> byToday.unreadArticleIDs(
                 filter.status,
                 range = range,
                 sortOrder = sortOrder,
-                query = query,
+                searchQuery = searchQuery,
             )
         }
 

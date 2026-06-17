@@ -541,6 +541,11 @@ internal class ReaderAccountDelegate(
                 )
 
                 if (automation.mute) {
+                    articleAutomation.logMatches(
+                        articleID = item.hexID,
+                        result = automation,
+                        matchedAt = updated,
+                    )
                     articleAutomation.clearMutedArticle(item.hexID)
                     articleIDsToMarkRead.add(item.hexID)
                     return@forEach

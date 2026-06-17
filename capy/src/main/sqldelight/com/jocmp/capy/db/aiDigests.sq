@@ -1,0 +1,39 @@
+find:
+SELECT id, filter_json, provider, model, language, article_ids_json, result_text, created_at
+FROM ai_digests
+WHERE id = :id
+LIMIT 1;
+
+upsert:
+INSERT INTO ai_digests(
+  id,
+  filter_json,
+  provider,
+  model,
+  language,
+  article_ids_json,
+  result_text,
+  created_at
+)
+VALUES (
+  :id,
+  :filterJson,
+  :provider,
+  :model,
+  :language,
+  :articleIdsJson,
+  :resultText,
+  :createdAt
+)
+ON CONFLICT(id)
+DO UPDATE SET
+  filter_json = excluded.filter_json,
+  provider = excluded.provider,
+  model = excluded.model,
+  language = excluded.language,
+  article_ids_json = excluded.article_ids_json,
+  result_text = excluded.result_text,
+  created_at = excluded.created_at;
+
+deleteAll:
+DELETE FROM ai_digests;

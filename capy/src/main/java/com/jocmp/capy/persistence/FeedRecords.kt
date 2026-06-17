@@ -3,6 +3,7 @@ package com.jocmp.capy.persistence
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.jocmp.capy.Feed
+import com.jocmp.capy.FeedOfflinePolicy
 import com.jocmp.capy.FeedPriority
 import com.jocmp.capy.Folder
 import com.jocmp.capy.common.withIOContext
@@ -111,6 +112,20 @@ internal class FeedRecords(private val database: Database) {
         )
     }
 
+    suspend fun updateOfflinePolicy(feedID: String, policy: FeedOfflinePolicy?) = withIOContext {
+        database.feedsQueries.updateOfflinePolicy(
+            policy = policy?.name,
+            feedID = feedID,
+        )
+    }
+
+    suspend fun updateExcludeFromAi(feedID: String, excluded: Boolean) = withIOContext {
+        database.feedsQueries.updateExcludeFromAi(
+            excluded = excluded,
+            feedID = feedID,
+        )
+    }
+
     suspend fun enableNotifications(feedID: String, enabled: Boolean) = withIOContext {
         database.feedsQueries.enableNotifications(
             enabled = enabled,
@@ -186,6 +201,8 @@ internal class FeedRecords(private val database: Database) {
         etag: String? = null,
         lastModified: String? = null,
         conditionalGetRefreshedAt: Long? = null,
+        offlinePolicy: String? = null,
+        excludeFromAi: Boolean = false,
         folderName: String? = "",
         expanded: Boolean? = false,
     ) = Feed(
@@ -203,6 +220,8 @@ internal class FeedRecords(private val database: Database) {
         openArticlesInBrowser = openArticlesInBrowser,
         folderExpanded = expanded ?: false,
         priority = FeedPriority.parse(priority),
+        offlinePolicy = FeedOfflinePolicy.parse(offlinePolicy),
+        excludeFromAi = excludeFromAi,
         showUnreadBadge = showUnreadBadge,
         isReadLater = readLater,
     )

@@ -1,0 +1,55 @@
+findResult:
+SELECT id, article_id, action, provider, base_url, model, language, prompt_hash, content_hash, result_text, created_at, updated_at
+FROM article_ai_results
+WHERE article_id = :articleID
+  AND action = :action
+  AND provider = :provider
+  AND base_url = :baseURL
+  AND model = :model
+  AND language = :language
+  AND prompt_hash = :promptHash
+  AND content_hash = :contentHash
+LIMIT 1;
+
+upsert:
+INSERT INTO article_ai_results(
+  id,
+  article_id,
+  action,
+  provider,
+  base_url,
+  model,
+  language,
+  prompt_hash,
+  content_hash,
+  result_text,
+  created_at,
+  updated_at
+)
+VALUES (
+  :id,
+  :articleID,
+  :action,
+  :provider,
+  :baseURL,
+  :model,
+  :language,
+  :promptHash,
+  :contentHash,
+  :resultText,
+  :createdAt,
+  :updatedAt
+)
+ON CONFLICT(article_id, action, provider, base_url, model, language, prompt_hash, content_hash)
+DO UPDATE SET
+  result_text = excluded.result_text,
+  updated_at = excluded.updated_at;
+
+deleteAll:
+DELETE FROM article_ai_results;
+
+deleteWithoutArticle:
+DELETE FROM article_ai_results
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);

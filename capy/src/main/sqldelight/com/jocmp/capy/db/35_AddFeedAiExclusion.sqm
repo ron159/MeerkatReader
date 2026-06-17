@@ -1,0 +1,4 @@
+import kotlin.Boolean;
+
+ALTER TABLE feeds
+ADD COLUMN exclude_from_ai INTEGER AS Boolean NOT NULL DEFAULT 0;

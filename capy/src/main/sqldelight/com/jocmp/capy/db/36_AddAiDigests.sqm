@@ -1,0 +1,13 @@
+CREATE TABLE ai_digests (
+  id TEXT NOT NULL PRIMARY KEY,
+  filter_json TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  language TEXT NOT NULL,
+  article_ids_json TEXT NOT NULL,
+  result_text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX ai_digests_created_at
+ON ai_digests(created_at);

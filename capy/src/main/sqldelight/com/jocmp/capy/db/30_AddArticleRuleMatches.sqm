@@ -1,0 +1,12 @@
+CREATE TABLE article_rule_matches (
+  id TEXT NOT NULL PRIMARY KEY,
+  article_id TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
+  rule_name TEXT NOT NULL,
+  actions_json TEXT NOT NULL,
+  matched_at INTEGER NOT NULL,
+  explanation TEXT NOT NULL
+);
+
+CREATE INDEX article_rule_matches_article_id_index
+  ON article_rule_matches(article_id);

@@ -5,15 +5,19 @@ import com.jocmp.capy.AccountPreferences
 import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.ArticleRuleAction
+import com.jocmp.capy.ArticleRuleCondition
 import com.jocmp.capy.ArticleRuleField
+import com.jocmp.capy.ArticleRuleOperator
 import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
+import com.jocmp.capy.RuleMatchMode
 import com.jocmp.capy.accounts.AddFeedResult
 import com.jocmp.capy.common.TimeHelpers
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.logging.CapyLog
 import com.jocmp.capy.persistence.ArticleRecords
+import com.jocmp.capy.persistence.ArticleRuleMatchRecords
 import com.jocmp.capy.persistence.FeedRecords
 import com.jocmp.capy.rssItemFixture
 import com.jocmp.feedfinder.FeedFinder
@@ -36,6 +40,7 @@ import java.net.URL
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -199,6 +204,134 @@ class LocalAccountDelegateTest {
             expected = listOf(item.link!!, oldItem.link!!),
             actual = savedSearchArticles,
         )
+
+        val ruleMatches = ArticleRuleMatchRecords(database).findByArticleID(item.link!!)
+        assertEquals(expected = 1, actual = ruleMatches.size)
+        assertEquals(expected = "Apple coverage", actual = ruleMatches.single().ruleName)
+        assertTrue(ruleMatches.single().actionsJSON.contains("MARK_READ"))
+        assertTrue(ruleMatches.single().actionsJSON.contains("STAR"))
+        assertTrue(ruleMatches.single().explanation.contains("Apple coverage"))
+    }
+
+    @Test
+    fun refreshAll_ignoresDisabledAutomationRules() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Disabled star",
+                    enabled = false,
+                    field = ArticleRuleField.AUTHOR,
+                    pattern = "Ed Zitron",
+                    actions = setOf(ArticleRuleAction.STAR),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)!!
+
+        assertFalse(article.starred)
+    }
+
+    @Test
+    fun refreshAll_appliesAutomationRulesWithAllConditions() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Apple author and title",
+                    actions = setOf(ArticleRuleAction.STAR),
+                    matchMode = RuleMatchMode.ALL,
+                    conditions = listOf(
+                        ArticleRuleCondition(
+                            field = ArticleRuleField.AUTHOR,
+                            operator = ArticleRuleOperator.CONTAINS,
+                            value = "Ed Zitron",
+                        ),
+                        ArticleRuleCondition(
+                            field = ArticleRuleField.CONTENT,
+                            operator = ArticleRuleOperator.CONTAINS,
+                            value = "Apple Intelligence",
+                        ),
+                    ),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)!!
+        val oldArticle = ArticleRecords(database).find(articleID = oldItem.link!!)!!
+
+        assertTrue(article.starred)
+        assertFalse(oldArticle.starred)
+    }
+
+    @Test
+    fun refreshAll_appliesAutomationRulesWithAnyCondition() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Title or missing author",
+                    actions = setOf(ArticleRuleAction.MARK_READ),
+                    matchMode = RuleMatchMode.ANY,
+                    conditions = listOf(
+                        ArticleRuleCondition(
+                            field = ArticleRuleField.AUTHOR,
+                            operator = ArticleRuleOperator.EQUALS,
+                            value = "Unknown",
+                        ),
+                        ArticleRuleCondition(
+                            field = ArticleRuleField.TITLE,
+                            operator = ArticleRuleOperator.ENDS_WITH,
+                            value = "Cook",
+                        ),
+                    ),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)!!
+
+        assertTrue(article.read)
+    }
+
+    @Test
+    fun refreshAll_logsMutedAutomationRuleMatches() = runTest {
+        accountPreferences.automationRules.set(
+            listOf(
+                ArticleAutomationRule(
+                    name = "Mute Apple",
+                    field = ArticleRuleField.TITLE,
+                    pattern = "Tim Cook",
+                    actions = setOf(ArticleRuleAction.MUTE),
+                )
+            )
+        )
+        coEvery { feedFinder.fetch(url = any()) }.returns(Result.success(RssChannelResult(channel = channel, conditionalGet = ConditionalGetInfo.EMPTY)))
+
+        FeedFixture(database).create(feedID = channel.link!!)
+
+        delegate.refresh(ArticleFilter.default())
+
+        val article = ArticleRecords(database).find(articleID = item.link!!)
+        val ruleMatches = ArticleRuleMatchRecords(database).findByArticleID(item.link!!)
+
+        assertEquals(expected = null, actual = article)
+        assertEquals(expected = 1, actual = ruleMatches.size)
+        assertEquals(expected = "Mute Apple", actual = ruleMatches.single().ruleName)
+        assertTrue(ruleMatches.single().actionsJSON.contains("MUTE"))
     }
 
     @Test

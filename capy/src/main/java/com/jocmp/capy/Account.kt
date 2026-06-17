@@ -168,11 +168,18 @@ data class Account(
     suspend fun editFeed(form: EditFeedFormEntry): Result<Feed> {
         val feed = findFeed(form.feedID) ?: return Result.failure(Throwable("Feed not found"))
 
-        return delegate.updateFeed(
+        val result = delegate.updateFeed(
             feed = feed,
             title = form.title,
             folderTitles = form.folderTitles
         )
+
+        if (result.isSuccess) {
+            feedRecords.updateOfflinePolicy(feedID = form.feedID, policy = form.offlinePolicy)
+            feedRecords.updateExcludeFromAi(feedID = form.feedID, excluded = form.excludeFromAi)
+        }
+
+        return result
     }
 
     suspend fun editFolder(form: EditFolderFormEntry): Result<Folder> {
@@ -466,6 +473,14 @@ data class Account(
 
     suspend fun updateOpenInBrowser(feedID: String, enabled: Boolean) {
         feedRecords.updateOpenInBrowser(feedID, enabled)
+    }
+
+    suspend fun updateOfflinePolicy(feedID: String, policy: FeedOfflinePolicy?) {
+        feedRecords.updateOfflinePolicy(feedID, policy)
+    }
+
+    suspend fun updateExcludeFromAi(feedID: String, excluded: Boolean) {
+        feedRecords.updateExcludeFromAi(feedID, excluded)
     }
 
     suspend fun toggleFeedUnreadBadge(feedID: String, enabled: Boolean) {

@@ -1,0 +1,15 @@
+CREATE TABLE article_integration_exports (
+  id TEXT NOT NULL PRIMARY KEY,
+  article_id TEXT NOT NULL,
+  integration_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  remote_id TEXT,
+  error_message TEXT,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX article_integration_exports_unique_article_integration
+ON article_integration_exports(article_id, integration_id);
+
+CREATE INDEX article_integration_exports_state
+ON article_integration_exports(state);

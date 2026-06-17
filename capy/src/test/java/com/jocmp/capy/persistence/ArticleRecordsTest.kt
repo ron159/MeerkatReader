@@ -2,6 +2,7 @@ package com.jocmp.capy.persistence
 
 import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleFilter
+import com.jocmp.capy.ArticleSearchQuery
 import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.FeedPriority
 import com.jocmp.capy.InMemoryDatabaseProvider
@@ -175,12 +176,13 @@ class ArticleRecordsTest {
         )
         val articleRecords = ArticleRecords(database)
         val query = "problem"
+        val searchQuery = ArticleSearchQuery.parse(query)
 
         val results = articleRecords
             .byStatus
             .all(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
                 limit = 3,
                 offset = 0,
                 sortOrder = SortOrder.NEWEST_FIRST,
@@ -191,7 +193,7 @@ class ArticleRecordsTest {
             .byStatus
             .count(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
             )
             .executeAsOne()
 
@@ -215,12 +217,13 @@ class ArticleRecordsTest {
         )
         val articleRecords = ArticleRecords(database)
         val query = "Chick-fil-A"
+        val searchQuery = ArticleSearchQuery.parse(query)
 
         val results = articleRecords
             .byStatus
             .all(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
                 limit = 3,
                 offset = 0,
                 sortOrder = SortOrder.NEWEST_FIRST,
@@ -231,7 +234,7 @@ class ArticleRecordsTest {
             .byStatus
             .count(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
             )
             .executeAsOne()
 
@@ -266,13 +269,14 @@ class ArticleRecordsTest {
         )
         val articleRecords = ArticleRecords(database)
         val query = "Chick-fil-A"
+        val searchQuery = ArticleSearchQuery.parse(query)
 
         val since = OffsetDateTime.now().minusDays(1)
         val results = articleRecords
             .byFeed
             .all(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
                 feedIDs = listOf(vergeFeed.id),
                 since = since,
                 limit = 10,
@@ -286,7 +290,7 @@ class ArticleRecordsTest {
             .byFeed
             .count(
                 status = ArticleStatus.ALL,
-                query = query,
+                searchQuery = searchQuery,
                 feedIDs = listOf(vergeFeed.id),
                 since = since,
                 priority = FeedPriority.FEED,
@@ -297,6 +301,71 @@ class ArticleRecordsTest {
 
         assertEquals(expected = 1, actual = count)
         assertEquals(actual = actualID, expected = articleResult.id)
+    }
+
+    @Test
+    fun allByStatus_advancedSearchQualifiers() {
+        val androidFeed = FeedFixture(database).create(title = "Android Weekly")
+        val otherFeed = FeedFixture(database).create(title = "Other Feed")
+        val publishedAt = OffsetDateTime.parse("2026-01-15T12:00:00Z").toEpochSecond()
+
+        val articleResult = articleFixture.create(
+            title = "Security update",
+            summary = "Monthly patch notes",
+            feed = androidFeed,
+            author = "Alice",
+            imageURL = "https://example.com/image.jpg",
+            enclosureType = "audio/mpeg",
+            read = false,
+            publishedAt = publishedAt,
+        )
+        articleFixture.create(
+            title = "Security update",
+            summary = "Monthly patch notes",
+            feed = otherFeed,
+            author = "Alice",
+            imageURL = "https://example.com/image.jpg",
+            enclosureType = "audio/mpeg",
+            read = false,
+            publishedAt = publishedAt,
+        )
+        articleFixture.create(
+            title = "Security update",
+            summary = "Monthly patch notes",
+            feed = androidFeed,
+            author = "Alice",
+            imageURL = null,
+            enclosureType = "audio/mpeg",
+            read = false,
+            publishedAt = publishedAt,
+        )
+
+        val searchQuery = ArticleSearchQuery.parse(
+            "patch is:unread feed:Android author:Alice title:Security after:2026-01-01 before:2026-01-31 has:image has:audio"
+        )
+        val articleRecords = ArticleRecords(database)
+
+        val results = articleRecords
+            .byStatus
+            .all(
+                status = ArticleStatus.ALL,
+                searchQuery = searchQuery,
+                limit = 10,
+                offset = 0,
+                sortOrder = SortOrder.NEWEST_FIRST,
+            )
+            .executeAsList()
+
+        val count = articleRecords
+            .byStatus
+            .count(
+                status = ArticleStatus.ALL,
+                searchQuery = searchQuery,
+            )
+            .executeAsOne()
+
+        assertEquals(expected = 1, actual = count)
+        assertEquals(expected = listOf(articleResult.id), actual = results.map { it.id })
     }
 
     @Test

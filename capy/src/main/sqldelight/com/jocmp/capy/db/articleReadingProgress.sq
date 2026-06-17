@@ -1,0 +1,34 @@
+find:
+SELECT article_id, scroll_percent, updated_at
+FROM article_reading_progress
+WHERE article_id = :articleID
+LIMIT 1;
+
+upsert:
+INSERT INTO article_reading_progress(
+  article_id,
+  scroll_percent,
+  updated_at
+)
+VALUES (
+  :articleID,
+  :scrollPercent,
+  :updatedAt
+)
+ON CONFLICT(article_id)
+DO UPDATE SET
+  scroll_percent = excluded.scroll_percent,
+  updated_at = excluded.updated_at;
+
+delete:
+DELETE FROM article_reading_progress
+WHERE article_id = :articleID;
+
+deleteAll:
+DELETE FROM article_reading_progress;
+
+deleteWithoutArticle:
+DELETE FROM article_reading_progress
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);
