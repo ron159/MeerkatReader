@@ -5,7 +5,11 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +46,11 @@ fun ArticleActionMenu(
     onMarkAllRead: (range: MarkRead) -> Unit = {},
     onOpenLabels: () -> Unit = {},
     onSaveForLater: (url: String) -> Unit = {},
+    onMuteFeed: () -> Unit = {},
+    onMuteSimilar: () -> Unit = {},
+    onNotifyAuthor: () -> Unit = {},
+    onDownloadOffline: () -> Unit = {},
+    onRemoveOffline: () -> Unit = {},
     onDismissRequest: () -> Unit = {},
 ) {
     val unreadCount = LocalUnreadCount.current
@@ -57,6 +66,17 @@ fun ArticleActionMenu(
         }
         if (showLabels) {
             LabelMenuItem(onDismissRequest, onOpenLabels)
+        }
+        DownloadOfflineMenuItem(onDismissRequest, onDownloadOffline)
+        RemoveOfflineMenuItem(onDismissRequest, onRemoveOffline)
+        if (!article.feedURL.isNullOrBlank() || article.feedName.isNotBlank()) {
+            MuteFeedMenuItem(onDismissRequest, onMuteFeed)
+        }
+        if (article.title.isNotBlank()) {
+            MuteSimilarMenuItem(onDismissRequest, onMuteSimilar)
+        }
+        if (!article.author.isNullOrBlank()) {
+            NotifyAuthorMenuItem(onDismissRequest, onNotifyAuthor)
         }
         if (unreadCount > 0) {
             if (index > 0) {
@@ -85,6 +105,106 @@ fun ArticleActionMenu(
         CopyLinkMenuItem(onDismissRequest, article)
         ShareLinkMenuItem(onDismissRequest, article)
     }
+}
+
+@Composable
+private fun DownloadOfflineMenuItem(
+    onDismissRequest: () -> Unit,
+    onDownloadOffline: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Download,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_download_offline)) },
+        onClick = {
+            onDismissRequest()
+            onDownloadOffline()
+        },
+    )
+}
+
+@Composable
+private fun RemoveOfflineMenuItem(
+    onDismissRequest: () -> Unit,
+    onRemoveOffline: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Delete,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_remove_offline)) },
+        onClick = {
+            onDismissRequest()
+            onRemoveOffline()
+        },
+    )
+}
+
+@Composable
+private fun MuteFeedMenuItem(
+    onDismissRequest: () -> Unit,
+    onMuteFeed: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Block,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_mute_feed_rule)) },
+        onClick = {
+            onDismissRequest()
+            onMuteFeed()
+        },
+    )
+}
+
+@Composable
+private fun MuteSimilarMenuItem(
+    onDismissRequest: () -> Unit,
+    onMuteSimilar: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Block,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_mute_similar_rule)) },
+        onClick = {
+            onDismissRequest()
+            onMuteSimilar()
+        },
+    )
+}
+
+@Composable
+private fun NotifyAuthorMenuItem(
+    onDismissRequest: () -> Unit,
+    onNotifyAuthor: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Notifications,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_notify_author_rule)) },
+        onClick = {
+            onDismissRequest()
+            onNotifyAuthor()
+        },
+    )
 }
 
 @Composable

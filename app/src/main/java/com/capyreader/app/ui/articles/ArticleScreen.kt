@@ -4,16 +4,22 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults.pinnedScrollBehavior
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
@@ -48,6 +54,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.capyreader.app.R
+import com.capyreader.app.ai.ArticleAiErrorMessages
 import com.capyreader.app.common.Media
 import com.capyreader.app.common.Saver
 import com.capyreader.app.common.asState
@@ -75,6 +82,7 @@ import com.capyreader.app.ui.articles.feeds.LocalSavedSearchActions
 import com.capyreader.app.ui.articles.feeds.SavedSearchActions
 import com.capyreader.app.ui.articles.list.ArticleHomeDestination
 import com.capyreader.app.ui.articles.list.ArticleHomeNavigationBar
+import com.capyreader.app.ui.articles.list.ArticleAiPreviewButton
 import com.capyreader.app.ui.articles.list.ArticleListTopBar
 import com.capyreader.app.ui.articles.list.EmptyOnboardingView
 import com.capyreader.app.ui.articles.list.LabelBottomSheet
@@ -166,6 +174,7 @@ fun ArticleScreen(
         .starredDisplay
         .collectChangesWithCurrent()
     val badgeStyle by appPreferences.badgeStyle.collectChangesWithDefault()
+    val aiEnabled by appPreferences.aiOptions.enabled.collectChangesWithDefault()
     var selectedHomeDestination by rememberSaveable {
         mutableStateOf(filter.homeDestination())
     }
@@ -247,6 +256,35 @@ fun ArticleScreen(
         }
 
         val listState = articles.rememberLazyListState()
+
+        fun visibleArticles(): List<Article> {
+            return listState.layoutInfo.visibleItemsInfo
+                .mapNotNull { itemInfo ->
+                    if (itemInfo.index < articles.itemCount) {
+                        articles[itemInfo.index]
+                    } else {
+                        null
+                    }
+                }
+                .distinctBy { it.id }
+        }
+
+        fun summarizeVisibleArticlePreviews() {
+            viewModel.summarizeArticlePreviews(visibleArticles())
+        }
+
+        LaunchedEffect(listState, articles) {
+            snapshotFlow { visibleArticles().map { it.id } }
+                .distinctUntilChanged()
+                .debounce(250)
+                .collect {
+                    viewModel.loadOfflinePackageStates(visibleArticles())
+                }
+        }
+
+        fun generateArticleDigest() {
+            viewModel.generateArticleDigest()
+        }
 
         fun scrollToArticle(index: Int) {
             coroutineScope.launch {
@@ -518,6 +556,18 @@ fun ArticleScreen(
             listPane = {
                 val keyboardManager = LocalSoftwareKeyboardController.current
                 val markReadPosition = LocalMarkAllReadButtonPosition.current
+                val showAiSummaryPreviewButton = aiEnabled &&
+                        !showFeedNavigation &&
+                        (articles.itemCount > 0 || viewModel.isAiSummaryPreviewLoading)
+                val canSummarizeArticlePreviews = showAiSummaryPreviewButton &&
+                        articles.itemCount > 0 &&
+                        !viewModel.isAiSummaryPreviewLoading
+                val showAiDigestButton = aiEnabled &&
+                        !showFeedNavigation &&
+                        (articles.itemCount > 0 || viewModel.aiDigestState.isLoading)
+                val canGenerateArticleDigest = showAiDigestButton &&
+                        articles.itemCount > 0 &&
+                        !viewModel.aiDigestState.isLoading
 
                 CompositionLocalProvider(
                     LocalMarkAllRead provides { markAllRead(MarkRead.All) },
@@ -542,6 +592,48 @@ fun ArticleScreen(
                             ArticleListTopBar(
                                 onRequestJumpToTop = { scrollToTop() },
                                 onNavigateToSettings = onNavigateToSettings,
+                                onSummarizeArticlePreviews = { summarizeVisibleArticlePreviews() },
+                                onGenerateArticleDigest = { generateArticleDigest() },
+                                onMarkSearchResultsRead = {
+                                    viewModel.markSearchResultsReadAsync { count ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                context.getString(R.string.search_batch_mark_read_done, count)
+                                            )
+                                        }
+                                    }
+                                },
+                                onStarSearchResults = {
+                                    viewModel.starSearchResultsAsync { count ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                context.getString(R.string.search_batch_star_done, count)
+                                            )
+                                        }
+                                    }
+                                },
+                                onSaveSearchResultsExternally = {
+                                    viewModel.saveSearchResultsExternallyAsync { result ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                result.fold(
+                                                    onSuccess = {
+                                                        context.getString(R.string.search_batch_save_done, it)
+                                                    },
+                                                    onFailure = {
+                                                        context.getString(R.string.search_batch_save_failed)
+                                                    },
+                                                )
+                                            )
+                                        }
+                                    }
+                                },
+                                showAiSummaryPreviewButton = showAiSummaryPreviewButton,
+                                canSummarizeArticlePreviews = canSummarizeArticlePreviews,
+                                isAiSummaryPreviewLoading = viewModel.isAiSummaryPreviewLoading,
+                                showAiDigestButton = showAiDigestButton,
+                                canGenerateArticleDigest = canGenerateArticleDigest,
+                                canSaveSearchResultsExternally = canSaveExternally,
                                 onRemoveFolder = { folderTitle, completion ->
                                     viewModel.removeFolder(
                                         folderTitle,
@@ -568,9 +660,20 @@ fun ArticleScreen(
                         },
                         floatingActionButton = {
                             if (markReadPosition == MarkReadPosition.FLOATING_ACTION_BUTTON) {
-                                MarkAllReadButton(
-                                    position = MarkReadPosition.FLOATING_ACTION_BUTTON,
-                                )
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                ) {
+                                    ArticleAiPreviewButton(
+                                        position = MarkReadPosition.FLOATING_ACTION_BUTTON,
+                                        visible = showAiSummaryPreviewButton,
+                                        enabled = canSummarizeArticlePreviews,
+                                        isLoading = viewModel.isAiSummaryPreviewLoading,
+                                        onClick = { summarizeVisibleArticlePreviews() },
+                                    )
+                                    MarkAllReadButton(
+                                        position = MarkReadPosition.FLOATING_ACTION_BUTTON,
+                                    )
+                                }
                             }
                         },
                         bottomBar = {
@@ -655,6 +758,8 @@ fun ArticleScreen(
                                             ArticleList(
                                                 articles = articles,
                                                 selectedArticleKey = article?.id,
+                                                aiSummaryPreviews = viewModel.aiSummaryPreviews,
+                                                offlinePackageStates = viewModel.offlinePackageStates,
                                                 listState = listState,
                                                 enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
                                                 dimReadArticles = filter.status != ArticleStatus.STARRED,
@@ -765,6 +870,46 @@ fun ArticleScreen(
             )
         }
 
+        val aiDigestState = viewModel.aiDigestState
+        val aiErrorMessages = ArticleAiErrorMessages(
+            requestFailed = stringResource(R.string.article_ai_error_request_failed),
+            disabled = stringResource(R.string.article_ai_error_disabled),
+            disabledForFeed = stringResource(R.string.article_ai_error_disabled_for_feed),
+            apiKeyRequired = stringResource(R.string.article_ai_error_api_key_required),
+            modelRequired = stringResource(R.string.article_ai_error_model_required),
+            contentEmpty = stringResource(R.string.article_ai_error_content_empty),
+            questionRequired = stringResource(R.string.article_ai_error_question_required),
+            noDigestArticles = stringResource(R.string.article_ai_error_no_digest_articles),
+        )
+        if (aiDigestState.isLoading || aiDigestState.result != null || aiDigestState.error != null) {
+            AlertDialog(
+                onDismissRequest = viewModel::clearArticleDigest,
+                title = {
+                    Text(stringResource(R.string.article_ai_digest_title))
+                },
+                text = {
+                    Text(
+                        text = when {
+                            aiDigestState.isLoading -> stringResource(R.string.article_ai_digest_loading)
+                            aiDigestState.error != null -> {
+                                stringResource(
+                                    R.string.article_ai_digest_failed,
+                                    aiErrorMessages.messageFor(aiDigestState.error),
+                                )
+                            }
+                            else -> aiDigestState.result.orEmpty()
+                        },
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = viewModel::clearArticleDigest) {
+                        Text(stringResource(R.string.article_ai_digest_close))
+                    }
+                },
+            )
+        }
+
         if (isUpdatePasswordDialogOpen) {
             UpdateAuthDialog(
                 onSuccess = { message ->
@@ -838,6 +983,11 @@ fun rememberArticleActions(viewModel: ArticleScreenViewModel): ArticleActions {
             unstar = viewModel::removeStarAsync,
             saveExternally = viewModel::saveArticleExternallyAsync,
             saveForLater = viewModel::saveForLater,
+            muteFeed = viewModel::createMuteFeedRule,
+            muteSimilar = viewModel::createMuteSimilarRule,
+            notifyAuthor = viewModel::createNotifyAuthorRule,
+            downloadOffline = viewModel::downloadOfflineAsync,
+            removeOffline = viewModel::removeOfflineAsync,
 
             showSaveForLater = viewModel.source.supportsReadLater,
         )

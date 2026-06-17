@@ -11,9 +11,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -26,9 +31,11 @@ import com.capyreader.app.ai.ArticleAiDisplayState
 fun ArticleAiSheet(
     topState: ArticleAiDisplayState?,
     translationState: ArticleAiDisplayState?,
-    onRunAction: (ArticleAiAction, Boolean) -> Unit,
+    onRunAction: (ArticleAiAction, Boolean, String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var question by rememberSaveable { mutableStateOf("") }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -50,24 +57,31 @@ fun ArticleAiSheet(
                 label = stringResource(R.string.article_ai_summarize),
                 hasResult = topState?.action == ArticleAiAction.SUMMARIZE && topState.result != null,
                 isLoading = topState?.action == ArticleAiAction.SUMMARIZE && topState.isLoading,
-                onRun = { onRunAction(ArticleAiAction.SUMMARIZE, false) },
-                onRegenerate = { onRunAction(ArticleAiAction.SUMMARIZE, true) },
+                onRun = { onRunAction(ArticleAiAction.SUMMARIZE, false, null) },
+                onRegenerate = { onRunAction(ArticleAiAction.SUMMARIZE, true, null) },
             )
 
             AiActionRow(
                 label = stringResource(R.string.article_ai_key_points),
                 hasResult = topState?.action == ArticleAiAction.KEY_POINTS && topState.result != null,
                 isLoading = topState?.action == ArticleAiAction.KEY_POINTS && topState.isLoading,
-                onRun = { onRunAction(ArticleAiAction.KEY_POINTS, false) },
-                onRegenerate = { onRunAction(ArticleAiAction.KEY_POINTS, true) },
+                onRun = { onRunAction(ArticleAiAction.KEY_POINTS, false, null) },
+                onRegenerate = { onRunAction(ArticleAiAction.KEY_POINTS, true, null) },
             )
 
             AiActionRow(
                 label = stringResource(R.string.article_ai_translate),
                 hasResult = translationState?.result != null,
                 isLoading = translationState?.isLoading == true,
-                onRun = { onRunAction(ArticleAiAction.TRANSLATE, false) },
-                onRegenerate = { onRunAction(ArticleAiAction.TRANSLATE, true) },
+                onRun = { onRunAction(ArticleAiAction.TRANSLATE, false, null) },
+                onRegenerate = { onRunAction(ArticleAiAction.TRANSLATE, true, null) },
+            )
+
+            AiQuestionRow(
+                question = question,
+                onQuestionChange = { question = it },
+                isLoading = topState?.action == ArticleAiAction.QUESTION && topState.isLoading,
+                onRun = { onRunAction(ArticleAiAction.QUESTION, false, question) },
             )
 
             Spacer(Modifier.height(8.dp))
@@ -102,6 +116,40 @@ private fun AiActionRow(
             ) {
                 Text(stringResource(R.string.article_ai_regenerate))
             }
+        }
+    }
+}
+
+@Composable
+private fun AiQuestionRow(
+    question: String,
+    onQuestionChange: (String) -> Unit,
+    isLoading: Boolean,
+    onRun: () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = question,
+            onValueChange = onQuestionChange,
+            label = { Text(stringResource(R.string.article_ai_question_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+        )
+        FilledTonalButton(
+            enabled = question.isNotBlank() && !isLoading,
+            onClick = onRun,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                if (isLoading) {
+                    stringResource(R.string.article_ai_loading_short)
+                } else {
+                    stringResource(R.string.article_ai_ask)
+                }
+            )
         }
     }
 }

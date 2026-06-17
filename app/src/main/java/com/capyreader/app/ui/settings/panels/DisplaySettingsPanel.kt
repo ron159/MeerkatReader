@@ -11,18 +11,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,13 +27,8 @@ import com.capyreader.app.R
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.AppTheme
-import com.capyreader.app.preferences.ArticleImageCacheCleanupInterval
-import com.capyreader.app.preferences.ArticleImageCacheSize
-import com.capyreader.app.preferences.ArticleImageDownloadMode
-import com.capyreader.app.preferences.ArticleStatusListDisplay
 import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
-import com.capyreader.app.ui.articles.MarkReadPosition
 import com.capyreader.app.ui.collectChangesWithCurrent
 import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
@@ -50,12 +40,9 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun DisplaySettingsPanel(
     viewModel: DisplaySettingsViewModel = koinViewModel(),
-    onNavigateToUnreadBadges: () -> Unit = {},
-    onNavigateToArticleList: () -> Unit = {},
 ) {
     val pinArticleBars by viewModel.pinArticleBars.collectChangesWithCurrent()
     val improveTalkback by viewModel.improveTalkback.collectChangesWithCurrent()
-    val markReadButtonPosition by viewModel.markReadButtonPosition.collectChangesWithCurrent()
     val appTheme by viewModel.appPreferences.appTheme.collectChangesWithCurrent()
 
     DisplaySettingsPanelView(
@@ -72,21 +59,6 @@ fun DisplaySettingsPanel(
         enablePinArticleBars = !improveTalkback,
         updateImageVisibility = viewModel::updateImageVisibility,
         imageVisibility = viewModel.imageVisibility,
-        articleImageDownloadMode = viewModel.articleImageDownloadMode,
-        updateArticleImageDownloadMode = viewModel::updateArticleImageDownloadMode,
-        articleImageCacheSize = viewModel.articleImageCacheSize,
-        updateArticleImageCacheSize = viewModel::updateArticleImageCacheSize,
-        articleImageCacheCleanupInterval = viewModel.articleImageCacheCleanupInterval,
-        updateArticleImageCacheCleanupInterval = viewModel::updateArticleImageCacheCleanupInterval,
-        clearArticleImageCache = viewModel::clearArticleImageCache,
-        markReadButtonPosition = markReadButtonPosition,
-        updateMarkReadButtonPosition = viewModel::updateMarkReadButtonPosition,
-        unreadDisplay = viewModel.unreadDisplay,
-        updateUnreadDisplay = viewModel::updateUnreadDisplay,
-        starredDisplay = viewModel.starredDisplay,
-        updateStarredDisplay = viewModel::updateStarredDisplay,
-        onNavigateToUnreadBadges = onNavigateToUnreadBadges,
-        onNavigateToArticleList = onNavigateToArticleList,
     )
 }
 
@@ -104,34 +76,8 @@ fun DisplaySettingsPanelView(
     pinArticleBars: Boolean,
     enablePinArticleBars: Boolean,
     imageVisibility: ReaderImageVisibility,
-    articleImageDownloadMode: ArticleImageDownloadMode,
-    articleImageCacheSize: ArticleImageCacheSize,
-    articleImageCacheCleanupInterval: ArticleImageCacheCleanupInterval,
-    markReadButtonPosition: MarkReadPosition,
     updateImageVisibility: (option: ReaderImageVisibility) -> Unit,
-    updateArticleImageDownloadMode: (mode: ArticleImageDownloadMode) -> Unit,
-    updateArticleImageCacheSize: (size: ArticleImageCacheSize) -> Unit,
-    updateArticleImageCacheCleanupInterval: (interval: ArticleImageCacheCleanupInterval) -> Unit,
-    clearArticleImageCache: () -> Unit,
-    updateMarkReadButtonPosition: (position: MarkReadPosition) -> Unit,
-    unreadDisplay: ArticleStatusListDisplay,
-    updateUnreadDisplay: (display: ArticleStatusListDisplay) -> Unit,
-    starredDisplay: ArticleStatusListDisplay,
-    updateStarredDisplay: (display: ArticleStatusListDisplay) -> Unit,
-    onNavigateToUnreadBadges: () -> Unit = {},
-    onNavigateToArticleList: () -> Unit = {},
 ) {
-    val (isClearImageCacheDialogOpen, setClearImageCacheDialogOpen) = remember { mutableStateOf(false) }
-
-    val onClearImageCacheCancel = {
-        setClearImageCacheDialogOpen(false)
-    }
-
-    val onRequestClearImageCache = {
-        setClearImageCacheDialogOpen(false)
-        clearArticleImageCache()
-    }
-
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
@@ -171,17 +117,6 @@ fun DisplaySettingsPanelView(
                 }
             }
 
-            Column {
-                SettingsDisclosureRow(
-                    title = stringResource(R.string.settings_article_list_title),
-                    onClick = onNavigateToArticleList,
-                )
-
-                SettingsDisclosureRow(
-                    title = stringResource(R.string.settings_panel_unread_counts_title),
-                    onClick = onNavigateToUnreadBadges,
-                )
-            }
         }
 
         FormSection(
@@ -196,41 +131,6 @@ fun DisplaySettingsPanelView(
                     stringResource(it.translationKey)
                 }
             )
-            PreferenceSelect(
-                selected = articleImageDownloadMode,
-                update = updateArticleImageDownloadMode,
-                options = ArticleImageDownloadMode.entries,
-                label = R.string.article_image_download_mode_label,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-            PreferenceSelect(
-                selected = articleImageCacheSize,
-                update = updateArticleImageCacheSize,
-                options = ArticleImageCacheSize.entries,
-                label = R.string.article_image_cache_size_label,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-            PreferenceSelect(
-                selected = articleImageCacheCleanupInterval,
-                update = updateArticleImageCacheCleanupInterval,
-                options = ArticleImageCacheCleanupInterval.entries,
-                label = R.string.article_image_cache_cleanup_label,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-            RowItem {
-                FilledTonalButton(
-                    onClick = { setClearImageCacheDialogOpen(true) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.article_image_cache_clear_button))
-                }
-            }
             RowItem {
                 TextSwitch(
                     enabled = enablePinArticleBars,
@@ -241,54 +141,7 @@ fun DisplaySettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_display_miscellaneous_title)) {
-            PreferenceSelect(
-                selected = unreadDisplay,
-                update = updateUnreadDisplay,
-                options = ArticleStatusListDisplay.entries,
-                label = R.string.settings_unread_display,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-            PreferenceSelect(
-                selected = starredDisplay,
-                update = updateStarredDisplay,
-                options = ArticleStatusListDisplay.entries,
-                label = R.string.settings_starred_display,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-            PreferenceSelect(
-                selected = markReadButtonPosition,
-                update = updateMarkReadButtonPosition,
-                options = MarkReadPosition.entries,
-                label = R.string.mark_all_read_button_position,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
-        }
-
         Spacer(Modifier.height(16.dp))
-    }
-
-    if (isClearImageCacheDialogOpen) {
-        AlertDialog(
-            onDismissRequest = onClearImageCacheCancel,
-            text = { Text(stringResource(R.string.article_image_cache_clear_message)) },
-            dismissButton = {
-                TextButton(onClick = onClearImageCacheCancel) {
-                    Text(stringResource(R.string.dialog_cancel))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onRequestClearImageCache) {
-                    Text(stringResource(R.string.article_image_cache_clear_confirm))
-                }
-            }
-        )
     }
 }
 
@@ -336,20 +189,7 @@ private fun DisplaySettingsPanelViewPreview() {
                 pinArticleBars = false,
                 updateImageVisibility = {},
                 imageVisibility = ReaderImageVisibility.ALWAYS_SHOW,
-                articleImageDownloadMode = ArticleImageDownloadMode.WIFI_ONLY,
-                updateArticleImageDownloadMode = {},
-                articleImageCacheSize = ArticleImageCacheSize.LARGE,
-                updateArticleImageCacheSize = {},
-                articleImageCacheCleanupInterval = ArticleImageCacheCleanupInterval.WEEKLY,
-                updateArticleImageCacheCleanupInterval = {},
-                clearArticleImageCache = {},
                 enablePinArticleBars = false,
-                markReadButtonPosition = MarkReadPosition.TOOLBAR,
-                updateMarkReadButtonPosition = {},
-                unreadDisplay = ArticleStatusListDisplay.ALL_ARTICLES,
-                updateUnreadDisplay = {},
-                starredDisplay = ArticleStatusListDisplay.GROUPED_BY_FEED,
-                updateStarredDisplay = {},
             )
         }
     }

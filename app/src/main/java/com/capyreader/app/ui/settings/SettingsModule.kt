@@ -18,6 +18,9 @@ val settingsModule = module {
             account = get(),
             appPreferences = get(),
             articleImageCacheCleaner = get(),
+            articleOfflinePackageRecords = get(),
+            articleReadingProgressRecords = get(),
+            articleRuleMatchRecords = get(),
         )
     }
     viewModel {
@@ -44,6 +47,7 @@ val settingsModule = module {
     viewModel {
         AiSettingsViewModel(
             appPreferences = get(),
+            articleAiRepository = get(),
         )
     }
     viewModel {

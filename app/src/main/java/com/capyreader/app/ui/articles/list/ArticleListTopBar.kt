@@ -45,6 +45,17 @@ import com.jocmp.capy.accounts.Source
 fun ArticleListTopBar(
     onRequestJumpToTop: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onSummarizeArticlePreviews: () -> Unit,
+    onGenerateArticleDigest: () -> Unit,
+    onMarkSearchResultsRead: () -> Unit,
+    onStarSearchResults: () -> Unit,
+    onSaveSearchResultsExternally: () -> Unit,
+    showAiSummaryPreviewButton: Boolean,
+    canSummarizeArticlePreviews: Boolean,
+    isAiSummaryPreviewLoading: Boolean,
+    showAiDigestButton: Boolean,
+    canGenerateArticleDigest: Boolean,
+    canSaveSearchResultsExternally: Boolean,
     onRemoveFolder: (folderTitle: String, completion: (result: Result<Unit>) -> Unit) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
     search: ArticleSearch,
@@ -137,11 +148,26 @@ fun ArticleListTopBar(
             }
         },
         actions = {
+            if (enableSearch && !search.query.isNullOrBlank()) {
+                SearchBatchActionMenu(
+                    canSaveExternally = canSaveSearchResultsExternally,
+                    onMarkRead = onMarkSearchResultsRead,
+                    onStar = onStarSearchResults,
+                    onSaveExternally = onSaveSearchResultsExternally,
+                )
+            }
             FilterActionMenu(
                 filter = filter,
                 currentFeed = currentFeed,
                 onRemoveFolder = onRemoveFolder,
                 onRequestSearch = { search.start() },
+                onSummarizeArticlePreviews = onSummarizeArticlePreviews,
+                onGenerateArticleDigest = onGenerateArticleDigest,
+                showAiSummaryPreviewButton = showAiSummaryPreviewButton,
+                canSummarizeArticlePreviews = canSummarizeArticlePreviews,
+                isAiSummaryPreviewLoading = isAiSummaryPreviewLoading,
+                showAiDigestButton = showAiDigestButton,
+                canGenerateArticleDigest = canGenerateArticleDigest,
                 hideSearchIcon = enableSearch,
                 source = source,
             )
@@ -165,6 +191,17 @@ private fun FeedListTopBarPreview() {
     ArticleListTopBar(
         onRequestJumpToTop = { },
         onNavigateToSettings = { },
+        onSummarizeArticlePreviews = { },
+        onGenerateArticleDigest = { },
+        onMarkSearchResultsRead = { },
+        onStarSearchResults = { },
+        onSaveSearchResultsExternally = { },
+        showAiSummaryPreviewButton = true,
+        canSummarizeArticlePreviews = true,
+        isAiSummaryPreviewLoading = false,
+        showAiDigestButton = true,
+        canGenerateArticleDigest = true,
+        canSaveSearchResultsExternally = true,
         onRemoveFolder = { _, _ -> },
         scrollBehavior = scrollBehavior,
         search = ArticleSearch(),

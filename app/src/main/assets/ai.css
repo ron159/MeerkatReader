@@ -8,6 +8,8 @@
   background: var(--color-surface-container);
   color: var(--color-on-surface);
   box-shadow: 0 .4rem 1.25rem rgb(0 0 0 / 8%);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ai-card__eyebrow {
@@ -80,6 +82,8 @@
   flex-direction: column;
   gap: .75rem;
   margin-bottom: 1.5rem;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ai-translation-row {

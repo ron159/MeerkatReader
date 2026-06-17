@@ -2,7 +2,9 @@ package com.capyreader.app.ui.articles
 
 import android.content.Context
 import com.capyreader.app.R
+import com.capyreader.app.ai.AiChatClient
 import com.capyreader.app.ai.ArticleAiRepository
+import com.capyreader.app.ai.OpenAiCompatibleChatClient
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.ui.addintent.AddLinkViewModel
 import com.capyreader.app.ui.articles.audio.AudioPlayerController
@@ -23,11 +25,19 @@ internal val articlesModule = module {
             account = get(),
         )
     }
+    single<AiChatClient> {
+        OpenAiCompatibleChatClient(
+            httpClient = get(),
+        )
+    }
     single {
         ArticleAiRepository(
             context = get(),
             appPreferences = get(),
-            httpClient = get(),
+            account = get(),
+            chatClient = get(),
+            articleAiDigestRecords = get(),
+            articleAiResultRecords = get(),
         )
     }
     single {
@@ -69,6 +79,8 @@ internal val articlesModule = module {
             articleImageStore = get(),
             articleImageCacheCleaner = get(),
             articleFullContentRecords = get(),
+            articleAiRepository = get(),
+            articleOfflinePackageDownloader = get(),
         )
     }
     viewModel {

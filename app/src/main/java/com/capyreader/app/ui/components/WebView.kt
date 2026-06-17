@@ -42,6 +42,7 @@ import okhttp3.Request
 import org.koin.compose.koinInject
 import org.koin.core.component.KoinComponent
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -51,6 +52,7 @@ fun WebView(
     article: Article? = null,
     showImages: Boolean = true,
     articleTopMarginPx: Int = 0,
+    initialScrollPercent: Double = 0.0,
 ) {
     val timeFormats = LocalTimeFormats.current
     AndroidView(
@@ -59,6 +61,7 @@ fun WebView(
         update = {
             article?.let {
                 state.loadHtml(article, showImages, timeFormats, articleTopMarginPx)
+                state.restoreScrollPercent(article.id, initialScrollPercent)
             }
         }
     )
@@ -167,6 +170,7 @@ class WebViewState(
 ) {
     private var htmlId: String? = null
     private var contentHash: Int = 0
+    private var restoredScrollArticleId: String? = null
     private var currentAudioUrl: String? = null
     private var isAudioPlaying: Boolean = false
 
@@ -190,6 +194,7 @@ class WebViewState(
         webView.isVerticalScrollBarEnabled = enableNativeScroll
         htmlId = id
         contentHash = hash
+        restoredScrollArticleId = null
         webView.scrollTo(0, 0)
 
         val client = webView.webViewClient as? AccompanistWebViewClient
@@ -213,8 +218,21 @@ class WebViewState(
         )
     }
 
+    fun restoreScrollPercent(articleID: String, scrollPercent: Double) {
+        if (articleID != htmlId || restoredScrollArticleId == articleID || scrollPercent <= 0.0) {
+            return
+        }
+
+        restoredScrollArticleId = articleID
+        webView.postDelayed({
+            val targetY = (webView.maxScrollY() * scrollPercent.coerceIn(0.0, 1.0)).roundToInt()
+            webView.scrollTo(0, targetY)
+        }, RESTORE_SCROLL_DELAY_MS)
+    }
+
     fun reset() {
         htmlId = null
+        restoredScrollArticleId = null
         loadEmpty()
     }
 
@@ -239,6 +257,10 @@ class WebViewState(
     }
 
     private fun loadEmpty() = webView.loadUrl("about:blank")
+
+    companion object {
+        private const val RESTORE_SCROLL_DELAY_MS = 250L
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -254,6 +276,7 @@ fun rememberWebViewState(
     onOpenAudioPlayer: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    onScrollProgressChanged: (scrollPercent: Double) -> Unit = {},
     enableTopSwipe: Boolean = false,
     enableBottomSwipe: Boolean = false,
     onSwipeDownFromTop: () -> Unit = {},
@@ -267,6 +290,7 @@ fun rememberWebViewState(
     val currentAudioUrlState by rememberUpdatedState(currentAudioUrl)
     val isAudioPlayingState by rememberUpdatedState(isAudioPlaying)
     val scrollChangedState by rememberUpdatedState(onScrollChanged)
+    val scrollProgressChangedState by rememberUpdatedState(onScrollProgressChanged)
     val enableTopSwipeState = rememberUpdatedState(enableTopSwipe)
     val enableBottomSwipeState = rememberUpdatedState(enableBottomSwipe)
     val swipeDownFromTopState = rememberUpdatedState(onSwipeDownFromTop)
@@ -315,6 +339,7 @@ fun rememberWebViewState(
 
             setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
                 scrollChangedState(scrollY, oldScrollY)
+                scrollProgressChangedState(scrollY.toScrollPercent(this))
             }
 
             setOnTouchListener(
@@ -340,6 +365,19 @@ fun rememberWebViewState(
                 it.updateAudioPlayState(currentAudioUrlState, isAudioPlayingState)
             }
         }
+    }
+}
+
+private fun WebView.maxScrollY(): Int {
+    return ((contentHeight * scale) - height).roundToInt().coerceAtLeast(0)
+}
+
+private fun Int.toScrollPercent(webView: WebView): Double {
+    val maxScrollY = webView.maxScrollY()
+    return if (maxScrollY == 0) {
+        0.0
+    } else {
+        (toDouble() / maxScrollY).coerceIn(0.0, 1.0)
     }
 }
 

@@ -5,8 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -25,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +38,7 @@ import com.capyreader.app.ui.articles.StyleProviders
 import com.capyreader.app.ui.articles.list.ArticleListItem
 import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.LabelStyle
+import com.capyreader.app.ui.components.MeerkatSilhouetteIcon
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
 import com.capyreader.app.ui.theme.LocalAppTheme
@@ -69,7 +66,7 @@ fun ArticleListSettings(
 ) {
     val fontScales = ArticleListFontScale.entries
 
-    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+    Column {
         PreviewArticleRow(options = options)
 
         FormSection(
@@ -235,10 +232,8 @@ private fun PreviewImage(imagePreview: ImagePreview) {
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
     ) {
-        Icon(
-            painter = painterResource(R.drawable.icon_empty_list),
+        MeerkatSilhouetteIcon(
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.size(
                 when (imagePreview) {
                     ImagePreview.SMALL -> 48.dp

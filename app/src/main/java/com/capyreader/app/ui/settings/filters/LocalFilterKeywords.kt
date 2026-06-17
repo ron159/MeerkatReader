@@ -10,6 +10,8 @@ data class FilterKeywords(
     val remove: (keyword: String) -> Unit = {},
     val keywords: List<String> = emptyList(),
     val addRule: (rule: ArticleAutomationRule) -> Unit = {},
+    val updateRule: (rule: ArticleAutomationRule) -> Unit = {},
     val removeRule: (rule: ArticleAutomationRule) -> Unit = {},
+    val moveRule: (rule: ArticleAutomationRule, direction: Int) -> Unit = { _, _ -> },
     val rules: List<ArticleAutomationRule> = emptyList(),
 )

@@ -46,6 +46,8 @@ fun ArticleReader(
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    onScrollProgressChanged: (scrollPercent: Double) -> Unit = {},
+    initialScrollPercent: Double = 0.0,
     enableTopSwipe: Boolean = false,
     enableBottomSwipe: Boolean = false,
     onSwipeDownFromTop: () -> Unit = {},
@@ -111,6 +113,7 @@ fun ArticleReader(
         onOpenAudioPlayer = onSelectAudio,
         onPauseAudio = onPauseAudio,
         onScrollChanged = onScrollChanged,
+        onScrollProgressChanged = onScrollProgressChanged,
         enableTopSwipe = enableTopSwipe,
         enableBottomSwipe = enableBottomSwipe,
         onSwipeDownFromTop = onSwipeDownFromTop,
@@ -138,6 +141,7 @@ fun ArticleReader(
                 article = article,
                 showImages = showImages,
                 articleTopMarginPx = articleTopMarginPx,
+                initialScrollPercent = initialScrollPercent,
             )
         }
     } else {
@@ -147,6 +151,7 @@ fun ArticleReader(
             article = article,
             showImages = showImages,
             articleTopMarginPx = articleTopMarginPx,
+            initialScrollPercent = initialScrollPercent,
         )
     }
 

@@ -30,6 +30,7 @@ import com.capyreader.app.ui.settings.panels.AboutSettingsPanel
 import com.capyreader.app.ui.settings.panels.AccountSettingsPanel
 import com.capyreader.app.ui.settings.panels.AiSettingsPanel
 import com.capyreader.app.ui.settings.panels.ArticleListSettingsPanel
+import com.capyreader.app.ui.settings.panels.DataStorageSettingsPanel
 import com.capyreader.app.ui.settings.panels.DisplaySettingsPanel
 import com.capyreader.app.ui.settings.panels.GeneralSettingsPanel
 import com.capyreader.app.ui.settings.panels.GesturesSettingPanel
@@ -143,19 +144,17 @@ fun SettingsView(
                                     feeds = feeds,
                                 )
 
-                                SettingsPanel.Display -> DisplaySettingsPanel(
-                                    onNavigateToUnreadBadges = {
-                                        navigateToPanel(SettingsPanel.UnreadBadges)
-                                    },
-                                    onNavigateToArticleList = {
-                                        navigateToPanel(SettingsPanel.ArticleList)
-                                    }
-                                )
+                                SettingsPanel.Display -> DisplaySettingsPanel()
                                 SettingsPanel.AI -> AiSettingsPanel()
                                 SettingsPanel.Gestures -> GesturesSettingPanel()
+                                SettingsPanel.DataStorage -> DataStorageSettingsPanel()
                                 SettingsPanel.Account -> AccountSettingsPanel(onRemoveAccount = onRemoveAccount)
                                 SettingsPanel.About -> AboutSettingsPanel()
-                                SettingsPanel.ArticleList -> ArticleListSettingsPanel()
+                                SettingsPanel.ArticleList -> ArticleListSettingsPanel(
+                                    onNavigateToUnreadBadges = {
+                                        navigateToPanel(SettingsPanel.UnreadBadges)
+                                    }
+                                )
                                 SettingsPanel.UnreadBadges -> UnreadBadgesSettingsPanel(
                                     badgeStyle = viewModel.badgeStyle,
                                     updateBadgeStyle = viewModel::updateBadgeStyle,

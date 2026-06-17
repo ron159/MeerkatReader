@@ -32,13 +32,24 @@ class CapyBackupFile(
         val result = runCatching {
             withContext(Dispatchers.IO) {
                 val backup = BackupDocument(
+                    version = BACKUP_VERSION,
                     exportedAt = Instant.now().toString(),
+                    app = BackupApp(
+                        preferences = appPreferences().backupValues(excludedKeys = SENSITIVE_APP_KEYS),
+                    ),
                     account = BackupAccount(
                         source = account.source,
-                        preferences = accountPreferences(account).backupValues(),
+                        preferences = accountPreferences(account).backupValues(excludedKeys = SENSITIVE_ACCOUNT_KEYS),
+                        subscriptionsOpml = account.opmlDocument(),
                     ),
-                    appPreferences = appPreferences().backupValues(),
-                    subscriptionsOpml = account.opmlDocument(),
+                    rules = backupSectionValue(accountPreferences(account), "article_automation_rules"),
+                    ai = BackupAi(
+                        settings = appPreferences().backupValues(
+                            includedKeys = { it.startsWith("ai_") },
+                            excludedKeys = SENSITIVE_APP_KEYS,
+                        ),
+                        includeApiKey = false,
+                    ),
                 )
                 val source = json.encodeToString(backup).toByteArray()
 
@@ -71,18 +82,28 @@ class CapyBackupFile(
                     throw SourceMismatchError(backup.account.source, account.source)
                 }
 
+                val appPreferenceValues = backup.app?.preferences ?: backup.appPreferences
+                val accountPreferenceValues = backup.account.preferences
+                val subscriptionsOpml = backup.account.subscriptionsOpml.ifBlank {
+                    backup.subscriptionsOpml
+                }
+
+                if (backup.version !in SUPPORTED_BACKUP_VERSIONS) {
+                    throw UnsupportedVersionError(backup.version)
+                }
+
                 restoreValues(
                     preferences = appPreferences(),
-                    values = backup.appPreferences,
+                    values = appPreferenceValues,
                     keysToKeep = setOf(ACCOUNT_ID_KEY),
                 )
                 restoreValues(
                     preferences = accountPreferences(account),
-                    values = backup.account.preferences,
+                    values = accountPreferenceValues,
                 )
 
-                if (backup.subscriptionsOpml.isNotBlank()) {
-                    account.import(backup.subscriptionsOpml.byteInputStream()) {}
+                if (subscriptionsOpml.isNotBlank()) {
+                    account.import(subscriptionsOpml.byteInputStream()) {}
                 }
                 account.refresh()
             }
@@ -112,8 +133,15 @@ class CapyBackupFile(
         return context.getSharedPreferences("account_${account.id}", Context.MODE_PRIVATE)
     }
 
-    private fun SharedPreferences.backupValues(): Map<String, BackupPreferenceValue> {
+    private fun SharedPreferences.backupValues(
+        includedKeys: (String) -> Boolean = { true },
+        excludedKeys: Set<String> = emptySet(),
+    ): Map<String, BackupPreferenceValue> {
         return all.mapNotNull { (key, value) ->
+            if (!includedKeys(key) || key in excludedKeys) {
+                return@mapNotNull null
+            }
+
             val backupValue = when (value) {
                 is String -> BackupPreferenceValue(TYPE_STRING, JsonPrimitive(value))
                 is Long -> BackupPreferenceValue(TYPE_LONG, JsonPrimitive(value))
@@ -190,14 +218,27 @@ class CapyBackupFile(
         return runCatching { jsonPrimitive.content }.getOrNull()
     }
 
+    private fun backupSectionValue(preferences: SharedPreferences, key: String): JsonElement? {
+        val value = preferences.all[key] as? String ?: return null
+
+        return runCatching { json.parseToJsonElement(value) }.getOrElse {
+            JsonPrimitive(value)
+        }
+    }
+
     private class SourceMismatchError(
         val backupSource: Source,
         val currentSource: Source,
     ) : Throwable("Backup source $backupSource does not match current source $currentSource")
 
+    private class UnsupportedVersionError(
+        val version: Int,
+    ) : Throwable("Backup version $version is not supported")
+
     companion object {
         const val DEFAULT_FILE_NAME = "capy-backup.json"
 
+        private const val BACKUP_VERSION = 2
         private const val ACCOUNT_ID_KEY = "account_id"
         private const val TYPE_STRING = "string"
         private const val TYPE_LONG = "long"
@@ -205,6 +246,9 @@ class CapyBackupFile(
         private const val TYPE_FLOAT = "float"
         private const val TYPE_BOOLEAN = "boolean"
         private const val TYPE_STRING_SET = "string_set"
+        private val SUPPORTED_BACKUP_VERSIONS = setOf(1, BACKUP_VERSION)
+        private val SENSITIVE_APP_KEYS = setOf("ai_api_key")
+        private val SENSITIVE_ACCOUNT_KEYS = setOf("password")
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -218,14 +262,32 @@ private data class BackupDocument(
     val version: Int = 1,
     val exportedAt: String,
     val account: BackupAccount,
+    val app: BackupApp? = null,
+    val rules: JsonElement? = null,
+    val savedSearches: List<JsonElement> = emptyList(),
+    val readLater: List<JsonElement> = emptyList(),
+    val starred: List<JsonElement> = emptyList(),
+    val ai: BackupAi = BackupAi(),
     val appPreferences: Map<String, BackupPreferenceValue> = emptyMap(),
     val subscriptionsOpml: String = "",
+)
+
+@Serializable
+private data class BackupApp(
+    val preferences: Map<String, BackupPreferenceValue> = emptyMap(),
 )
 
 @Serializable
 private data class BackupAccount(
     val source: Source,
     val preferences: Map<String, BackupPreferenceValue> = emptyMap(),
+    val subscriptionsOpml: String = "",
+)
+
+@Serializable
+private data class BackupAi(
+    val settings: Map<String, BackupPreferenceValue> = emptyMap(),
+    val includeApiKey: Boolean = false,
 )
 
 @Serializable

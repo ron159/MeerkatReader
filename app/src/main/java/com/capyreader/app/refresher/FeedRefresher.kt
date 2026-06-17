@@ -1,6 +1,7 @@
 package com.capyreader.app.refresher
 
 import android.content.Context
+import com.capyreader.app.ai.ArticleAiPreviewWorker
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.common.isOnWifi
@@ -34,8 +35,24 @@ class FeedRefresher(
             account.refresh()
             articleImageCacheCleaner.cleanup()
             articleImagePreloader.enqueue()
+            enqueueAiPreviewWorker()
             notificationHelper.notify(since = since)
             WidgetUpdater.update(appContext)
         }
+    }
+
+    private fun enqueueAiPreviewWorker() {
+        val aiOptions = appPreferences.aiOptions
+        if (!aiOptions.enabled.get() ||
+            !aiOptions.backgroundPreviewsEnabled.get() ||
+            aiOptions.apiKey.get().isBlank()
+        ) {
+            return
+        }
+
+        ArticleAiPreviewWorker.enqueue(
+            context = appContext,
+            wiFiOnly = aiOptions.backgroundPreviewsOnWiFiOnly.get(),
+        )
     }
 }

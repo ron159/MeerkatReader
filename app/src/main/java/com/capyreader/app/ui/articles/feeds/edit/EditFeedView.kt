@@ -46,6 +46,7 @@ import com.capyreader.app.ui.fixtures.FeedSample
 import com.capyreader.app.ui.theme.CapyTheme
 import com.jocmp.capy.EditFeedFormEntry
 import com.jocmp.capy.Feed
+import com.jocmp.capy.FeedOfflinePolicy
 import com.jocmp.capy.FeedPriority
 import com.jocmp.capy.Folder
 
@@ -74,6 +75,8 @@ fun EditFeedView(
     val scrollState = rememberScrollState()
     val (name, setName) = remember { mutableStateOf(feed.title) }
     val (selectedFolder, setSelectedFolder) = remember { mutableStateOf(defaultFolder()) }
+    val (offlinePolicy, setOfflinePolicy) = remember { mutableStateOf(feed.offlinePolicy) }
+    val (excludeFromAi, setExcludeFromAi) = remember { mutableStateOf(feed.excludeFromAi) }
     val switchFolders = remember(folders) {
         folders
             .map { it.title to feedFolderTitles.contains(it.title) }
@@ -93,7 +96,9 @@ fun EditFeedView(
             EditFeedFormEntry(
                 feedID = feed.id,
                 title = name,
-                folderTitles = folderNames
+                folderTitles = folderNames,
+                offlinePolicy = offlinePolicy,
+                excludeFromAi = excludeFromAi,
             )
         )
     }
@@ -169,6 +174,27 @@ fun EditFeedView(
                         onSelectFolder = setSelectedFolder,
                     )
                 }
+            }
+
+            FormSection(
+                modifier = Modifier.padding(bottom = 16.dp),
+                title = stringResource(R.string.edit_feed_ai_section),
+            ) {
+                CheckboxRow(
+                    title = stringResource(R.string.feed_exclude_from_ai),
+                    checked = excludeFromAi,
+                    onCheck = setExcludeFromAi,
+                )
+            }
+
+            FormSection(
+                modifier = Modifier.padding(bottom = 16.dp),
+                title = stringResource(R.string.edit_feed_offline_policy_section),
+            ) {
+                OfflinePolicyRadioSelect(
+                    selectedPolicy = offlinePolicy,
+                    onSelectPolicy = setOfflinePolicy,
+                )
             }
         }
     }
@@ -371,6 +397,48 @@ private fun CheckboxRow(title: String, checked: Boolean, onCheck: (value: Boolea
     }
 }
 
+@Composable
+private fun OfflinePolicyRadioSelect(
+    selectedPolicy: FeedOfflinePolicy?,
+    onSelectPolicy: (FeedOfflinePolicy?) -> Unit,
+) {
+    Column {
+        OfflinePolicyRadioRow(
+            title = stringResource(R.string.feed_offline_policy_global),
+            selected = selectedPolicy == null,
+            onClick = { onSelectPolicy(null) },
+        )
+
+        FeedOfflinePolicy.entries.forEach { policy ->
+            OfflinePolicyRadioRow(
+                title = stringResource(policy.translationKey),
+                selected = selectedPolicy == policy,
+                onClick = { onSelectPolicy(policy) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun OfflinePolicyRadioRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        leadingContent = {
+            RadioButton(
+                selected = selected,
+                onClick = onClick,
+            )
+        },
+        headlineContent = {
+            Text(title)
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+}
+
 private fun collectFolders(
     existingFolders: Set<String>,
     addedFolder: String,
@@ -440,4 +508,10 @@ private val FeedPriority.translationKey: Int
         FeedPriority.IMPORTANT -> R.string.freshrss_visibility_option_important
         FeedPriority.CATEGORY -> R.string.freshrss_visibility_option_folder
         FeedPriority.FEED -> R.string.freshrss_visibility_option_feed
+    }
+
+private val FeedOfflinePolicy.translationKey: Int
+    get() = when (this) {
+        FeedOfflinePolicy.ALWAYS -> R.string.feed_offline_policy_always
+        FeedOfflinePolicy.NEVER -> R.string.feed_offline_policy_never
     }

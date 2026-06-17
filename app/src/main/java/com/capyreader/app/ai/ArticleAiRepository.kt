@@ -3,77 +3,213 @@ package com.capyreader.app.ai
 import android.content.Context
 import com.capyreader.app.preferences.AiProvider
 import com.capyreader.app.preferences.AppPreferences
+import com.jocmp.capy.Account
 import com.jocmp.capy.Article
 import com.jocmp.capy.common.withIOContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.jocmp.capy.persistence.ArticleAiDigestInput
+import com.jocmp.capy.persistence.ArticleAiDigestRecords
+import com.jocmp.capy.persistence.ArticleAiResultInput
+import com.jocmp.capy.persistence.ArticleAiResultRecords
 import java.io.File
-import java.io.IOException
 import java.security.MessageDigest
 
 class ArticleAiRepository(
     context: Context,
     private val appPreferences: AppPreferences,
-    private val httpClient: OkHttpClient,
+    private val account: Account,
+    private val chatClient: AiChatClient,
+    private val articleAiDigestRecords: ArticleAiDigestRecords,
+    private val articleAiResultRecords: ArticleAiResultRecords,
 ) {
     private val cacheDirectory = File(context.filesDir, "article-ai-cache")
-    private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun run(
         action: ArticleAiAction,
         article: Article,
         forceRefresh: Boolean,
+        question: String? = null,
     ): Result<String> = withIOContext {
         val settings = ArticleAiSettings.from(appPreferences)
-        val content = article.plainTextContent()
+        val fullContent = article.plainTextContent()
+        val requestContent = fullContent.take(settings.maxInputCharacters)
+        val cacheContent = if (action == ArticleAiAction.SUMMARIZE) {
+            fullContent
+        } else {
+            requestContent
+        }
+        val questionText = question?.trim().orEmpty()
 
         if (!settings.enabled) {
-            return@withIOContext Result.failure(IllegalStateException("AI is disabled"))
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.DISABLED))
+        }
+
+        if (isExcludedFromAi(article)) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.DISABLED_FOR_FEED))
         }
 
         if (settings.apiKey.isBlank()) {
-            return@withIOContext Result.failure(IllegalStateException("API key is required"))
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.API_KEY_REQUIRED))
         }
 
         if (settings.model.isBlank()) {
-            return@withIOContext Result.failure(IllegalStateException("Model is required"))
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.MODEL_REQUIRED))
         }
 
-        if (content.isBlank()) {
-            return@withIOContext Result.failure(IllegalStateException("Article content is empty"))
+        if (fullContent.isBlank()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.CONTENT_EMPTY))
         }
 
-        val cacheFile = cacheFile(settings, action, article.id, content)
+        if (action == ArticleAiAction.QUESTION && questionText.isBlank()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.QUESTION_REQUIRED))
+        }
 
-        if (!forceRefresh && cacheFile.exists()) {
-            val cached = cacheFile.readText().trim()
-            if (cached.isNotBlank()) {
+        if (!forceRefresh) {
+            cachedResult(settings, action, article, cacheContent, questionText)?.let { cached ->
                 return@withIOContext Result.success(cached)
             }
         }
 
-        requestAi(settings, action, article, content).onSuccess { result ->
+        val result = if (action == ArticleAiAction.SUMMARIZE) {
+            requestSummary(settings, article, fullContent)
+        } else {
+            requestAi(settings, action, article, requestContent, questionText)
+        }
+
+        result.onSuccess { result ->
             cacheDirectory.mkdirs()
-            cacheFile.writeText(result)
+            cacheFile(settings, action, article.id, cacheContent, questionText).writeText(result)
+            articleAiResultRecords.upsert(
+                input = resultInput(settings, action, article.id, cacheContent, questionText),
+                resultText = result,
+            )
         }
     }
 
-    fun cachedResult(action: ArticleAiAction, article: Article): String? {
+    suspend fun cachedResult(action: ArticleAiAction, article: Article): String? = withIOContext {
+        if (isExcludedFromAi(article)) {
+            return@withIOContext null
+        }
+
         val settings = ArticleAiSettings.from(appPreferences)
-        val content = article.plainTextContent()
-        val cacheFile = cacheFile(settings, action, article.id, content)
-        return cacheFile.takeIf { it.exists() }?.readText()?.takeIf { it.isNotBlank() }
+        val content = article.plainTextContent().take(settings.maxInputCharacters)
+        cachedResult(settings, action, article, content)
+    }
+
+    suspend fun runDigest(
+        articles: List<Article>,
+        forceRefresh: Boolean = false,
+    ): Result<String> = withIOContext {
+        val settings = ArticleAiSettings.from(appPreferences)
+
+        if (!settings.enabled) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.DISABLED))
+        }
+
+        if (settings.apiKey.isBlank()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.API_KEY_REQUIRED))
+        }
+
+        if (settings.model.isBlank()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.MODEL_REQUIRED))
+        }
+
+        val eligibleArticles = articles
+            .distinctBy { it.id }
+            .filterNot { isExcludedFromAi(it) }
+            .take(MAX_DIGEST_ARTICLES)
+
+        if (eligibleArticles.isEmpty()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.NO_DIGEST_ARTICLES))
+        }
+
+        val content = digestInput(eligibleArticles).take(settings.maxInputCharacters)
+
+        if (content.isBlank()) {
+            return@withIOContext Result.failure(ArticleAiException(ArticleAiErrorReason.CONTENT_EMPTY))
+        }
+
+        val digestInput = digestResultInput(
+            settings = settings,
+            articles = eligibleArticles,
+            content = content,
+        )
+
+        if (!forceRefresh) {
+            articleAiDigestRecords.find(digestInput.id)?.resultText?.trim()?.takeIf { it.isNotBlank() }?.let { cached ->
+                return@withIOContext Result.success(cached)
+            }
+        }
+
+        chatClient.complete(
+            AiChatRequest(
+                baseUrl = settings.baseUrl,
+                apiKey = settings.apiKey,
+                model = settings.model,
+                messages = listOf(
+                    AiChatMessage(
+                        role = "system",
+                        content = "You help RSS reader users process article queues. Use only the provided article excerpts.",
+                    ),
+                    AiChatMessage(
+                        role = "user",
+                        content = settings.promptFor(ArticleAiAction.DIGEST)
+                            .renderPromptVariables(settings.language, eligibleArticles.first(), content, ""),
+                    ),
+                ),
+            )
+        ).onSuccess { result ->
+            articleAiDigestRecords.upsert(
+                input = digestInput,
+                resultText = result,
+            )
+        }
+    }
+
+    suspend fun clearCache() = withIOContext {
+        articleAiDigestRecords.deleteAll()
+        articleAiResultRecords.deleteAll()
+        cacheDirectory.deleteRecursively()
+    }
+
+    private suspend fun cachedResult(
+        settings: ArticleAiSettings,
+        action: ArticleAiAction,
+        article: Article,
+        content: String,
+        question: String = "",
+    ): String? {
+        if (content.isBlank()) {
+            return null
+        }
+
+        return cachedResult(settings, action, article.id, content, question)
+    }
+
+    private suspend fun cachedResult(
+        settings: ArticleAiSettings,
+        action: ArticleAiAction,
+        articleID: String,
+        content: String,
+        question: String = "",
+    ): String? {
+        val input = resultInput(settings, action, articleID, content, question)
+        val sqlCached = articleAiResultRecords.find(input)?.resultText?.trim()
+
+        if (!sqlCached.isNullOrBlank()) {
+            return sqlCached
+        }
+
+        val fileCached = cacheFile(settings, action, articleID, content, question)
+            .takeIf { it.exists() }
+            ?.readText()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+
+        if (fileCached != null) {
+            articleAiResultRecords.upsert(input, fileCached)
+        }
+
+        return fileCached
     }
 
     private suspend fun requestAi(
@@ -81,78 +217,140 @@ class ArticleAiRepository(
         action: ArticleAiAction,
         article: Article,
         content: String,
+        question: String,
     ): Result<String> {
-        val request = Request.Builder()
-            .url("${settings.baseUrl.trimEnd('/')}/chat/completions")
-            .header("Authorization", "Bearer ${settings.apiKey}")
-            .header("Content-Type", "application/json")
-            .post(buildRequestBody(settings, action, article, content))
-            .build()
-
-        return try {
-            httpClient.newCall(request).execute().use { response ->
-                val responseBody = response.body.string()
-
-                if (!response.isSuccessful) {
-                    return Result.failure(IOException("AI API request failed: HTTP ${response.code}"))
-                }
-
-                val result = json.parseToJsonElement(responseBody)
-                    .jsonObject["choices"]
-                    ?.jsonArray
-                    ?.firstOrNull()
-                    ?.jsonObject
-                    ?.get("message")
-                    ?.jsonObject
-                    ?.get("content")
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?.trim()
-                    .orEmpty()
-
-                if (result.isBlank()) {
-                    Result.failure(IOException("AI API returned an empty result"))
-                } else {
-                    Result.success(result)
-                }
-            }
-        } catch (e: Throwable) {
-            Result.failure(e)
-        }
+        return chatClient.complete(
+            AiChatRequest(
+                baseUrl = settings.baseUrl,
+                apiKey = settings.apiKey,
+                model = settings.model,
+                messages = listOf(
+                    AiChatMessage(
+                        role = "system",
+                        content = "You help RSS reader users understand articles. Use only the provided article content. Return only the requested output without extra preamble, caveats, or source labels.",
+                    ),
+                    AiChatMessage(
+                        role = "user",
+                        content = promptFor(settings, action, article, content, question),
+                    ),
+                ),
+            )
+        )
     }
 
-    private fun buildRequestBody(
+    private suspend fun requestSummary(
         settings: ArticleAiSettings,
-        action: ArticleAiAction,
         article: Article,
         content: String,
-    ) = buildJsonObject {
-        put("model", settings.model)
-        put("stream", false)
-        put("temperature", 0.2)
-        put(
-            "messages",
-            buildJsonArray {
-                addJsonObject {
-                    put("role", "system")
-                    put("content", "You help RSS reader users understand articles. Return concise Markdown without extra preamble.")
-                }
-                addJsonObject {
-                    put("role", "user")
-                    put("content", promptFor(settings, action, article, content))
-                }
-            }
+    ): Result<String> {
+        if (content.length <= settings.maxInputCharacters) {
+            return requestAi(settings, ArticleAiAction.SUMMARIZE, article, content, "")
+        }
+
+        return requestChunkedSummary(settings, article, content)
+    }
+
+    private suspend fun requestChunkedSummary(
+        settings: ArticleAiSettings,
+        article: Article,
+        content: String,
+    ): Result<String> {
+        val chunks = content.chunked(settings.maxInputCharacters).take(MAX_SUMMARY_CHUNKS)
+        val chunkSummaries = mutableListOf<String>()
+
+        chunks.forEachIndexed { index, chunk ->
+            val prompt = """
+                |Summarize chunk ${index + 1} of ${chunks.size} from this RSS article in ${settings.language}.
+                |
+                |Return only concise notes that preserve facts, names, numbers, dates, decisions, and consequences.
+                |Do not add outside knowledge.
+                |
+                |Title: ${article.title}
+                |URL: ${article.url ?: ""}
+                |
+                |Chunk:
+                |$chunk
+            """.trimMargin()
+
+            chatClient.complete(
+                AiChatRequest(
+                    baseUrl = settings.baseUrl,
+                    apiKey = settings.apiKey,
+                    model = settings.model,
+                    messages = listOf(
+                        AiChatMessage(
+                            role = "system",
+                            content = "You summarize long RSS articles from partial excerpts. Use only the provided chunk.",
+                        ),
+                        AiChatMessage(role = "user", content = prompt),
+                    ),
+                )
+            ).fold(
+                onSuccess = { chunkSummaries += it.trim() },
+                onFailure = { return Result.failure(it) },
+            )
+        }
+
+        val combinedSummaryInput = chunkSummaries.joinToString("\n\n")
+        val finalPrompt = """
+            |Create the final article summary in ${settings.language} from these chunk summaries.
+            |
+            |Output:
+            |- Return 2 to 3 short paragraphs.
+            |- Focus on the main claim/event, why it matters, and important details.
+            |- Include concrete names, numbers, dates, and places when they are central.
+            |- Use only the chunk summaries. Do not speculate.
+            |- Return only the summary, with no heading or preamble.
+            |
+            |Title: ${article.title}
+            |URL: ${article.url ?: ""}
+            |
+            |Chunk summaries:
+            |$combinedSummaryInput
+        """.trimMargin()
+
+        return chatClient.complete(
+            AiChatRequest(
+                baseUrl = settings.baseUrl,
+                apiKey = settings.apiKey,
+                model = settings.model,
+                messages = listOf(
+                    AiChatMessage(
+                        role = "system",
+                        content = "You combine chunk summaries into one faithful RSS article summary.",
+                    ),
+                    AiChatMessage(role = "user", content = finalPrompt),
+                ),
+            )
         )
-    }.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+    }
+
+    private suspend fun isExcludedFromAi(article: Article): Boolean {
+        return account.findFeed(article.feedID)?.excludeFromAi == true
+    }
+
+    private fun digestInput(articles: List<Article>): String {
+        return articles.joinToString("\n\n") { article ->
+            """
+                |Title: ${article.title}
+                |Feed: ${article.feedName}
+                |Author: ${article.author.orEmpty()}
+                |URL: ${article.url ?: ""}
+                |Excerpt:
+                |${article.plainTextContent().take(MAX_DIGEST_ARTICLE_CHARACTERS)}
+            """.trimMargin()
+        }
+    }
 
     private fun promptFor(
         settings: ArticleAiSettings,
         action: ArticleAiAction,
         article: Article,
         content: String,
+        question: String,
     ): String {
         val template = settings.promptFor(action)
-        val renderedTemplate = template.renderPromptVariables(settings.language, article, content)
+        val renderedTemplate = template.renderPromptVariables(settings.language, article, content, question)
 
         return if (template.contains("{content}")) {
             renderedTemplate
@@ -181,10 +379,12 @@ class ArticleAiRepository(
         language: String,
         article: Article,
         content: String,
+        question: String,
     ): String {
         return replace("{language}", language)
             .replace("{title}", article.title)
             .replace("{url}", article.url?.toString().orEmpty())
+            .replace("{question}", question)
             .replace("{content}", content)
     }
 
@@ -193,6 +393,7 @@ class ArticleAiRepository(
         action: ArticleAiAction,
         articleID: String,
         content: String,
+        question: String,
     ): File {
         val key = listOf(
             articleID,
@@ -202,10 +403,96 @@ class ArticleAiRepository(
             settings.model,
             settings.language,
             settings.promptFor(action),
+            question,
             sha256(content),
         ).joinToString("|")
 
         return File(cacheDirectory, "${sha256(key)}.txt")
+    }
+
+    private fun resultInput(
+        settings: ArticleAiSettings,
+        action: ArticleAiAction,
+        articleID: String,
+        content: String,
+        question: String,
+    ): ArticleAiResultInput {
+        val promptHash = sha256(listOf(settings.promptFor(action), question).joinToString("|"))
+        val contentHash = sha256(content)
+        val id = sha256(
+            listOf(
+                articleID,
+                action.name,
+                settings.provider.name,
+                settings.baseUrl,
+                settings.model,
+                settings.language,
+                promptHash,
+                contentHash,
+            ).joinToString("|")
+        )
+
+        return ArticleAiResultInput(
+            id = id,
+            articleID = articleID,
+            action = action.name,
+            provider = settings.provider.name,
+            baseURL = settings.baseUrl,
+            model = settings.model,
+            language = settings.language,
+            promptHash = promptHash,
+            contentHash = contentHash,
+        )
+    }
+
+    private fun digestResultInput(
+        settings: ArticleAiSettings,
+        articles: List<Article>,
+        content: String,
+    ): ArticleAiDigestInput {
+        val articleIDs = articles.map { it.id }
+        val articleIdsJson = articleIDs.joinToString(prefix = "[", postfix = "]") { "\"${it.escapeJson()}\"" }
+        val filterJson = """{"source":"visible_articles","maxArticles":$MAX_DIGEST_ARTICLES}"""
+        val contentHash = sha256(content)
+        val promptHash = sha256(settings.promptFor(ArticleAiAction.DIGEST))
+        val id = sha256(
+            listOf(
+                "visible_articles",
+                articleIDs.joinToString(","),
+                settings.provider.name,
+                settings.baseUrl,
+                settings.model,
+                settings.language,
+                promptHash,
+                contentHash,
+            ).joinToString("|")
+        )
+
+        return ArticleAiDigestInput(
+            id = id,
+            filterJson = filterJson,
+            provider = settings.provider.name,
+            model = settings.model,
+            language = settings.language,
+            articleIdsJson = articleIdsJson,
+        )
+    }
+
+    private fun String.escapeJson(): String {
+        return buildString {
+            this@escapeJson.forEach { char ->
+                when (char) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\b' -> append("\\b")
+                    '\u000C' -> append("\\f")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(char)
+                }
+            }
+        }
     }
 
     private fun sha256(value: String): String {
@@ -220,15 +507,20 @@ class ArticleAiRepository(
         val apiKey: String,
         val model: String,
         val language: String,
+        val maxInputCharacters: Int,
         val translatePrompt: String,
         val summarizePrompt: String,
+        val previewSummaryPrompt: String,
         val keyPointsPrompt: String,
     ) {
         fun promptFor(action: ArticleAiAction): String {
             return when (action) {
                 ArticleAiAction.TRANSLATE -> translatePrompt
                 ArticleAiAction.SUMMARIZE -> summarizePrompt
+                ArticleAiAction.PREVIEW_SUMMARY -> previewSummaryPrompt
                 ArticleAiAction.KEY_POINTS -> keyPointsPrompt
+                ArticleAiAction.QUESTION -> ArticleAiPrompts.QUESTION
+                ArticleAiAction.DIGEST -> ArticleAiPrompts.DIGEST
             }
         }
 
@@ -243,14 +535,25 @@ class ArticleAiRepository(
                     apiKey = appPreferences.aiOptions.apiKey.get().trim(),
                     model = appPreferences.aiOptions.model.get().ifBlank { provider.defaultModel },
                     language = appPreferences.aiOptions.language.get().ifBlank { "English" },
+                    maxInputCharacters = appPreferences.aiOptions.maxInputCharacters.get()
+                        .coerceAtLeast(MIN_INPUT_CHARACTERS),
                     translatePrompt = appPreferences.aiOptions.translatePrompt.get()
                         .ifBlank { ArticleAiPrompts.TRANSLATE },
                     summarizePrompt = appPreferences.aiOptions.summarizePrompt.get()
                         .ifBlank { ArticleAiPrompts.SUMMARIZE },
+                    previewSummaryPrompt = appPreferences.aiOptions.previewSummaryPrompt.get()
+                        .ifBlank { ArticleAiPrompts.PREVIEW_SUMMARY },
                     keyPointsPrompt = appPreferences.aiOptions.keyPointsPrompt.get()
                         .ifBlank { ArticleAiPrompts.KEY_POINTS },
                 )
             }
         }
+    }
+
+    companion object {
+        private const val MIN_INPUT_CHARACTERS = 1000
+        private const val MAX_DIGEST_ARTICLES = 12
+        private const val MAX_DIGEST_ARTICLE_CHARACTERS = 1800
+        private const val MAX_SUMMARY_CHUNKS = 8
     }
 }

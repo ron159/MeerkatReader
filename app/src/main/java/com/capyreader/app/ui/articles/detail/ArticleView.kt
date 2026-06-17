@@ -32,15 +32,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.paging.compose.LazyPagingItems
-import com.capyreader.app.common.AudioEnclosure
-import com.capyreader.app.common.Media
+import com.capyreader.app.R
 import com.capyreader.app.ai.ArticleAiAction
 import com.capyreader.app.ai.ArticleAiDisplayState
+import com.capyreader.app.ai.ArticleAiErrorMessages
+import com.capyreader.app.ai.ArticleAiLabels
 import com.capyreader.app.ai.ArticleAiRepository
 import com.capyreader.app.ai.withAiDisplayContent
+import com.capyreader.app.common.AudioEnclosure
+import com.capyreader.app.common.Media
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleVerticalSwipe
 import com.capyreader.app.preferences.ArticleVerticalSwipe.DISABLED
@@ -51,11 +55,13 @@ import com.capyreader.app.preferences.ArticleVerticalSwipe.PREVIOUS_ARTICLE
 import com.capyreader.app.ui.LocalLinkOpener
 import com.capyreader.app.ui.articles.LocalFullContent
 import com.capyreader.app.ui.collectChangesWithDefault
-import com.capyreader.app.ui.components.pullrefresh.SwipeRefresh
 import com.capyreader.app.ui.components.LocalSnackbarHost
+import com.capyreader.app.ui.components.pullrefresh.SwipeRefresh
 import com.jocmp.capy.Article
+import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.abs
 
 @Composable
 fun ArticleView(
@@ -79,6 +85,7 @@ fun ArticleView(
     onToggleFullscreen: () -> Unit = {},
     appPreferences: AppPreferences = koinInject(),
     articleAiRepository: ArticleAiRepository = koinInject(),
+    articleReadingProgressRecords: ArticleReadingProgressRecords = koinInject(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     val enableHorizontalPager by appPreferences.readerOptions.enableHorizontaPagination.collectChangesWithDefault()
@@ -154,8 +161,29 @@ fun ArticleView(
     var isAiSheetOpen by rememberSaveable(article.id) { mutableStateOf(false) }
     var topAiState by remember(article.id) { mutableStateOf<ArticleAiDisplayState?>(null) }
     var translationAiState by remember(article.id) { mutableStateOf<ArticleAiDisplayState?>(null) }
+    var initialScrollPercent by remember(article.id) { mutableStateOf(0.0) }
+    var lastSavedScrollPercent by remember(article.id) { mutableStateOf(0.0) }
+    val aiLabels = ArticleAiLabels(
+        translation = stringResource(R.string.article_ai_label_translation),
+        summary = stringResource(R.string.article_ai_label_summary),
+        previewSummary = stringResource(R.string.article_ai_label_preview_summary),
+        keyPoints = stringResource(R.string.article_ai_label_key_points),
+        answer = stringResource(R.string.article_ai_label_answer),
+        digest = stringResource(R.string.article_ai_label_digest),
+        workingOnIt = stringResource(R.string.article_ai_working_on_it),
+    )
+    val aiErrorMessages = ArticleAiErrorMessages(
+        requestFailed = stringResource(R.string.article_ai_error_request_failed),
+        disabled = stringResource(R.string.article_ai_error_disabled),
+        disabledForFeed = stringResource(R.string.article_ai_error_disabled_for_feed),
+        apiKeyRequired = stringResource(R.string.article_ai_error_api_key_required),
+        modelRequired = stringResource(R.string.article_ai_error_model_required),
+        contentEmpty = stringResource(R.string.article_ai_error_content_empty),
+        questionRequired = stringResource(R.string.article_ai_error_question_required),
+        noDigestArticles = stringResource(R.string.article_ai_error_no_digest_articles),
+    )
 
-    fun runAiAction(action: ArticleAiAction, forceRefresh: Boolean) {
+    fun runAiAction(action: ArticleAiAction, forceRefresh: Boolean, question: String? = null) {
         isAiSheetOpen = false
 
         val loadingState = ArticleAiDisplayState(
@@ -170,7 +198,7 @@ fun ArticleView(
         }
 
         coroutineScope.launch {
-            articleAiRepository.run(action, article, forceRefresh)
+            articleAiRepository.run(action, article, forceRefresh, question)
                 .fold(
                     onSuccess = {
                         val resultState = ArticleAiDisplayState(action = action, result = it)
@@ -183,7 +211,7 @@ fun ArticleView(
                     onFailure = {
                         val errorState = ArticleAiDisplayState(
                             action = action,
-                            error = it.message ?: it::class.simpleName ?: "AI request failed",
+                            error = aiErrorMessages.messageFor(it),
                         )
                         if (action == ArticleAiAction.TRANSLATE) {
                             translationAiState = errorState
@@ -195,16 +223,34 @@ fun ArticleView(
         }
     }
 
-    val displayArticle = remember(article, topAiState, translationAiState, aiTranslationMode, aiEnabled) {
+    val displayArticle = remember(article, topAiState, translationAiState, aiTranslationMode, aiEnabled, aiLabels) {
         article.withAiDisplayContent(
             topState = topAiState.takeIf { aiEnabled },
             translationState = translationAiState.takeIf { aiEnabled },
             translationMode = aiTranslationMode,
+            labels = aiLabels,
         )
     }
 
     LaunchedEffect(article.id) {
         scrollState.reset()
+        val savedScrollPercent = articleReadingProgressRecords.find(article.id)?.scrollPercent ?: 0.0
+        initialScrollPercent = savedScrollPercent
+        lastSavedScrollPercent = savedScrollPercent
+    }
+
+    fun saveReadingProgress(scrollPercent: Double) {
+        if (abs(scrollPercent - lastSavedScrollPercent) < PROGRESS_SAVE_DELTA && scrollPercent < NEAR_END_PROGRESS) {
+            return
+        }
+
+        lastSavedScrollPercent = scrollPercent
+        coroutineScope.launch {
+            articleReadingProgressRecords.upsert(
+                articleID = article.id,
+                scrollPercent = scrollPercent,
+            )
+        }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -247,6 +293,8 @@ fun ArticleView(
                             currentAudioUrl = currentAudioUrl,
                             isAudioPlaying = isAudioPlaying,
                             onScrollChanged = scrollState::updateFromScroll,
+                            onScrollProgressChanged = ::saveReadingProgress,
+                            initialScrollPercent = initialScrollPercent,
                             enableTopSwipe = enableTopSwipe,
                             enableBottomSwipe = enableBottomSwipe,
                             onSwipeDownFromTop = { onSwipe(topSwipe) },
@@ -318,6 +366,8 @@ private fun ArticleReaderPool(
     currentAudioUrl: String? = null,
     isAudioPlaying: Boolean = false,
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
+    onScrollProgressChanged: (scrollPercent: Double) -> Unit = {},
+    initialScrollPercent: Double = 0.0,
     enableTopSwipe: Boolean = false,
     enableBottomSwipe: Boolean = false,
     onSwipeDownFromTop: () -> Unit = {},
@@ -335,6 +385,8 @@ private fun ArticleReaderPool(
                 currentAudioUrl = currentAudioUrl,
                 isAudioPlaying = isAudioPlaying,
                 onScrollChanged = onScrollChanged,
+                onScrollProgressChanged = onScrollProgressChanged,
+                initialScrollPercent = initialScrollPercent,
                 enableTopSwipe = enableTopSwipe,
                 enableBottomSwipe = enableBottomSwipe,
                 onSwipeDownFromTop = onSwipeDownFromTop,
@@ -436,3 +488,6 @@ private fun rememberContentPadding(pinToolbars: Boolean): PaddingValues {
         PaddingValues()
     }
 }
+
+private const val PROGRESS_SAVE_DELTA = 0.05
+private const val NEAR_END_PROGRESS = 0.98

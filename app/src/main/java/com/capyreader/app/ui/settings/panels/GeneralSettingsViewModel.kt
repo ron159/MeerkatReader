@@ -15,6 +15,9 @@ import com.jocmp.capy.Account
 import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.accounts.AutoDelete
 import com.jocmp.capy.articles.SortOrder
+import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
+import com.jocmp.capy.persistence.ArticleReadingProgressRecords
+import com.jocmp.capy.persistence.ArticleRuleMatchRecords
 import com.jocmp.capy.preferences.getAndSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
@@ -25,6 +28,9 @@ class GeneralSettingsViewModel(
     val account: Account,
     private val appPreferences: AppPreferences,
     private val articleImageCacheCleaner: ArticleImageCacheCleaner,
+    private val articleOfflinePackageRecords: ArticleOfflinePackageRecords,
+    private val articleReadingProgressRecords: ArticleReadingProgressRecords,
+    private val articleRuleMatchRecords: ArticleRuleMatchRecords,
 ) : ViewModel() {
     val source = account.source
 
@@ -58,9 +64,94 @@ class GeneralSettingsViewModel(
     var refreshOnWiFiOnly by mutableStateOf(appPreferences.refreshOnWiFiOnly.get())
         private set
 
+    var offlineReadingEnabled by mutableStateOf(appPreferences.offlineOptions.enabled.get())
+        private set
+
+    var offlineDownloadOnWiFiOnly by mutableStateOf(appPreferences.offlineOptions.downloadOnWiFiOnly.get())
+        private set
+
+    var offlineIncludeFullContent by mutableStateOf(appPreferences.offlineOptions.includeFullContent.get())
+        private set
+
+    var offlineIncludeImages by mutableStateOf(appPreferences.offlineOptions.includeImages.get())
+        private set
+
+    var offlineIncludeAudio by mutableStateOf(appPreferences.offlineOptions.includeAudio.get())
+        private set
+
+    var offlineStorageLimitMegabytes by mutableStateOf(appPreferences.offlineOptions.storageLimitMegabytes.get().toString())
+        private set
+
+    var offlinePreserveStarred by mutableStateOf(appPreferences.offlineOptions.preserveStarred.get())
+        private set
+
+    var offlinePreserveSavedForLater by mutableStateOf(appPreferences.offlineOptions.preserveSavedForLater.get())
+        private set
+
+    var offlinePreserveRecentlyOpened by mutableStateOf(appPreferences.offlineOptions.preserveRecentlyOpened.get())
+        private set
+
+    var offlinePreserveFeedOffline by mutableStateOf(appPreferences.offlineOptions.preserveFeedOffline.get())
+        private set
+
     fun updateRefreshOnWiFiOnly(enabled: Boolean) {
         appPreferences.refreshOnWiFiOnly.set(enabled)
         refreshOnWiFiOnly = enabled
+    }
+
+    fun updateOfflineReadingEnabled(enabled: Boolean) {
+        appPreferences.offlineOptions.enabled.set(enabled)
+        offlineReadingEnabled = enabled
+    }
+
+    fun updateOfflineDownloadOnWiFiOnly(enabled: Boolean) {
+        appPreferences.offlineOptions.downloadOnWiFiOnly.set(enabled)
+        offlineDownloadOnWiFiOnly = enabled
+    }
+
+    fun updateOfflineIncludeFullContent(enabled: Boolean) {
+        appPreferences.offlineOptions.includeFullContent.set(enabled)
+        offlineIncludeFullContent = enabled
+    }
+
+    fun updateOfflineIncludeImages(enabled: Boolean) {
+        appPreferences.offlineOptions.includeImages.set(enabled)
+        offlineIncludeImages = enabled
+    }
+
+    fun updateOfflineIncludeAudio(enabled: Boolean) {
+        appPreferences.offlineOptions.includeAudio.set(enabled)
+        offlineIncludeAudio = enabled
+    }
+
+    fun updateOfflineStorageLimitMegabytes(value: String) {
+        val sanitized = value.filter(Char::isDigit).take(6)
+        offlineStorageLimitMegabytes = sanitized
+
+        val parsed = sanitized.toIntOrNull() ?: return
+        if (parsed > 0) {
+            appPreferences.offlineOptions.storageLimitMegabytes.set(parsed)
+        }
+    }
+
+    fun updateOfflinePreserveStarred(enabled: Boolean) {
+        appPreferences.offlineOptions.preserveStarred.set(enabled)
+        offlinePreserveStarred = enabled
+    }
+
+    fun updateOfflinePreserveSavedForLater(enabled: Boolean) {
+        appPreferences.offlineOptions.preserveSavedForLater.set(enabled)
+        offlinePreserveSavedForLater = enabled
+    }
+
+    fun updateOfflinePreserveRecentlyOpened(enabled: Boolean) {
+        appPreferences.offlineOptions.preserveRecentlyOpened.set(enabled)
+        offlinePreserveRecentlyOpened = enabled
+    }
+
+    fun updateOfflinePreserveFeedOffline(enabled: Boolean) {
+        appPreferences.offlineOptions.preserveFeedOffline.set(enabled)
+        offlinePreserveFeedOffline = enabled
     }
 
     val filterKeywords = account
@@ -140,6 +231,24 @@ class GeneralSettingsViewModel(
         }
     }
 
+    fun clearOfflinePackages() {
+        viewModelScope.launch(Dispatchers.IO) {
+            articleOfflinePackageRecords.deleteAll()
+        }
+    }
+
+    fun clearReadingProgress() {
+        viewModelScope.launch(Dispatchers.IO) {
+            articleReadingProgressRecords.deleteAll()
+        }
+    }
+
+    fun clearRuleMatchHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            articleRuleMatchRecords.deleteAll()
+        }
+    }
+
     fun addFilterKeyword(keyword: String) {
         account.preferences.filterKeywords.getAndSet { list ->
             list.toMutableSet().apply { add(keyword) }
@@ -158,9 +267,35 @@ class GeneralSettingsViewModel(
         }
     }
 
+    fun updateAutomationRule(rule: ArticleAutomationRule) {
+        account.preferences.automationRules.getAndSet { rules ->
+            rules.map { existingRule ->
+                if (existingRule.id == rule.id) rule else existingRule
+            }
+        }
+    }
+
     fun removeAutomationRule(rule: ArticleAutomationRule) {
         account.preferences.automationRules.getAndSet { rules ->
             rules.filterNot { it.id == rule.id }
+        }
+    }
+
+    fun moveAutomationRule(rule: ArticleAutomationRule, direction: Int) {
+        account.preferences.automationRules.getAndSet { rules ->
+            val currentIndex = rules.indexOfFirst { it.id == rule.id }
+            if (currentIndex == -1) {
+                return@getAndSet rules
+            }
+
+            val targetIndex = (currentIndex + direction).coerceIn(rules.indices)
+            if (targetIndex == currentIndex) {
+                return@getAndSet rules
+            }
+
+            rules.toMutableList().apply {
+                add(targetIndex, removeAt(currentIndex))
+            }
         }
     }
 

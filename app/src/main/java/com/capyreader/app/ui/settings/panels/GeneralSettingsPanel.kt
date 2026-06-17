@@ -15,23 +15,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,8 +38,6 @@ import com.capyreader.app.BuildConfig
 import com.capyreader.app.R
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.notifications.Notifications
-import com.capyreader.app.preferences.AfterReadAllBehavior
-import com.capyreader.app.preferences.DefaultHomeTab
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.ui.CrashReporting
 import com.capyreader.app.ui.components.FormSection
@@ -53,14 +45,11 @@ import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.fixtures.PreviewKoinApplication
 import com.capyreader.app.ui.settings.CrashReportingCheckbox
 import com.capyreader.app.ui.components.LocalSnackbarHost
-import com.capyreader.app.ui.settings.PreferenceSelect
 import com.capyreader.app.ui.settings.filters.FilterKeywords
 import com.capyreader.app.ui.settings.filters.FiltersItem
 import com.capyreader.app.ui.settings.filters.LocalFilterKeywords
 import com.capyreader.app.ui.theme.CapyTheme
-import com.jocmp.capy.accounts.AutoDelete
 import com.jocmp.capy.accounts.Source
-import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.common.launchUI
 import org.koin.androidx.compose.koinViewModel
 import java.lang.String.CASE_INSENSITIVE_ORDER
@@ -80,6 +69,8 @@ fun GeneralSettingsPanel(
         rules = rules,
         removeRule = viewModel::removeAutomationRule,
         addRule = viewModel::addAutomationRule,
+        updateRule = viewModel::updateAutomationRule,
+        moveRule = viewModel::moveAutomationRule,
     )
 
     CompositionLocalProvider(
@@ -94,21 +85,8 @@ fun GeneralSettingsPanel(
             updateRefreshOnWiFiOnly = viewModel::updateRefreshOnWiFiOnly,
             canOpenLinksInternally = viewModel.canOpenLinksInternally,
             updateOpenLinksInternally = viewModel::updateOpenLinksInternally,
-            updateAutoDelete = viewModel::updateAutoDelete,
-            autoDelete = viewModel.autoDelete,
-            onClearArticles = viewModel::clearAllArticles,
-            updateSortOrder = viewModel::updateSortOrder,
-            sortOrder = viewModel.sortOrder,
-            defaultHomeTab = viewModel.defaultHomeTab,
-            updateDefaultHomeTab = viewModel::updateDefaultHomeTab,
-            updateConfirmMarkAllRead = viewModel::updateConfirmMarkAllRead,
-            confirmMarkAllRead = viewModel.confirmMarkAllRead,
-            afterReadAll = viewModel.afterReadAll,
-            updateAfterReadAll = viewModel::updateAfterReadAll,
             updateStickyFullContent = viewModel::updateStickyFullContent,
             enableStickyFullContent = viewModel.enableStickyFullContent,
-            markReadOnScroll = viewModel.markReadOnScroll,
-            updateMarkReadOnScroll = viewModel::updateMarkReadOnScroll,
         )
     }
 }
@@ -117,57 +95,19 @@ fun GeneralSettingsPanel(
 fun GeneralSettingsPanelView(
     source: Source,
     onNavigateToNotifications: () -> Unit,
-    onClearArticles: () -> Unit,
     refreshInterval: RefreshInterval,
     updateRefreshInterval: (RefreshInterval) -> Unit,
     refreshOnWiFiOnly: Boolean,
     updateRefreshOnWiFiOnly: (enabled: Boolean) -> Unit,
     canOpenLinksInternally: Boolean,
     updateOpenLinksInternally: (canOpenLinksInternally: Boolean) -> Unit,
-    updateAutoDelete: (AutoDelete) -> Unit,
-    autoDelete: AutoDelete,
-    updateSortOrder: (SortOrder) -> Unit,
-    sortOrder: SortOrder,
-    defaultHomeTab: DefaultHomeTab,
-    updateDefaultHomeTab: (DefaultHomeTab) -> Unit,
     updateStickyFullContent: (enable: Boolean) -> Unit,
     enableStickyFullContent: Boolean,
-    updateConfirmMarkAllRead: (enable: Boolean) -> Unit,
-    afterReadAll: AfterReadAllBehavior,
-    updateAfterReadAll: (behavior: AfterReadAllBehavior) -> Unit,
-    confirmMarkAllRead: Boolean,
-    markReadOnScroll: Boolean,
-    updateMarkReadOnScroll: (enable: Boolean) -> Unit,
 ) {
-    val (isClearArticlesDialogOpen, setClearArticlesDialogOpen) = remember { mutableStateOf(false) }
-
-    val onClearArticlesCancel = {
-        setClearArticlesDialogOpen(false)
-    }
-
-    val onRequestClearArticles = {
-        setClearArticlesDialogOpen(false)
-        onClearArticles()
-    }
-
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        SortOrderSelect(
-            sortOrder,
-            updateSortOrder
-        )
-        PreferenceSelect(
-            selected = defaultHomeTab,
-            update = updateDefaultHomeTab,
-            options = DefaultHomeTab.entries,
-            label = R.string.settings_default_home_tab,
-            optionText = {
-                stringResource(it.translationKey)
-            }
-        )
-
         FormSection(title = stringResource(R.string.settings_section_refresh)) {
             Column {
                 RefreshIntervalMenu(
@@ -185,8 +125,11 @@ fun GeneralSettingsPanelView(
                     onNavigate = onNavigateToNotifications,
                     refreshInterval = refreshInterval,
                 )
-                FiltersItem()
             }
+        }
+
+        FormSection(title = stringResource(R.string.settings_section_automation)) {
+            FiltersItem()
         }
 
         if (CrashReporting.isAvailable) {
@@ -219,78 +162,15 @@ fun GeneralSettingsPanelView(
         }
 
         FormSection(
-            title = stringResource(R.string.settings_section_mark_all_as_read),
-        ) {
-            Column {
-                RowItem {
-                    TextSwitch(
-                        onCheckedChange = updateMarkReadOnScroll,
-                        checked = markReadOnScroll,
-                        title = stringResource(R.string.settings_mark_read_on_scroll),
-                    )
-                }
-                RowItem {
-                    TextSwitch(
-                        onCheckedChange = updateConfirmMarkAllRead,
-                        checked = confirmMarkAllRead,
-                        title = stringResource(R.string.settings_confirm_mark_all_read),
-                    )
-                }
-                PreferenceSelect(
-                    selected = afterReadAll,
-                    update = updateAfterReadAll,
-                    options = AfterReadAllBehavior.entries,
-                    label = R.string.after_read_all_behavior_label,
-                    optionText = {
-                        stringResource(id = it.translationKey)
-                    }
-                )
-            }
-        }
-
-        FormSection(
             title = stringResource(R.string.settings_section_advanced)
         ) {
-            Column {
-                CrashLogExportItem(source = source)
-
-                AutoDeleteMenu(
-                    updateAutoDelete = updateAutoDelete,
-                    autoDelete = autoDelete,
-                )
-            }
-
-            RowItem {
-                FilledTonalButton(
-                    onClick = { setClearArticlesDialogOpen(true) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.settings_clear_all_articles_button))
-                }
-            }
+            CrashLogExportItem(source = source)
 
             if (BuildConfig.DEBUG && !LocalView.current.isInEditMode) {
                 TestNotificationRow()
             }
         }
         Spacer(Modifier.height(16.dp))
-    }
-
-    if (isClearArticlesDialogOpen) {
-        AlertDialog(
-            onDismissRequest = onClearArticlesCancel,
-            text = { Text(stringResource(R.string.settings_clear_all_articles_text)) },
-            dismissButton = {
-                TextButton(onClick = onClearArticlesCancel) {
-                    Text(stringResource(R.string.dialog_cancel))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onRequestClearArticles) {
-                    Text(text = stringResource(R.string.settings_clear_all_articles_confirm))
-                }
-            }
-        )
     }
 }
 
@@ -384,23 +264,10 @@ private fun GeneralSettingsPanelPreview() {
                 refreshOnWiFiOnly = false,
                 updateRefreshOnWiFiOnly = {},
                 canOpenLinksInternally = false,
-                onClearArticles = {},
                 updateOpenLinksInternally = {},
-                updateAutoDelete = {},
-                autoDelete = AutoDelete.WEEKLY,
-                sortOrder = SortOrder.NEWEST_FIRST,
-                updateSortOrder = {},
-                defaultHomeTab = DefaultHomeTab.FEEDS,
-                updateDefaultHomeTab = {},
                 onNavigateToNotifications = {},
-                updateConfirmMarkAllRead = {},
-                confirmMarkAllRead = true,
                 updateStickyFullContent = {},
                 enableStickyFullContent = true,
-                afterReadAll = AfterReadAllBehavior.NOTHING,
-                updateAfterReadAll = {},
-                markReadOnScroll = false,
-                updateMarkReadOnScroll = {},
             )
         }
     }

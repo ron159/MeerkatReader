@@ -15,22 +15,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.capyreader.app.BuildConfig.VERSION_NAME
@@ -60,16 +57,35 @@ fun AboutSettingsPanel() {
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
         Column {
+            Text(
+                text = stringResource(R.string.settings_about_description),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            Box(
+                modifier = Modifier.clickable {
+                    linkOpener.open(Project.ISSUES_URL.toUri())
+                }
+            ) {
+                ListItem(
+                    leadingContent = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.settings_bug_report_title)) },
+                    supportingContent = {
+                        Text(stringResource(R.string.settings_bug_report_summary))
+                    }
+                )
+            }
+
             Box(
                 modifier = Modifier.clickable {
                     linkOpener.open(Project.ORIGINAL_URL.toUri())
                 }
             ) {
                 ListItem(
-                    leadingContent = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
-                    headlineContent = { Text(stringResource(R.string.settings_original_project_title)) },
+                    leadingContent = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.settings_acknowledgements_title)) },
                     supportingContent = {
-                        Text(stringResource(R.string.settings_original_project_summary))
+                        Text(stringResource(R.string.settings_acknowledgements_summary))
                     }
                 )
             }
@@ -101,22 +117,12 @@ fun AboutSettingsPanel() {
             }
         }
         HorizontalDivider()
-        FormSection {
-            Box(Modifier.padding(horizontal = 4.dp)) {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    TextButton(onClick = { linkOpener.open(Project.ORIGINAL_URL.toUri()) }) {
-                        Text(
-                            text = stringResource(R.string.settings_project_attribution),
-                        )
-                    }
-                }
-            }
-        }
         Spacer(Modifier.height(16.dp))
     }
 }
 
 private object Project {
+    const val ISSUES_URL = "https://github.com/ron159/MeerkatReader/issues"
     const val ORIGINAL_URL = "https://github.com/jocmp/capyreader"
 }
 

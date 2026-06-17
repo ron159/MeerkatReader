@@ -30,6 +30,8 @@ class AppPreferences(context: Context) {
 
     val aiOptions = AiOptions(preferenceStore)
 
+    val offlineOptions = OfflineOptions(preferenceStore)
+
     val isLoggedIn
         get() = accountID.get().isNotBlank()
 
@@ -234,6 +236,38 @@ class AppPreferences(context: Context) {
 
     }
 
+    class OfflineOptions(private val preferenceStore: PreferenceStore) {
+        val enabled: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_reading_enabled", true)
+
+        val downloadOnWiFiOnly: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_download_on_wifi_only", true)
+
+        val includeFullContent: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_include_full_content", true)
+
+        val includeImages: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_include_images", true)
+
+        val includeAudio: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_include_audio", false)
+
+        val storageLimitMegabytes: Preference<Int>
+            get() = preferenceStore.getInt("offline_storage_limit_megabytes", 512)
+
+        val preserveStarred: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_cleanup_preserve_starred", true)
+
+        val preserveSavedForLater: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_cleanup_preserve_saved_for_later", true)
+
+        val preserveRecentlyOpened: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_cleanup_preserve_recently_opened", true)
+
+        val preserveFeedOffline: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_cleanup_preserve_feed_offline", true)
+    }
+
     class AiOptions(private val preferenceStore: PreferenceStore) {
         val enabled: Preference<Boolean>
             get() = preferenceStore.getBoolean("ai_enabled", false)
@@ -256,6 +290,15 @@ class AppPreferences(context: Context) {
                 Locale.getDefault().displayLanguage.ifBlank { "English" },
             )
 
+        val maxInputCharacters: Preference<Int>
+            get() = preferenceStore.getInt("ai_max_input_characters", 12000)
+
+        val backgroundPreviewsEnabled: Preference<Boolean>
+            get() = preferenceStore.getBoolean("ai_background_preview_summaries_enabled", false)
+
+        val backgroundPreviewsOnWiFiOnly: Preference<Boolean>
+            get() = preferenceStore.getBoolean("ai_background_preview_summaries_wifi_only", true)
+
         val translationMode: Preference<AiTranslationMode>
             get() = preferenceStore.getEnum("ai_translation_mode", AiTranslationMode.default)
 
@@ -269,6 +312,12 @@ class AppPreferences(context: Context) {
             get() = preferenceStore.getString(
                 "ai_summarize_prompt",
                 com.capyreader.app.ai.ArticleAiPrompts.SUMMARIZE,
+            )
+
+        val previewSummaryPrompt: Preference<String>
+            get() = preferenceStore.getString(
+                "ai_preview_summary_prompt",
+                com.capyreader.app.ai.ArticleAiPrompts.PREVIEW_SUMMARY,
             )
 
         val keyPointsPrompt: Preference<String>

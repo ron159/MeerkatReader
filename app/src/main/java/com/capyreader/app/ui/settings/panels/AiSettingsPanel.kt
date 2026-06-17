@@ -8,11 +8,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,14 +48,24 @@ fun AiSettingsPanel(
         updateModel = viewModel::updateModel,
         language = viewModel.language,
         updateLanguage = viewModel::updateLanguage,
+        maxInputCharacters = viewModel.maxInputCharacters,
+        updateMaxInputCharacters = viewModel::updateMaxInputCharacters,
+        backgroundPreviewsEnabled = viewModel.backgroundPreviewsEnabled,
+        updateBackgroundPreviewsEnabled = viewModel::updateBackgroundPreviewsEnabled,
+        backgroundPreviewsOnWiFiOnly = viewModel.backgroundPreviewsOnWiFiOnly,
+        updateBackgroundPreviewsOnWiFiOnly = viewModel::updateBackgroundPreviewsOnWiFiOnly,
         translationMode = viewModel.translationMode,
         updateTranslationMode = viewModel::updateTranslationMode,
         translatePrompt = viewModel.translatePrompt,
         updateTranslatePrompt = viewModel::updateTranslatePrompt,
         summarizePrompt = viewModel.summarizePrompt,
         updateSummarizePrompt = viewModel::updateSummarizePrompt,
+        previewSummaryPrompt = viewModel.previewSummaryPrompt,
+        updatePreviewSummaryPrompt = viewModel::updatePreviewSummaryPrompt,
         keyPointsPrompt = viewModel.keyPointsPrompt,
         updateKeyPointsPrompt = viewModel::updateKeyPointsPrompt,
+        isClearingAiCache = viewModel.isClearingAiCache,
+        clearAiCache = viewModel::clearAiCache,
     )
 }
 
@@ -69,15 +83,32 @@ fun AiSettingsPanelView(
     updateModel: (String) -> Unit,
     language: String,
     updateLanguage: (String) -> Unit,
+    maxInputCharacters: String,
+    updateMaxInputCharacters: (String) -> Unit,
+    backgroundPreviewsEnabled: Boolean,
+    updateBackgroundPreviewsEnabled: (Boolean) -> Unit,
+    backgroundPreviewsOnWiFiOnly: Boolean,
+    updateBackgroundPreviewsOnWiFiOnly: (Boolean) -> Unit,
     translationMode: AiTranslationMode,
     updateTranslationMode: (AiTranslationMode) -> Unit,
     translatePrompt: String,
     updateTranslatePrompt: (String) -> Unit,
     summarizePrompt: String,
     updateSummarizePrompt: (String) -> Unit,
+    previewSummaryPrompt: String,
+    updatePreviewSummaryPrompt: (String) -> Unit,
     keyPointsPrompt: String,
     updateKeyPointsPrompt: (String) -> Unit,
+    isClearingAiCache: Boolean,
+    clearAiCache: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        focusManager.clearFocus(force = true)
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
@@ -137,6 +168,32 @@ fun AiSettingsPanelView(
                 )
             }
 
+            RowItem {
+                SettingsTextField(
+                    value = maxInputCharacters,
+                    onValueChange = updateMaxInputCharacters,
+                    label = stringResource(R.string.ai_settings_max_input_characters),
+                    keyboardType = KeyboardType.Number,
+                )
+            }
+
+            RowItem {
+                TextSwitch(
+                    checked = backgroundPreviewsEnabled,
+                    onCheckedChange = updateBackgroundPreviewsEnabled,
+                    title = stringResource(R.string.ai_settings_background_previews_enabled),
+                    subtitle = stringResource(R.string.ai_settings_background_previews_detail),
+                )
+            }
+
+            RowItem {
+                TextSwitch(
+                    checked = backgroundPreviewsOnWiFiOnly,
+                    onCheckedChange = updateBackgroundPreviewsOnWiFiOnly,
+                    title = stringResource(R.string.ai_settings_background_previews_wifi_only),
+                )
+            }
+
             PreferenceSelect(
                 selected = translationMode,
                 update = updateTranslationMode,
@@ -169,6 +226,15 @@ fun AiSettingsPanelView(
 
             RowItem {
                 SettingsTextField(
+                    value = previewSummaryPrompt,
+                    onValueChange = updatePreviewSummaryPrompt,
+                    label = stringResource(R.string.ai_settings_preview_summary_prompt),
+                    singleLine = false,
+                )
+            }
+
+            RowItem {
+                SettingsTextField(
                     value = keyPointsPrompt,
                     onValueChange = updateKeyPointsPrompt,
                     label = stringResource(R.string.ai_settings_key_points_prompt),
@@ -192,6 +258,23 @@ fun AiSettingsPanelView(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            RowItem {
+                FilledTonalButton(
+                    enabled = !isClearingAiCache,
+                    onClick = clearAiCache,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (isClearingAiCache) {
+                                R.string.ai_settings_clear_cache_clearing
+                            } else {
+                                R.string.ai_settings_clear_cache
+                            }
+                        )
+                    )
+                }
             }
         }
 

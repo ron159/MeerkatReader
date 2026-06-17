@@ -11,6 +11,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import com.capyreader.app.R
+import com.capyreader.app.ai.ArticleAiAction
+import com.capyreader.app.ai.ArticleAiRepository
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
@@ -18,6 +20,8 @@ import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.isOnWifi
 import com.capyreader.app.common.toast
 import com.capyreader.app.notifications.NotificationHelper
+import com.capyreader.app.offline.ArticleOfflinePackageDownloader
+import com.capyreader.app.offline.ArticleOfflinePackageWorker
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
@@ -27,7 +31,11 @@ import com.capyreader.app.ui.components.SearchState
 import com.capyreader.app.ui.widget.WidgetUpdater
 import com.jocmp.capy.Account
 import com.jocmp.capy.Article
+import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.ArticleFilter
+import com.jocmp.capy.ArticleOfflinePackageState
+import com.jocmp.capy.ArticleRuleAction
+import com.jocmp.capy.ArticleRuleField
 import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.ArticleStatus.UNREAD
 import com.jocmp.capy.Feed
@@ -46,6 +54,7 @@ import com.jocmp.capy.countToday
 import com.jocmp.capy.logging.CapyLog
 import com.jocmp.capy.persistence.ArticleFullContentRecords
 import com.jocmp.capy.persistence.ArticleImageRecords
+import com.jocmp.capy.preferences.getAndSet
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,6 +73,18 @@ import java.time.OffsetDateTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+data class ArticleAiPreviewState(
+    val isLoading: Boolean = false,
+    val result: String? = null,
+    val error: String? = null,
+)
+
+data class ArticleAiDigestState(
+    val isLoading: Boolean = false,
+    val result: String? = null,
+    val error: String? = null,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArticleScreenViewModel(
     private val account: Account,
@@ -76,6 +97,8 @@ class ArticleScreenViewModel(
     private val articleImageStore: ArticleImageStore,
     private val articleImageCacheCleaner: ArticleImageCacheCleaner,
     private val articleFullContentRecords: ArticleFullContentRecords,
+    private val articleAiRepository: ArticleAiRepository,
+    private val articleOfflinePackageDownloader: ArticleOfflinePackageDownloader,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val syncFlushInterval: Duration? = SYNC_FLUSH_INTERVAL,
 ) : AndroidViewModel(application) {
@@ -83,7 +106,19 @@ class ArticleScreenViewModel(
 
     private var fullContentJob: Job? = null
 
+    private var aiSummaryPreviewJob: Job? = null
+
     val preloadedArticles = mutableStateMapOf<String, Article>()
+
+    val aiSummaryPreviews = mutableStateMapOf<String, ArticleAiPreviewState>()
+
+    val offlinePackageStates = mutableStateMapOf<String, ArticleOfflinePackageState>()
+
+    var aiDigestState by mutableStateOf(ArticleAiDigestState())
+        private set
+
+    val isAiSummaryPreviewLoading: Boolean
+        get() = aiSummaryPreviews.values.any { it.isLoading }
 
     var refreshSkipReason by mutableStateOf<RefreshSkipReason?>(null)
         private set
@@ -394,6 +429,199 @@ class ArticleScreenViewModel(
         }
     }
 
+    fun summarizeArticlePreviews(articles: List<Article>) {
+        if (articles.isEmpty() || aiSummaryPreviewJob?.isActive == true) {
+            return
+        }
+
+        val articleBatch = articles.distinctBy { it.id }
+
+        articleBatch.forEach { article ->
+            if (aiSummaryPreviews[article.id]?.result.isNullOrBlank()) {
+                aiSummaryPreviews[article.id] = ArticleAiPreviewState(isLoading = true)
+            }
+        }
+
+        aiSummaryPreviewJob = viewModelScope.launchIO {
+            articleBatch.forEach { article ->
+                val result = articleAiRepository.run(
+                    action = ArticleAiAction.PREVIEW_SUMMARY,
+                    article = article,
+                    forceRefresh = false,
+                )
+
+                withUIContext {
+                    aiSummaryPreviews[article.id] = result.fold(
+                        onSuccess = { ArticleAiPreviewState(result = it.trim()) },
+                        onFailure = {
+                            ArticleAiPreviewState(
+                                error = it.localizedMessage ?: it.message ?: it.toString(),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadOfflinePackageStates(articles: List<Article>) {
+        if (articles.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launchIO {
+            val states = articleOfflinePackageDownloader.findStates(articles.map { it.id })
+
+            withUIContext {
+                articles.forEach { article ->
+                    val state = states[article.id]
+                    if (state == null) {
+                        offlinePackageStates.remove(article.id)
+                    } else {
+                        offlinePackageStates[article.id] = state
+                    }
+                }
+            }
+        }
+    }
+
+    fun generateArticleDigest(articles: List<Article>) {
+        if (articles.isEmpty() || aiDigestState.isLoading) {
+            return
+        }
+
+        aiDigestState = ArticleAiDigestState(isLoading = true)
+
+        viewModelScope.launchIO {
+            val result = articleAiRepository.runDigest(articles)
+
+            withUIContext {
+                aiDigestState = result.fold(
+                    onSuccess = { ArticleAiDigestState(result = it.trim()) },
+                    onFailure = {
+                        ArticleAiDigestState(
+                            error = it.localizedMessage ?: it.message ?: it.toString(),
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun generateArticleDigest() {
+        if (aiDigestState.isLoading) {
+            return
+        }
+
+        aiDigestState = ArticleAiDigestState(isLoading = true)
+
+        viewModelScope.launchIO {
+            val articles = account.findArticles(
+                filter = latestFilter,
+                query = _searchQuery.value,
+                sortOrder = sortOrder.value,
+                since = articlesSince.value,
+                limit = DIGEST_ARTICLE_LIMIT,
+            )
+            val result = articleAiRepository.runDigest(articles)
+
+            withUIContext {
+                aiDigestState = result.fold(
+                    onSuccess = { ArticleAiDigestState(result = it.trim()) },
+                    onFailure = {
+                        ArticleAiDigestState(
+                            error = it.localizedMessage ?: it.message ?: it.toString(),
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun clearArticleDigest() {
+        aiDigestState = ArticleAiDigestState()
+    }
+
+    fun createMuteFeedRule(article: Article): Boolean {
+        val pattern = article.feedURL?.takeIf { it.isNotBlank() }
+            ?: article.feedName.takeIf { it.isNotBlank() }
+            ?: return false
+        val ruleName = article.feedName.takeIf { it.isNotBlank() } ?: pattern
+
+        addAutomationRule(
+            ArticleAutomationRule(
+                name = "Mute $ruleName",
+                field = ArticleRuleField.FEED,
+                pattern = pattern,
+                actions = setOf(ArticleRuleAction.MUTE),
+            )
+        )
+        return true
+    }
+
+    fun createMuteSimilarRule(article: Article): Boolean {
+        val pattern = article.title.trim().takeIf { it.isNotBlank() } ?: return false
+
+        addAutomationRule(
+            ArticleAutomationRule(
+                name = "Mute similar articles",
+                field = ArticleRuleField.TITLE,
+                pattern = pattern,
+                actions = setOf(ArticleRuleAction.MUTE),
+            )
+        )
+        return true
+    }
+
+    fun createNotifyAuthorRule(article: Article): Boolean {
+        val author = article.author?.trim()?.takeIf { it.isNotBlank() } ?: return false
+
+        addAutomationRule(
+            ArticleAutomationRule(
+                name = "Notify for $author",
+                field = ArticleRuleField.AUTHOR,
+                pattern = author,
+                actions = setOf(ArticleRuleAction.NOTIFY),
+            )
+        )
+        return true
+    }
+
+    fun downloadOfflineAsync(article: Article) {
+        viewModelScope.launchIO {
+            val offlineOptions = appPreferences.offlineOptions
+
+            articleOfflinePackageDownloader.queue(
+                articleID = article.id,
+                includeFullContent = offlineOptions.includeFullContent.get(),
+                includeImages = offlineOptions.includeImages.get(),
+                includeAudio = offlineOptions.includeAudio.get() && article.enclosures.isNotEmpty(),
+            )
+            withUIContext {
+                offlinePackageStates[article.id] = ArticleOfflinePackageState.QUEUED
+            }
+            ArticleOfflinePackageWorker.enqueue(
+                context = application.applicationContext,
+                wiFiOnly = offlineOptions.downloadOnWiFiOnly.get(),
+            )
+        }
+    }
+
+    fun removeOfflineAsync(article: Article) {
+        viewModelScope.launchIO {
+            articleOfflinePackageDownloader.remove(article.id)
+            withUIContext {
+                offlinePackageStates.remove(article.id)
+            }
+        }
+    }
+
+    private fun addAutomationRule(rule: ArticleAutomationRule) {
+        account.preferences.automationRules.getAndSet { rules ->
+            rules + rule
+        }
+    }
+
     val canSaveArticleExternally = account.canSaveArticleExternally.stateIn(viewModelScope)
 
     fun saveArticleExternallyAsync(articleID: String, onComplete: (Result<Unit>) -> Unit) {
@@ -695,6 +923,55 @@ class ArticleScreenViewModel(
         markRead(articleID)
     }
 
+    fun markSearchResultsReadAsync(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launchIO {
+            val articles = currentSearchBatch()
+            val articleIDs = articles.map { it.id }
+            account.markAllRead(articleIDs)
+            notificationHelper.dismissNotifications(articleIDs)
+            updateArticlesSince()
+            withUIContext { onComplete(articleIDs.size) }
+        }
+    }
+
+    fun starSearchResultsAsync(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launchIO {
+            val articles = currentSearchBatch()
+            articles.forEach { article ->
+                account.addStar(article.id)
+            }
+            updateArticlesSince()
+            withUIContext { onComplete(articles.size) }
+        }
+    }
+
+    fun saveSearchResultsExternallyAsync(onComplete: (Result<Int>) -> Unit = {}) {
+        viewModelScope.launchIO {
+            val articles = currentSearchBatch()
+            var saved = 0
+            var failure: Throwable? = null
+
+            articles.forEach { article ->
+                account.saveArticleExternally(article.id).fold(
+                    onSuccess = { saved += 1 },
+                    onFailure = {
+                        if (failure == null) {
+                            failure = it
+                        }
+                    },
+                )
+            }
+
+            withUIContext {
+                if (failure == null) {
+                    onComplete(Result.success(saved))
+                } else {
+                    onComplete(Result.failure(failure))
+                }
+            }
+        }
+    }
+
     fun markUnreadAsync(articleID: String) = viewModelScope.launchIO {
         toggleCurrentRead(articleID)
         markUnread(articleID)
@@ -726,6 +1003,16 @@ class ArticleScreenViewModel(
 
     private suspend fun markUnread(articleID: String) {
         account.markUnread(articleID)
+    }
+
+    private suspend fun currentSearchBatch(limit: Long = SEARCH_BATCH_LIMIT): List<Article> {
+        return account.findArticles(
+            filter = latestFilter,
+            query = _searchQuery.value,
+            sortOrder = sortOrder.value,
+            since = articlesSince.value,
+            limit = limit,
+        )
     }
 
     private fun resetToDefaultFilter() {
@@ -848,13 +1135,24 @@ class ArticleScreenViewModel(
         article ?: return
 
         viewModelScope.launchIO {
-            if (enableStickyFullContent && !account.isFullContentEnabled(feedID = article.feedID)) {
-                account.enableStickyContent(article.feedID)
+            val stickyFullContentEnabled = enableStickyFullContent
+
+            if (stickyFullContentEnabled) {
+                if (!account.isFullContentEnabled(feedID = article.feedID)) {
+                    account.enableStickyContent(article.feedID)
+                }
+
+                clearPreloadedArticlesForFeed(article.feedID)
             }
 
-            _article = article.copy(fullContent = Article.FullContentState.LOADING)
+            val loadingArticle = article.copy(
+                enableStickyFullContent = article.enableStickyFullContent || stickyFullContentEnabled,
+                fullContent = Article.FullContentState.LOADING,
+            )
 
-            _article?.let { fetchFullContent(it) }
+            _article = loadingArticle
+
+            fetchFullContent(loadingArticle)
         }
     }
 
@@ -871,13 +1169,25 @@ class ArticleScreenViewModel(
 
         _article = article.copy(
             content = article.defaultContent,
+            enableStickyFullContent = if (enableStickyFullContent) {
+                false
+            } else {
+                article.enableStickyFullContent
+            },
             fullContent = Article.FullContentState.NONE
         )
 
         if (enableStickyFullContent) {
             viewModelScope.launch {
+                clearPreloadedArticlesForFeed(article.feedID)
                 account.disableStickyContent(article.feedID)
             }
+        }
+    }
+
+    private fun clearPreloadedArticlesForFeed(feedID: String) {
+        preloadedArticles.entries.removeAll { (_, article) ->
+            article.feedID == feedID
         }
     }
 
@@ -1031,6 +1341,8 @@ class ArticleScreenViewModel(
 
     companion object {
         val SYNC_FLUSH_INTERVAL = 2.minutes
+        private const val DIGEST_ARTICLE_LIMIT = 30L
+        private const val SEARCH_BATCH_LIMIT = 200L
     }
 }
 

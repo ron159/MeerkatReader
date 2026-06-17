@@ -15,6 +15,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import com.capyreader.app.R
 import com.capyreader.app.ui.LocalMarkAllReadButtonPosition
+import com.capyreader.app.ui.articles.list.ArticleAiDigestButton
+import com.capyreader.app.ui.articles.list.ArticleAiPreviewButton
 import com.capyreader.app.ui.articles.list.FeedActionMenu
 import com.capyreader.app.ui.articles.list.FolderActionMenu
 import com.capyreader.app.ui.articles.list.MarkAllReadButton
@@ -31,6 +33,13 @@ fun FilterActionMenu(
     currentFeed: Feed?,
     onRemoveFolder: (folderTitle: String, completion: (result: Result<Unit>) -> Unit) -> Unit,
     onRequestSearch: () -> Unit,
+    onSummarizeArticlePreviews: () -> Unit,
+    onGenerateArticleDigest: () -> Unit,
+    showAiSummaryPreviewButton: Boolean,
+    canSummarizeArticlePreviews: Boolean,
+    isAiSummaryPreviewLoading: Boolean,
+    showAiDigestButton: Boolean,
+    canGenerateArticleDigest: Boolean,
     hideSearchIcon: Boolean,
     source: Source,
 ) {
@@ -51,7 +60,19 @@ fun FilterActionMenu(
             }
         }
 
+        ArticleAiDigestButton(
+            visible = showAiDigestButton,
+            enabled = canGenerateArticleDigest,
+            onClick = onGenerateArticleDigest,
+        )
+
         if (markReadPosition == MarkReadPosition.TOOLBAR) {
+            ArticleAiPreviewButton(
+                visible = showAiSummaryPreviewButton,
+                enabled = canSummarizeArticlePreviews,
+                isLoading = isAiSummaryPreviewLoading,
+                onClick = onSummarizeArticlePreviews,
+            )
             MarkAllReadButton()
         }
 
@@ -96,6 +117,13 @@ fun FeedActionsPreview(@PreviewParameter(FeedSample::class) feed: Feed) {
         FilterActionMenu(
             onRemoveFolder = { _, _ -> },
             onRequestSearch = {},
+            onSummarizeArticlePreviews = {},
+            onGenerateArticleDigest = {},
+            showAiSummaryPreviewButton = true,
+            canSummarizeArticlePreviews = true,
+            isAiSummaryPreviewLoading = false,
+            showAiDigestButton = true,
+            canGenerateArticleDigest = true,
             currentFeed = feed,
             filter = ArticleFilter.Feeds(
                 feedID = feed.id,

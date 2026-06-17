@@ -17,6 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
@@ -68,6 +72,7 @@ import com.capyreader.app.ui.theme.CapyTheme
 import com.capyreader.app.ui.theme.LocalAppTheme
 import com.jocmp.capy.Article
 import com.jocmp.capy.EnclosureType
+import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.articles.relativeTime
 import java.net.URL
@@ -96,6 +101,8 @@ fun ArticleRow(
     onMarkAllRead: (range: MarkRead) -> Unit = {},
     currentTime: LocalDateTime,
     options: ArticleRowOptions = ArticleRowOptions(),
+    aiSummaryPreview: ArticleAiPreviewState? = null,
+    offlinePackageState: ArticleOfflinePackageState? = null,
 ) {
     val imageURL = article.imageURL
     val isMonochrome = LocalAppTheme.current.value == AppTheme.MONOCHROME
@@ -116,6 +123,9 @@ fun ArticleRow(
     val snackbarHost = LocalSnackbarHost.current
     val scope = rememberCoroutineScope()
     val savedForLaterMessage = stringResource(R.string.saved_for_later_success)
+    val ruleCreatedMessage = stringResource(R.string.article_actions_rule_created)
+    val offlineQueuedMessage = stringResource(R.string.article_actions_offline_queued)
+    val offlineRemovedMessage = stringResource(R.string.article_actions_offline_removed)
     val openArticleMenu = {
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         setArticleMenuOpen(true)
@@ -181,6 +191,13 @@ fun ArticleRow(
                                         .padding(end = 2.dp)
                                 )
                             }
+                            if (offlinePackageState != null) {
+                                OfflineStatusIcon(
+                                    state = offlinePackageState,
+                                    tint = feedNameColor,
+                                    fontScale = options.fontScale,
+                                )
+                            }
                             Text(
                                 text = relativeTime(
                                     time = article.publishedAt,
@@ -198,7 +215,12 @@ fun ArticleRow(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(vertical = 4.dp)
                     ) {
-                        if (article.summary.isNotBlank() && options.showSummary) {
+                        if (aiSummaryPreview != null) {
+                            ArticleAiSummaryPreview(
+                                state = aiSummaryPreview,
+                                deEmphasizeFontWeight = deEmphasizeFontWeight,
+                            )
+                        } else if (article.summary.isNotBlank() && options.showSummary) {
                             Text(
                                 text = article.summary,
                                 maxLines = 2,
@@ -256,9 +278,114 @@ fun ArticleRow(
                         }
                     }
                 },
+                onMuteFeed = {
+                    if (articleActions.muteFeed(article)) {
+                        scope.launch { snackbarHost.showSnackbar(ruleCreatedMessage) }
+                    }
+                },
+                onMuteSimilar = {
+                    if (articleActions.muteSimilar(article)) {
+                        scope.launch { snackbarHost.showSnackbar(ruleCreatedMessage) }
+                    }
+                },
+                onNotifyAuthor = {
+                    if (articleActions.notifyAuthor(article)) {
+                        scope.launch { snackbarHost.showSnackbar(ruleCreatedMessage) }
+                    }
+                },
+                onDownloadOffline = {
+                    articleActions.downloadOffline(article)
+                    scope.launch { snackbarHost.showSnackbar(offlineQueuedMessage) }
+                },
+                onRemoveOffline = {
+                    articleActions.removeOffline(article)
+                    scope.launch { snackbarHost.showSnackbar(offlineRemovedMessage) }
+                },
                 onDismissRequest = {
                     setArticleMenuOpen(false)
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun OfflineStatusIcon(
+    state: ArticleOfflinePackageState,
+    tint: Color,
+    fontScale: ArticleListFontScale,
+) {
+    val icon = when (state) {
+        ArticleOfflinePackageState.READY -> Icons.Rounded.DownloadDone
+        ArticleOfflinePackageState.FAILED -> Icons.Rounded.ErrorOutline
+        ArticleOfflinePackageState.QUEUED,
+        ArticleOfflinePackageState.DOWNLOADING,
+        ArticleOfflinePackageState.STALE,
+        ArticleOfflinePackageState.NOT_DOWNLOADED -> Icons.Rounded.Download
+    }
+    val description = when (state) {
+        ArticleOfflinePackageState.READY -> stringResource(R.string.article_offline_status_ready)
+        ArticleOfflinePackageState.FAILED -> stringResource(R.string.article_offline_status_failed)
+        ArticleOfflinePackageState.QUEUED -> stringResource(R.string.article_offline_status_queued)
+        ArticleOfflinePackageState.DOWNLOADING -> stringResource(R.string.article_offline_status_downloading)
+        ArticleOfflinePackageState.STALE -> stringResource(R.string.article_offline_status_stale)
+        ArticleOfflinePackageState.NOT_DOWNLOADED -> stringResource(R.string.article_offline_status_not_downloaded)
+    }
+
+    Icon(
+        icon,
+        contentDescription = description,
+        tint = tint,
+        modifier = Modifier
+            .width(14.dp.relative(fontScale))
+            .padding(end = 2.dp),
+    )
+}
+
+@Composable
+private fun ArticleAiSummaryPreview(
+    state: ArticleAiPreviewState,
+    deEmphasizeFontWeight: Boolean,
+) {
+    val isError = state.error != null
+    val text = when {
+        state.isLoading -> stringResource(R.string.article_ai_preview_loading)
+        isError -> stringResource(R.string.article_ai_preview_error)
+        else -> state.result.orEmpty()
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    if (text.isBlank()) {
+        return
+    }
+
+    val tint = if (isError) colorScheme.error else colorScheme.primary
+
+    Surface(
+        color = colorScheme.surfaceContainer,
+        contentColor = if (isError) colorScheme.error else colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.AutoAwesome,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (deEmphasizeFontWeight) FontWeight.Light else null,
+                modifier = Modifier.weight(1f),
             )
         }
     }

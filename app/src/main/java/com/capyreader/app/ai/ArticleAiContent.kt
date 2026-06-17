@@ -13,19 +13,39 @@ data class ArticleAiDisplayState(
     val error: String? = null,
 )
 
+data class ArticleAiLabels(
+    val translation: String,
+    val summary: String,
+    val previewSummary: String,
+    val keyPoints: String,
+    val answer: String,
+    val digest: String,
+    val workingOnIt: String,
+) {
+    fun labelFor(action: ArticleAiAction): String = when (action) {
+        ArticleAiAction.TRANSLATE -> translation
+        ArticleAiAction.SUMMARIZE -> summary
+        ArticleAiAction.PREVIEW_SUMMARY -> previewSummary
+        ArticleAiAction.KEY_POINTS -> keyPoints
+        ArticleAiAction.QUESTION -> answer
+        ArticleAiAction.DIGEST -> digest
+    }
+}
+
 fun Article.withAiDisplayContent(
     topState: ArticleAiDisplayState?,
     translationState: ArticleAiDisplayState?,
     translationMode: AiTranslationMode,
+    labels: ArticleAiLabels,
 ): Article {
     val originalContent = content.ifBlank { defaultContent }
-    val topHtml = topState?.toTopCardHtml().orEmpty()
+    val topHtml = topState?.toTopCardHtml(labels).orEmpty()
     val bodyHtml = when {
         translationState?.isLoading == true -> originalContent
-        translationState?.error != null -> translationState.toErrorCardHtml() + originalContent
+        translationState?.error != null -> translationState.toErrorCardHtml(labels) + originalContent
         translationState?.result != null -> when (translationMode) {
             AiTranslationMode.REPLACE_ORIGINAL -> translatedHtmlPreservingMedia(originalContent, translationState.result)
-            AiTranslationMode.PARALLEL -> parallelTranslationHtml(originalContent, translationState.result)
+            AiTranslationMode.PARALLEL -> parallelTranslationHtml(originalContent, translationState.result, labels)
         }
         else -> originalContent
     }
@@ -41,21 +61,21 @@ fun Article.plainTextContent(): String {
         .trim()
 }
 
-private fun ArticleAiDisplayState.toTopCardHtml(): String {
+private fun ArticleAiDisplayState.toTopCardHtml(labels: ArticleAiLabels): String {
     return when {
         isLoading -> """
             <section class="ai-card ai-card--loading" data-capy-ai-preserve="true">
-              <div class="ai-card__eyebrow">${action.labelHtml()}</div>
-              <div class="ai-card__title">Working on it</div>
+              <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
+              <div class="ai-card__title">${labels.workingOnIt.escapeHtml()}</div>
               <div class="ai-shimmer ai-shimmer--wide"></div>
               <div class="ai-shimmer"></div>
               <div class="ai-shimmer ai-shimmer--short"></div>
             </section>
         """.trimIndent()
-        error != null -> toErrorCardHtml()
+        error != null -> toErrorCardHtml(labels)
         result != null -> """
             <section class="ai-card" data-capy-ai-preserve="true">
-              <div class="ai-card__eyebrow">${action.labelHtml()}</div>
+              <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
               <div class="ai-card__content">${result.toArticleHtml()}</div>
             </section>
         """.trimIndent()
@@ -63,16 +83,20 @@ private fun ArticleAiDisplayState.toTopCardHtml(): String {
     }
 }
 
-private fun ArticleAiDisplayState.toErrorCardHtml(): String {
+private fun ArticleAiDisplayState.toErrorCardHtml(labels: ArticleAiLabels): String {
     return """
         <section class="ai-card ai-card--error" data-capy-ai-preserve="true">
-          <div class="ai-card__eyebrow">${action.labelHtml()}</div>
+          <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
           <div class="ai-card__content">${error.orEmpty().escapeHtml()}</div>
         </section>
     """.trimIndent()
 }
 
-private fun parallelTranslationHtml(originalHtml: String, translatedText: String): String {
+private fun parallelTranslationHtml(
+    originalHtml: String,
+    translatedText: String,
+    labels: ArticleAiLabels,
+): String {
     val document = Jsoup.parseBodyFragment(originalHtml)
     val translatedBlocks = translatedText.toPlainBlocks().toMutableList()
     val rows = document.body().children().joinToString("") { element ->
@@ -81,7 +105,7 @@ private fun parallelTranslationHtml(originalHtml: String, translatedText: String
 
     return """
         <section class="ai-translation" data-capy-ai-preserve="true">
-          <div class="ai-card__eyebrow">AI Translation</div>
+          <div class="ai-card__eyebrow">${labels.translation.escapeHtml()}</div>
           $rows
         </section>
     """.trimIndent()
@@ -255,10 +279,4 @@ private fun String.escapeHtml(): String {
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
-}
-
-private fun ArticleAiAction.labelHtml() = when (this) {
-    ArticleAiAction.TRANSLATE -> "AI Translation"
-    ArticleAiAction.SUMMARIZE -> "AI Summary"
-    ArticleAiAction.KEY_POINTS -> "AI Key Points"
 }

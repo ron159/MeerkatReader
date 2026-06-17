@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.capyreader.app.R
@@ -34,8 +35,20 @@ sealed class SettingsPanel(@StringRes val title: Int) {
     }
 
     @Parcelize
+    data object ArticleList : SettingsPanel(title = R.string.settings_article_list_title),
+        Parcelable {
+        override fun icon() = Icons.Rounded.Visibility
+    }
+
+    @Parcelize
     data object AI : SettingsPanel(title = R.string.settings_panel_ai_title), Parcelable {
         override fun icon() = Icons.Rounded.AutoAwesome
+    }
+
+    @Parcelize
+    data object DataStorage : SettingsPanel(title = R.string.settings_panel_data_storage_title),
+        Parcelable {
+        override fun icon() = Icons.Rounded.Storage
     }
 
     @Parcelize
@@ -60,12 +73,6 @@ sealed class SettingsPanel(@StringRes val title: Int) {
         override fun icon() = Icons.Rounded.Visibility
     }
 
-    @Parcelize
-    data object ArticleList : SettingsPanel(title = R.string.settings_article_list_title),
-        Parcelable {
-        override fun icon() = Icons.Rounded.Visibility
-    }
-
     fun isNested() = !items.contains(this)
 
     companion object {
@@ -73,8 +80,10 @@ sealed class SettingsPanel(@StringRes val title: Int) {
             get() = listOf(
                 General,
                 Display,
+                ArticleList,
                 AI,
                 Gestures,
+                DataStorage,
                 Account,
                 About,
             )

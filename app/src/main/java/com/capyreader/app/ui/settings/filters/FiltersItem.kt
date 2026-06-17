@@ -47,8 +47,14 @@ fun FiltersItem() {
                     onAddRule = {
                         keywords.addRule(it)
                     },
+                    onUpdateRule = {
+                        keywords.updateRule(it)
+                    },
                     onRemoveRule = {
                         keywords.removeRule(it)
+                    },
+                    onMoveRule = { rule, direction ->
+                        keywords.moveRule(rule, direction)
                     },
                 )
             }
