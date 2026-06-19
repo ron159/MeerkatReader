@@ -60,9 +60,10 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
 
     /**
      * [Docs](https://developer.android.com/develop/ui/compose/glance/generated-previews)
-     *
-     * Android 17 can reject preview updates when the receiver is not registered
-     * as an AppWidget provider in the current profile.
+     * On Android 17 the underlying `setWidgetPreview` binder call throws when the
+     * receiver isn't a registered AppWidget provider in the current profile (e.g. a
+     * private/workspace), which would otherwise crash the app on launch.
+     * See https://issuetracker.google.com/issues/488125748
      */
     private fun loadWidgetPreview() {
         MainScope().launchUI {
