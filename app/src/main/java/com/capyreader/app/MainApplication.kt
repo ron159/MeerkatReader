@@ -12,7 +12,6 @@ import coil3.svg.SvgDecoder
 import coil3.video.VideoFrameDecoder
 import com.capyreader.app.common.AndroidLogging
 import com.capyreader.app.preferences.AppPreferences
-import com.capyreader.app.refresher.RefreshScheduler
 import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.ui.widget.HeadlinesWidgetReceiver
 import com.capyreader.app.ui.widget.SpotlightWidgetReceiver
@@ -40,15 +39,10 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
 
         if (get<AppPreferences>().isLoggedIn) {
             loadAccountModules()
-            initializeRefreshScheduler()
             get<AutomaticBackupScheduler>().initialize()
         }
 
         loadWidgetPreview()
-    }
-
-    private fun initializeRefreshScheduler() {
-        get<RefreshScheduler>().initialize()
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
@@ -64,13 +58,21 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
 
     /**
      * [Docs](https://developer.android.com/develop/ui/compose/glance/generated-previews)
+     *
+     * Android 17 can reject preview updates when the receiver is not registered
+     * as an AppWidget provider in the current profile.
      */
     private fun loadWidgetPreview() {
         MainScope().launchUI {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
                 val manager = GlanceAppWidgetManager(applicationContext)
-                manager.setWidgetPreviews(HeadlinesWidgetReceiver::class)
-                manager.setWidgetPreviews(SpotlightWidgetReceiver::class)
+
+                try {
+                    manager.setWidgetPreviews(HeadlinesWidgetReceiver::class)
+                    manager.setWidgetPreviews(SpotlightWidgetReceiver::class)
+                } catch (e: IllegalArgumentException) {
+                    CapyLog.error("widget_preview", e)
+                }
             }
         }
     }

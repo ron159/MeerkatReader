@@ -25,7 +25,6 @@ import com.capyreader.app.offline.ArticleOfflinePackageWorker
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
-import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.ui.articles.feeds.AngleRefreshState
 import com.capyreader.app.ui.components.SearchState
@@ -372,8 +371,7 @@ class ArticleScreenViewModel(
             }
         }
 
-        val skipInitialRefresh =
-            appPreferences.refreshInterval.get() == RefreshInterval.MANUALLY_ONLY
+        val skipInitialRefresh = account.preferences.lastRefreshedAt.get() > 0
 
         if (skipInitialRefresh) {
             refreshInitialized = true

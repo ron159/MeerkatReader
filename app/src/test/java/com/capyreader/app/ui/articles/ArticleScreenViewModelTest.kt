@@ -84,6 +84,11 @@ class ArticleScreenViewModelTest {
             every { countAllBySavedSearch(any()) } returns flowOf(emptyMap())
             every { source } returns Source.LOCAL
             coEvery { refresh(any()) } returns Result.success(Unit)
+            every { preferences } returns mockk(relaxed = true) {
+                every { lastRefreshedAt } returns mockk(relaxed = true) {
+                    every { get() } returns 0L
+                }
+            }
         }
 
         appPreferences = AppPreferences(RuntimeEnvironment.getApplication()).also {
@@ -122,8 +127,9 @@ class ArticleScreenViewModelTest {
     }
 
     @Test
-    fun `skips initial refresh when refresh interval is manual only`() = runTest {
-        appPreferences.refreshInterval.set(RefreshInterval.MANUALLY_ONLY)
+    fun `skips initial refresh when account has already synced before`() = runTest {
+        every { account.preferences.lastRefreshedAt.get() } returns
+            ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
 
         val viewModel = buildViewModel()
 
@@ -133,7 +139,8 @@ class ArticleScreenViewModelTest {
 
     @Test
     fun `refreshAll transitions from stopped, running, to settling`() = runTest {
-        appPreferences.refreshInterval.set(RefreshInterval.MANUALLY_ONLY)
+        every { account.preferences.lastRefreshedAt.get() } returns
+            ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
 
         val viewModel = buildViewModel()
 
@@ -151,7 +158,8 @@ class ArticleScreenViewModelTest {
 
     @Test
     fun `refreshAll guards against double calls while running`() = runTest {
-        appPreferences.refreshInterval.set(RefreshInterval.MANUALLY_ONLY)
+        every { account.preferences.lastRefreshedAt.get() } returns
+            ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
 
         val viewModel = buildViewModel()
 
