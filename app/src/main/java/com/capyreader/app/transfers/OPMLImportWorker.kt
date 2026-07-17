@@ -39,6 +39,7 @@ class OPMLImportWorker(
     parameters: WorkerParameters
 ) : CoroutineWorker(context, parameters), KoinComponent {
     private val account by inject<Account>()
+    private val automaticBackupScheduler by inject<AutomaticBackupScheduler>()
 
     private val channelID = Notifications.OPML_IMPORT.channelID
 
@@ -91,6 +92,7 @@ class OPMLImportWorker(
                 account.refresh()
             }
         }
+        automaticBackupScheduler.enqueueAfterChange()
     }
 
     private fun createForegroundInfo(): ForegroundInfo {

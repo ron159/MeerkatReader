@@ -44,6 +44,8 @@ fun DataStorageSettingsPanel(
         updateOfflineReadingEnabled = generalViewModel::updateOfflineReadingEnabled,
         offlineDownloadOnWiFiOnly = generalViewModel.offlineDownloadOnWiFiOnly,
         updateOfflineDownloadOnWiFiOnly = generalViewModel::updateOfflineDownloadOnWiFiOnly,
+        offlineRequireCharging = generalViewModel.offlineRequireCharging,
+        updateOfflineRequireCharging = generalViewModel::updateOfflineRequireCharging,
         offlineIncludeFullContent = generalViewModel.offlineIncludeFullContent,
         updateOfflineIncludeFullContent = generalViewModel::updateOfflineIncludeFullContent,
         offlineIncludeImages = generalViewModel.offlineIncludeImages,
@@ -82,6 +84,8 @@ private fun DataStorageSettingsPanelView(
     updateOfflineReadingEnabled: (enabled: Boolean) -> Unit,
     offlineDownloadOnWiFiOnly: Boolean,
     updateOfflineDownloadOnWiFiOnly: (enabled: Boolean) -> Unit,
+    offlineRequireCharging: Boolean,
+    updateOfflineRequireCharging: (enabled: Boolean) -> Unit,
     offlineIncludeFullContent: Boolean,
     updateOfflineIncludeFullContent: (enabled: Boolean) -> Unit,
     offlineIncludeImages: Boolean,
@@ -139,6 +143,13 @@ private fun DataStorageSettingsPanelView(
                         checked = offlineDownloadOnWiFiOnly,
                         onCheckedChange = updateOfflineDownloadOnWiFiOnly,
                         title = stringResource(R.string.settings_offline_download_on_wifi_only),
+                    )
+                }
+                RowItem {
+                    TextSwitch(
+                        checked = offlineRequireCharging,
+                        onCheckedChange = updateOfflineRequireCharging,
+                        title = stringResource(R.string.settings_offline_require_charging),
                     )
                 }
                 RowItem {

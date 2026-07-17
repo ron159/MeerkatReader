@@ -14,6 +14,8 @@
     <string name="filter_action_menu_description">编辑</string>
     <string name="feed_action_unsubscribe_message">确定要取消订阅“%1$s”吗？</string>
     <string name="feed_action_edit">编辑订阅源</string>
+    <string name="feed_action_edit_success">订阅源已更新</string>
+    <string name="feed_action_edit_error">无法在服务器上更新订阅源</string>
     <string name="feed_action_reload_icon">重新加载图标</string>
     <string name="edit_feed_submit">保存</string>
     <string name="folder_action_delete_title">删除文件夹</string>
@@ -93,6 +95,8 @@
     <string name="feed_form_feed_url_title">订阅源 URL</string>
     <string name="feed_action_unsubscribe_title">取消订阅</string>
     <string name="feed_action_unsubscribe_confirm">取消订阅</string>
+    <string name="feed_action_unsubscribe_success">已取消订阅</string>
+    <string name="feed_action_unsubscribe_error">无法在服务器上取消订阅</string>
     <string name="settings_remove_account_button_service">退出登录</string>
     <string name="dialog_cancel">取消</string>
     <string name="settings_remove_account_title_local">删除账号</string>

@@ -70,6 +70,9 @@ class GeneralSettingsViewModel(
     var offlineDownloadOnWiFiOnly by mutableStateOf(appPreferences.offlineOptions.downloadOnWiFiOnly.get())
         private set
 
+    var offlineRequireCharging by mutableStateOf(appPreferences.offlineOptions.requireCharging.get())
+        private set
+
     var offlineIncludeFullContent by mutableStateOf(appPreferences.offlineOptions.includeFullContent.get())
         private set
 
@@ -107,6 +110,11 @@ class GeneralSettingsViewModel(
     fun updateOfflineDownloadOnWiFiOnly(enabled: Boolean) {
         appPreferences.offlineOptions.downloadOnWiFiOnly.set(enabled)
         offlineDownloadOnWiFiOnly = enabled
+    }
+
+    fun updateOfflineRequireCharging(enabled: Boolean) {
+        appPreferences.offlineOptions.requireCharging.set(enabled)
+        offlineRequireCharging = enabled
     }
 
     fun updateOfflineIncludeFullContent(enabled: Boolean) {
