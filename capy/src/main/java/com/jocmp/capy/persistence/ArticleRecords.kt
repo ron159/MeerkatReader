@@ -4,6 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrDefault
 import com.jocmp.capy.Article
+import com.jocmp.capy.ArticleBackupReference
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.ArticleNotification
 import com.jocmp.capy.ArticleSearchQuery
@@ -212,6 +213,16 @@ class ArticleRecords(
             starred = true,
             lastUnstarredAt = null,
         )
+    }
+
+    fun starredArticleIDs(): List<String> {
+        return database.articlesQueries.starredArticleIDs().executeAsList()
+    }
+
+    fun readLaterArticleReferences(): List<ArticleBackupReference> {
+        return database.articlesQueries.readLaterArticleReferences(
+            mapper = ::ArticleBackupReference,
+        ).executeAsList()
     }
 
     fun removeStar(articleID: String) {

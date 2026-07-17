@@ -1,6 +1,7 @@
 package com.jocmp.capy.articles
 
 import com.jocmp.capy.Article
+import com.jocmp.capy.Enclosure
 import com.jocmp.capy.MacroProcessor
 import com.jocmp.capy.preferences.Preference
 
@@ -14,6 +15,9 @@ class ArticleRenderer(
     private val enableHorizontalScroll: Preference<Boolean>,
     private val audioPlayerLabels: AudioPlayerLabels = AudioPlayerLabels(),
     private val imageRewriter: ArticleImageRewriter = ArticleImageRewriter(),
+    private val audioEnclosureURL: (Article, Enclosure) -> String = { _, enclosure ->
+        enclosure.url.toString()
+    },
 ) {
 
     fun render(
@@ -70,13 +74,15 @@ class ArticleRenderer(
     }
 
     private fun buildContent(article: Article, hideImages: Boolean): String {
+        val audioEnclosures = article.audioEnclosureHTML(
+            playLabel = audioPlayerLabels.play,
+            pauseLabel = audioPlayerLabels.pause,
+            enclosureURL = { enclosure -> audioEnclosureURL(article, enclosure) },
+        )
+
         return if (article.parseFullContent) {
-            parseHtml(article, hideImages)
+            audioEnclosures + parseHtml(article, hideImages)
         } else {
-            val audioEnclosures = article.audioEnclosureHTML(
-                playLabel = audioPlayerLabels.play,
-                pauseLabel = audioPlayerLabels.pause,
-            )
             val otherEnclosures = article.enclosureHTML()
             val articleContent = imageRewriter.rewrite(
                 html = article.content,

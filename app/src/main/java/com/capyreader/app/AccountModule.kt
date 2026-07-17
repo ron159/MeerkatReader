@@ -4,9 +4,11 @@ import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.offline.ArticleOfflineAudioDownloader
+import com.capyreader.app.offline.ArticleOfflineAudioStore
 import com.capyreader.app.offline.ArticleOfflinePackageDownloader
-import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.notifications.NotificationHelper
+import com.capyreader.app.preferences.AppPreferences
 import com.jocmp.capy.Account
 import com.jocmp.capy.AccountManager
 import com.jocmp.capy.DatabaseProvider
@@ -20,6 +22,7 @@ import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
 import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import com.jocmp.capy.persistence.ArticleRuleMatchRecords
 import org.koin.dsl.module
+import java.io.File
 
 val accountModule = module {
     single<Database> {
@@ -41,6 +44,8 @@ val accountModule = module {
     single { ArticleReadingProgressRecords(database = get()) }
     single { ArticleRuleMatchRecords(database = get()) }
     single { ArticleImageStore(context = get()) }
+    single { ArticleOfflineAudioStore(accountDirectory = File(get<Account>().path)) }
+    single { ArticleOfflineAudioDownloader(httpClient = get(), store = get()) }
     single {
         ArticleImageCacheCleaner(
             records = get(),
@@ -59,6 +64,8 @@ val accountModule = module {
             imageRecords = get(),
             readingProgressRecords = get(),
             imageDownloader = get(),
+            audioDownloader = get(),
+            audioStore = get(),
             appPreferences = get(),
         )
     }

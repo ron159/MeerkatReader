@@ -23,6 +23,10 @@ class ArticleOfflinePackageRecords(
         ).executeAsList()
     }
 
+    suspend fun findAll(): List<ArticleOfflinePackageRecord> = withIOContext {
+        database.articleOfflinePackagesQueries.findAll(mapper = ::mapper).executeAsList()
+    }
+
     suspend fun upsert(
         input: ArticleOfflinePackageInput,
         updatedAt: ZonedDateTime = nowUTC(),

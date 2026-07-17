@@ -44,6 +44,7 @@ class ArticleOfflinePackageWorker(
             context: Context,
             replaceExisting: Boolean = false,
             wiFiOnly: Boolean = false,
+            requiresCharging: Boolean = false,
         ) {
             val policy = if (replaceExisting) {
                 ExistingWorkPolicy.REPLACE
@@ -52,17 +53,7 @@ class ArticleOfflinePackageWorker(
             }
 
             val request = OneTimeWorkRequestBuilder<ArticleOfflinePackageWorker>()
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(
-                            if (wiFiOnly) {
-                                NetworkType.UNMETERED
-                            } else {
-                                NetworkType.CONNECTED
-                            }
-                        )
-                        .build()
-                )
+                .setConstraints(offlinePackageConstraints(wiFiOnly, requiresCharging))
                 .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
@@ -72,4 +63,20 @@ class ArticleOfflinePackageWorker(
             )
         }
     }
+}
+
+internal fun offlinePackageConstraints(
+    wiFiOnly: Boolean,
+    requiresCharging: Boolean,
+): Constraints {
+    return Constraints.Builder()
+        .setRequiredNetworkType(
+            if (wiFiOnly) {
+                NetworkType.UNMETERED
+            } else {
+                NetworkType.CONNECTED
+            }
+        )
+        .setRequiresCharging(requiresCharging)
+        .build()
 }

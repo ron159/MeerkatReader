@@ -10,6 +10,11 @@ FROM article_offline_packages
 WHERE state = :state
 ORDER BY updated_at ASC;
 
+findAll:
+SELECT article_id, state, include_full_content, include_images, include_audio, bytes, error_message, updated_at
+FROM article_offline_packages
+ORDER BY updated_at ASC;
+
 upsert:
 INSERT INTO article_offline_packages(
   article_id,

@@ -25,6 +25,8 @@ class ArticleOfflinePackageDownloader(
     private val imageRecords: ArticleImageRecords,
     private val readingProgressRecords: ArticleReadingProgressRecords,
     private val imageDownloader: ArticleImageDownloader,
+    private val audioDownloader: ArticleOfflineAudioDownloader,
+    private val audioStore: ArticleOfflineAudioStore,
     private val appPreferences: AppPreferences,
 ) {
     suspend fun queue(
@@ -45,6 +47,7 @@ class ArticleOfflinePackageDownloader(
     }
 
     suspend fun remove(articleID: String) {
+        audioStore.deleteArticle(articleID)
         packageRecords.delete(articleID)
     }
 
@@ -54,6 +57,17 @@ class ArticleOfflinePackageDownloader(
             .mapNotNull { articleID ->
                 packageRecords.find(articleID)?.let { record ->
                     articleID to record.state
+                }
+            }
+            .toMap()
+    }
+
+    suspend fun findRecords(articleIDs: Collection<String>): Map<String, ArticleOfflinePackageRecord> = withIOContext {
+        articleIDs
+            .distinct()
+            .mapNotNull { articleID ->
+                packageRecords.find(articleID)?.let { record ->
+                    articleID to record
                 }
             }
             .toMap()
@@ -84,7 +98,8 @@ class ArticleOfflinePackageDownloader(
                     articleID = article.id,
                     includeFullContent = offlineOptions.includeFullContent.get(),
                     includeImages = offlineOptions.includeImages.get(),
-                    includeAudio = offlineOptions.includeAudio.get() && article.enclosures.isNotEmpty(),
+                    includeAudio = offlineOptions.includeAudio.get() &&
+                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
                 )
                 queued += 1
             }
@@ -143,6 +158,9 @@ class ArticleOfflinePackageDownloader(
             maxBytes = offlineOptions.storageLimitMegabytes.get().toLong() * BYTES_PER_MEGABYTE,
             preservedArticleIDs = protectedArticleIDs,
         )
+        audioStore.deleteUnreferencedArticles(
+            packageRecords.findAll().map { it.articleID }
+        )
 
         CleanupResult(
             removedFailed = removedFailed,
@@ -197,7 +215,12 @@ class ArticleOfflinePackageDownloader(
         val feed = account.findFeed(article.feedID)
         if (feed?.offlinePolicy == FeedOfflinePolicy.NEVER) {
             packageRecords.delete(article.id)
+            audioStore.deleteArticle(article.id)
             return true
+        }
+
+        if (!offlinePackage.includeAudio) {
+            audioStore.deleteArticle(article.id)
         }
 
         val content = contentFor(article, offlinePackage) ?: return false
@@ -212,6 +235,10 @@ class ArticleOfflinePackageDownloader(
             )
             imageDownloader.downloadPendingForArticle(article.id)
             bytes += imageRecords.readyBytesForArticle(article.id)
+        }
+
+        if (offlinePackage.includeAudio) {
+            bytes += audioDownloader.download(article)
         }
 
         packageRecords.updateState(

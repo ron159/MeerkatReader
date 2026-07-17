@@ -31,6 +31,24 @@ class ArticleEnclosuresExtTest {
     }
 
     @Test
+    fun `audioEnclosureHTML uses a localized enclosure URL`() {
+        val audioEnclosure = Enclosure(
+            url = URL("https://example.com/podcast.mp3"),
+            type = "audio/mpeg",
+            itunesDurationSeconds = null,
+            itunesImage = null,
+        )
+        val article = createArticle(enclosures = listOf(audioEnclosure))
+
+        val html = article.audioEnclosureHTML(
+            enclosureURL = { "file:/offline/podcast.mp3" }
+        )
+
+        assertContains(html, "file:/offline/podcast.mp3")
+        assertEquals(false, html.contains("https://example.com/podcast.mp3"))
+    }
+
+    @Test
     fun `audioEnclosureHTML formats duration correctly for minutes`() {
         val audioEnclosure = Enclosure(
             url = URL("https://example.com/podcast.mp3"),

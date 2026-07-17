@@ -221,6 +221,19 @@ JOIN article_statuses ON articles.id = article_statuses.article_id
 WHERE article_statuses.starred = 1
 ORDER BY articles.published_at DESC;
 
+starredArticleIDs:
+SELECT article_id
+FROM article_statuses
+WHERE starred = 1
+ORDER BY article_id;
+
+readLaterArticleReferences:
+SELECT articles.id, articles.url
+FROM articles
+JOIN feeds ON articles.feed_id = feeds.id
+WHERE feeds.read_later = 1
+ORDER BY articles.id;
+
 deleteAllArticles {
   DELETE FROM article_statuses WHERE starred = 0 AND read = 1;
 

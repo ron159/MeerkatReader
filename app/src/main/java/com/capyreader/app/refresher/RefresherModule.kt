@@ -17,7 +17,6 @@ val refresherModule = module {
             articleImageCacheCleaner = get(),
         )
     }
-    single { RefreshScheduler(get(), get()) }
     worker { RefreshFeedsWorker(get(), get()) }
     worker { ArticleImageDownloadWorker(get(), get()) }
     worker { ArticleAiPreviewWorker(get(), get()) }

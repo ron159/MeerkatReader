@@ -20,12 +20,20 @@ internal class SavedSearchRecords(private val database: Database) {
         return savedSearchQueries.allIDs().executeAsList()
     }
 
+    internal fun allSync(): List<SavedSearch> {
+        return savedSearchQueries.all(mapper = ::mapper).executeAsList()
+    }
+
     internal fun remoteIDs(): List<String> {
-        return allIDs().filterNot(::isAutomationID)
+        return allIDs().filterNot(::isAutomationID).filterNot(::isLocalQueryID)
     }
 
     internal fun automationIDs(): List<String> {
         return allIDs().filter(::isAutomationID)
+    }
+
+    internal fun localQueryIDs(): List<String> {
+        return allIDs().filter(::isLocalQueryID)
     }
 
     internal fun savedSearchIDsByArticle(articleID: String): Flow<List<String>> {
@@ -33,6 +41,10 @@ internal class SavedSearchRecords(private val database: Database) {
             .savedSearchIDsByArticle(articleID)
             .asFlow()
             .mapToList(Dispatchers.IO)
+    }
+
+    internal fun articleIDs(savedSearchID: String): List<String> {
+        return savedSearchQueries.articlesBySavedSearchID(savedSearchID).executeAsList()
     }
 
     internal suspend fun find(savedSearchID: String): SavedSearch? = withIOContext {
@@ -69,7 +81,7 @@ internal class SavedSearchRecords(private val database: Database) {
     }
 
     internal fun deleteOrphaned(excludedIDs: List<String>) {
-        savedSearchQueries.deleteOrphaned(excludedIDs = excludedIDs + automationIDs())
+        savedSearchQueries.deleteOrphaned(excludedIDs = excludedIDs + automationIDs() + localQueryIDs())
     }
 
     internal fun deleteOrphanedEntries(savedSearchID: String, excludedIDs: List<String>) {
@@ -105,9 +117,14 @@ internal class SavedSearchRecords(private val database: Database) {
 
     companion object {
         private const val AUTOMATION_PREFIX = "automation:"
+        private const val LOCAL_QUERY_PREFIX = "query:"
 
         fun automationID(name: String) = "$AUTOMATION_PREFIX$name"
 
         fun isAutomationID(id: String) = id.startsWith(AUTOMATION_PREFIX)
+
+        fun localQueryID(id: String) = "$LOCAL_QUERY_PREFIX$id"
+
+        fun isLocalQueryID(id: String) = id.startsWith(LOCAL_QUERY_PREFIX)
     }
 }

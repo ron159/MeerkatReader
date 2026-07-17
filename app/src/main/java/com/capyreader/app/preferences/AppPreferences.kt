@@ -94,6 +94,21 @@ class AppPreferences(context: Context) {
     val lastArticleImageCacheCleanupAt: Preference<Long>
         get() = preferenceStore.getLong("last_article_image_cache_cleanup_at", 0L)
 
+    val automaticBackupEnabled: Preference<Boolean>
+        get() = preferenceStore.getBoolean("automatic_backup_enabled", false)
+
+    val automaticBackupTreeUri: Preference<String>
+        get() = preferenceStore.getString("automatic_backup_tree_uri")
+
+    val automaticBackupRetention: Preference<Int>
+        get() = preferenceStore.getInt("automatic_backup_retention", 7)
+
+    val lastAutomaticBackupAt: Preference<Long>
+        get() = preferenceStore.getLong("automatic_backup_last_at", 0L)
+
+    val lastAutomaticBackupError: Preference<String>
+        get() = preferenceStore.getString("automatic_backup_last_error")
+
     val paneExpansionIndex: Preference<Int>
         get() = preferenceStore.getInt("pane_expansion_index", DefaultPaneExpansionIndex)
 
@@ -242,6 +257,9 @@ class AppPreferences(context: Context) {
 
         val downloadOnWiFiOnly: Preference<Boolean>
             get() = preferenceStore.getBoolean("offline_download_on_wifi_only", true)
+
+        val requireCharging: Preference<Boolean>
+            get() = preferenceStore.getBoolean("offline_require_charging", false)
 
         val includeFullContent: Preference<Boolean>
             get() = preferenceStore.getBoolean("offline_include_full_content", true)

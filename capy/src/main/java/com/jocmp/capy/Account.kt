@@ -51,6 +51,7 @@ import okhttp3.OkHttpClient
 import java.io.InputStream
 import java.net.URI
 import java.time.ZonedDateTime
+import java.util.UUID
 
 data class Account(
     val id: String,
@@ -61,7 +62,7 @@ data class Account(
     val source: Source = Source.LOCAL,
     val faviconPolicy: FaviconPolicy,
     private val clientCertManager: ClientCertManager = ClientCertManager { builder, _ -> builder },
-    private val userAgent: String,
+    private val userAgent: () -> String,
     private val acceptLanguage: String,
     private val localHttpClient: OkHttpClient = LocalOkHttpClient.forAccount(path = cacheDirectory),
     val delegate: AccountDelegate = when (source) {
@@ -303,6 +304,68 @@ data class Account(
         return savedSearchRecords.find(savedSearchID)
     }
 
+    suspend fun savedSearchBackupEntries(): List<SavedSearchBackupEntry> = withIOContext {
+        savedSearchRecords
+            .allSync()
+            .filterNot { SavedSearchRecords.isAutomationID(it.id) }
+            .map { savedSearch ->
+                SavedSearchBackupEntry(
+                    id = savedSearch.id,
+                    name = savedSearch.name,
+                    query = savedSearch.query,
+                    showUnreadBadge = savedSearch.showUnreadBadge,
+                    articleIDs = savedSearchRecords.articleIDs(savedSearch.id),
+                )
+            }
+    }
+
+    suspend fun restoreSavedSearchBackupEntries(entries: List<SavedSearchBackupEntry>) = withIOContext {
+        database.transactionWithErrorHandling {
+            entries.forEach { entry ->
+                savedSearchRecords.upsert(
+                    id = entry.id,
+                    name = entry.name,
+                    query = entry.query,
+                )
+                database.saved_searchesQueries.updateShowUnreadBadge(
+                    id = entry.id,
+                    enabled = entry.showUnreadBadge,
+                )
+                entry.articleIDs.forEach { articleID ->
+                    savedSearchRecords.upsertArticle(
+                        articleID = articleID,
+                        savedSearchID = entry.id,
+                    )
+                }
+            }
+        }
+    }
+
+    suspend fun starredArticleBackupIDs(): List<String> = withIOContext {
+        articleRecords.starredArticleIDs()
+    }
+
+    suspend fun restoreStarredArticleBackupIDs(articleIDs: List<String>) {
+        articleIDs.forEach { articleID ->
+            addStar(articleID)
+        }
+    }
+
+    suspend fun readLaterArticleBackupReferences(): List<ArticleBackupReference> = withIOContext {
+        articleRecords.readLaterArticleReferences()
+    }
+
+    suspend fun restoreReadLaterArticleBackupReferences(entries: List<ArticleBackupReference>) {
+        if (!source.supportsReadLater) return
+
+        entries
+            .mapNotNull { it.url }
+            .distinct()
+            .forEach { url ->
+                createPage(url)
+            }
+    }
+
     suspend fun findFolder(title: String): Folder? {
         return feedRecords.findFolder(title = title)
     }
@@ -340,6 +403,18 @@ data class Account(
 
     suspend fun createSavedSearch(name: String): Result<String> {
         return delegate.createSavedSearch(name)
+    }
+
+    suspend fun createSavedSearch(name: String, query: String): Result<String> = withIOContext {
+        val id = SavedSearchRecords.localQueryID(UUID.randomUUID().toString())
+
+        savedSearchRecords.upsert(
+            id = id,
+            name = name,
+            query = query,
+        )
+
+        Result.success(id)
     }
 
     fun getArticleSavedSearches(articleID: String): Flow<List<String>> {
