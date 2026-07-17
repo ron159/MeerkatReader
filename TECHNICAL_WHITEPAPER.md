@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-Meerkat Reader has already evolved beyond a basic RSS client. The current codebase includes multi-provider feed sync, local feeds, full-content extraction, article image caching, backup and restore, configurable reader UI, home widgets, notifications, audio playback, rule-based article automation, and manual AI actions for translation, summaries, and key points.
+Meerkat Reader has already evolved beyond a basic RSS client. The current codebase includes multi-provider feed sync, local feeds, full-content extraction, article image caching, backup and restore, configurable reader UI, home widgets, notifications, audio playback, rule-based article automation, advanced article search, offline package state, reading progress, and AI actions for translation, summaries, key points, Q&A, list previews, and digest generation.
 
-The next product phase should focus on turning those individual capabilities into a coherent reading intelligence layer. The goal is not to add heavyweight infrastructure or broad dependencies. The goal is to make high-volume RSS reading easier by combining AI assistance, stronger filtering, advanced search, reliable offline reading, portable backups, selective external integrations, and improved reader ergonomics.
+The current implementation has already delivered much of the first reading-intelligence layer. The next product phase should focus on completing the remaining user-facing workflows around backup portability, integrations, reader structure, and deeper offline polish. The goal is still not to add heavyweight infrastructure or broad dependencies. The goal is to make high-volume RSS reading easier by combining AI assistance, stronger filtering, advanced search, reliable offline reading, portable backups, selective external integrations, and improved reader ergonomics.
 
 This document proposes the target behavior and technical design for seven feature areas:
 
@@ -24,11 +24,14 @@ The current project already provides the following relevant foundations:
 
 - Article model, feed model, account delegates, and SQLDelight persistence in the `capy` module.
 - Android UI, settings, workers, widgets, AI, backup, and image cache implementation in the `app` module.
-- Manual AI actions through `ArticleAiRepository`, using OpenAI-compatible `/chat/completions` requests.
-- AI settings for provider, base URL, API key, model, language, translation display mode, and custom prompts.
-- Article automation through `ArticleAutomation` and `ArticleAutomationRule`.
-- Rule actions for mute, keep, mark read, star, categorize, and notify.
-- Backup export and restore through `CapyBackupFile`.
+- AI actions through `ArticleAiRepository`, using an OpenAI-compatible chat client abstraction.
+- AI settings for provider, base URL, API key, model, language, translation display mode, custom prompts, background previews, and cache controls.
+- SQLDelight-backed AI results, AI digests, rule match logs, offline packages, integration export state, and reading progress.
+- Article automation through `ArticleAutomation`, `ArticleAutomationRule`, and shared rule matching helpers.
+- Rule actions for mute, keep, mark read, star, categorize, and notify, with multi-condition matching, rule ordering, rule testing, and create-from-article shortcuts.
+- Advanced search parsing for field qualifiers, dates, media filters, and status filters.
+- Offline download controls, per-feed offline policy, offline status indicators, storage limits, and cleanup preservation policy.
+- Backup export and restore through `CapyBackupFile`, including backup version 2 structure and secret exclusion.
 - Article image cache and preloading workers.
 - OPML import/export and starred bookmark export.
 
@@ -84,7 +87,8 @@ Application services
   IntegrationRepository
 
 Background work
-  AI digest worker
+  AI preview worker
+  Optional AI digest worker
   Offline download worker
   Cache cleanup worker
   Backup worker
@@ -256,10 +260,18 @@ AI background work should be opt-in and bounded:
 - Never run if API key is missing.
 - Never run for feeds excluded from AI.
 
-Workers:
+Current implementation:
 
-- `ArticleAiPreviewWorker`: generates list previews for unread articles.
-- `ArticleAiDigestWorker`: generates a digest for selected filters.
+- `ArticleAiPreviewWorker` can generate bounded list previews for unread articles after refresh when the user explicitly enables background previews.
+- Current-filter digest generation is available as a manual action from the article list and is persisted in `ai_digests`.
+- Article Q&A, long-summary chunking, provider-neutral transport, SQL cache lookup, and cache clearing are implemented.
+
+Remaining work:
+
+- Add a bounded `ArticleAiDigestWorker` only if digest automation is still desired. It should remain opt-in because it can send multiple article bodies to an AI provider.
+- Add charging and per-day budget settings for background AI work.
+- Move API keys into encrypted storage where available.
+- Replace generic failures with typed AI errors for provider, rate-limit, timeout, empty content, and missing-setting cases.
 
 ### 6.8 Privacy and Security
 
@@ -300,7 +312,6 @@ data class ArticleAutomationRule(
     val conditions: List<ArticleRuleCondition>,
     val actions: Set<ArticleRuleAction>,
     val categoryName: String,
-    val priority: Int,
 )
 
 enum class RuleMatchMode {
@@ -324,7 +335,7 @@ enum class ArticleRuleOperator {
 }
 ```
 
-Keep backward compatibility by migrating existing `pattern` rules into one condition.
+Keep backward compatibility by treating existing `field` and `pattern` rules as a single `CONTAINS` condition. Rule priority is represented by list order in account preferences rather than a separate stored priority field.
 
 ### 7.4 Rule Match Log
 
@@ -394,6 +405,19 @@ AI rules should be a second phase:
 - The result is logged with explanation.
 
 This should be opt-in per rule because it can increase cost and send article metadata to a provider.
+
+Current implementation:
+
+- Rules support multi-condition matching with `ALL` or `ANY` mode.
+- Conditions support contains, does-not-contain, regex, equals, starts-with, and ends-with operators.
+- The rule editor supports create, edit, enable/disable, delete, reorder, sample-text testing, and create-from-article actions.
+- Rule match logs are persisted locally for later explanation and debugging.
+- Article row actions expose a read-only automation history dialog for the selected article.
+
+Remaining work:
+
+- Add remote-account integration tests that verify local rule actions and remote sync boundaries for Feedbin, Reader API, and Miniflux.
+- Add AI-assisted rules as a separate opt-in capability after the non-AI rule system is stable.
 
 ## 8. Feature Area 3: Advanced Search
 
@@ -480,6 +504,19 @@ FTS maintenance options:
 - Allow saving the current query as a saved search.
 - Allow batch actions on results.
 
+Current implementation:
+
+- The search parser supports status, feed, folder, author, title, date, image, and audio qualifiers.
+- Article list queries route through SQLDelight-backed search paths and can use the current filter, sort order, and search syntax together.
+- Search result batch actions are available for non-empty searches: mark result batch as read, star result batch, and save result batch externally when the account supports it.
+- Recognized query qualifiers are surfaced as chips above search results.
+- Users can save the current query as a local query-backed saved search and reopen it from the saved-search list.
+
+Remaining work:
+
+- Add an advanced search screen only if top-bar syntax becomes hard to discover.
+- Add SQLite FTS for very large archives if `LIKE` search becomes a measurable bottleneck.
+
 ## 9. Feature Area 4: Complete Offline Reading
 
 ### 9.1 Goals
@@ -499,7 +536,7 @@ An offline package is a local bundle for an article:
 - Extracted full content when available
 - Rewritten local image paths
 - Enclosures metadata
-- Optional audio metadata
+- Optional account-owned audio enclosure files
 
 Add package state:
 
@@ -532,9 +569,11 @@ Add `ArticleOfflinePackageWorker`:
 - Processes queued articles.
 - Downloads full content if requested.
 - Reuses `ArticleImageDownloader`.
+- Downloads requested audio enclosures into account-owned offline storage.
 - Rewrites image URLs to local paths.
+- Resolves downloaded audio enclosures to local file URLs at render time.
 - Updates package state.
-- Respects Wi-Fi and battery settings.
+- Respects Wi-Fi-only and optional charging settings through WorkManager constraints.
 
 ### 9.4 User Controls
 
@@ -542,6 +581,7 @@ Settings:
 
 - Offline reading enabled.
 - Download on Wi-Fi only.
+- Download only while charging.
 - Include images.
 - Include full content.
 - Include audio.
@@ -574,6 +614,19 @@ Cleanup should remove:
 - Old read unstarred packages.
 - Failed partial packages.
 - Files not referenced by package metadata.
+
+Current implementation:
+
+- Offline package metadata, state transitions, and worker processing are backed by SQLDelight.
+- Users can download or remove an article's offline copy from the article action menu.
+- Article rows show offline status.
+- Article action menus surface failed offline package details and allow retrying failed downloads.
+- Feeds support global, always-keep-offline, and never-cache-offline policy.
+- Settings expose offline reading, Wi-Fi-only and charging-only download constraints, included content types, storage limit in MB, and cleanup preservation options.
+- Cleanup removes orphan and failed records, then prunes READY packages by configured storage limit while preserving starred, saved-for-later, recently opened, and feed-level offline articles when configured.
+- Requested audio enclosures are downloaded atomically into per-account, per-article storage and counted toward package bytes.
+- Article rendering prefers downloaded enclosure files, and Media3 routes local file URLs without using the network.
+- Removing, pruning, or orphan-cleaning an offline package also removes audio directories no longer referenced by package metadata.
 
 ## 10. Feature Area 5: Enhanced Backup and Restore
 
@@ -645,12 +698,18 @@ Restore should:
 - Restore rules and saved searches.
 - Trigger refresh.
 
-Potential modes:
+Current implementation:
+
+- Backup version 2 uses explicit app, account, rules, AI, and subscription sections.
+- The structured `savedSearches`, `readLater`, and `starred` sections export and restore saved-search definitions, saved-search article membership, Feedbin read-later URLs, and local starred article IDs.
+- API keys and account passwords are excluded from normal backup.
+- Restore previews the selected backup before applying changes, then validates backup version and account source, preserves credentials and the current account ID, restores preferences, imports OPML, restores structured saved-search/starred/read-later state, and refreshes.
+- The restore dialog offers replace and merge modes. Replace clears settings not present in the backup; merge overwrites only settings supplied by the backup. Both modes preserve excluded credentials, and imported subscriptions and structured article state remain additive.
+
+Available modes:
 
 - Merge into current account.
 - Replace current configuration.
-
-Start with replace mode because it is simpler and less surprising.
 
 ### 10.6 Automatic Backup
 
@@ -660,6 +719,11 @@ Optional later phase:
 - App writes periodic backup.
 - Keep last N backups.
 - Trigger after major preference or subscription changes.
+
+Remaining work:
+
+- Add encrypted credential export only as an explicit separate choice.
+- Add automatic backup to a user-selected document tree with retention.
 
 ## 11. Feature Area 6: External Service Integrations
 
@@ -736,6 +800,17 @@ Recommended order:
 - Authentication failures surface in settings.
 - Per-article export status is visible in the action sheet.
 
+Current implementation:
+
+- `ArticleExportIntegration`, `ArticleIntegrationExportState`, and SQLDelight export-state records provide the local foundation for integration queues.
+
+Remaining work:
+
+- Add a real Wallabag integration first, including settings, authentication, API client, queued export worker, retry behavior, and error visibility.
+- Add Readwise after Wallabag if user demand justifies it.
+- Add WebDAV or Nextcloud backup sync separately from article export integrations.
+- Surface per-article export status in the article action sheet.
+
 ## 12. Feature Area 7: Reader Experience Improvements
 
 ### 12.1 Goals
@@ -763,6 +838,11 @@ Behavior:
 - Mark read only when configured threshold is crossed.
 - Sync read status separately from progress.
 
+Current implementation:
+
+- Reading progress is stored locally and restored when reopening an article.
+- Read state remains separate from progress.
+
 ### 12.3 Bilingual Translation View
 
 Current translation mode supports replace or parallel display conceptually. Improve it with paragraph-level alignment:
@@ -774,6 +854,11 @@ Current translation mode supports replace or parallel display conceptually. Impr
 
 For MVP, alignment can be best-effort by paragraph order.
 
+Current implementation:
+
+- Translation can replace original content or render a parallel bilingual view.
+- Parallel translation aligns original and translated text by paragraph-like blocks while preserving media where possible.
+
 ### 12.4 Article Structure
 
 Add:
@@ -783,6 +868,17 @@ Add:
 - Estimated reading time.
 - Image gallery view.
 - Better code block/table rendering where possible.
+
+Current implementation:
+
+- Estimated reading time is shown in article bylines.
+
+Remaining work:
+
+- Add a table of contents from headings and heading jump actions.
+- Add image gallery view.
+- Improve code block and table rendering.
+- Add paragraph-level copy controls for translated text.
 
 ### 12.5 Text-to-Speech
 
@@ -794,6 +890,15 @@ TTS should be local-first:
 - Save per-article TTS position.
 
 This should reuse the current media/audio UI patterns where practical.
+
+Current implementation:
+
+- Existing media and audio playback patterns provide reusable UI and service structure.
+
+Remaining work:
+
+- Add Android TTS playback for original article, AI summary, and translated article.
+- Add play, pause, skip, and per-article TTS position persistence.
 
 ### 12.6 Accessibility
 
@@ -848,7 +953,7 @@ Settings should include:
 Use WorkManager for all non-immediate jobs:
 
 - AI preview generation
-- Digest generation
+- Optional digest generation
 - Offline package download
 - Cache cleanup
 - Automatic backup
@@ -906,40 +1011,58 @@ No background worker should make unbounded AI calls.
 
 ### Phase 1: Stabilize Current AI and Rules
 
-- Move AI cache metadata to SQLDelight.
-- Add AI cache clear action.
-- Add rule edit and enable/disable.
-- Add rule match log.
-- Add "create rule from article".
+- Done: move AI cache metadata to SQLDelight.
+- Done: add AI cache clear action.
+- Done: add rule edit, enable/disable, delete, and reorder.
+- Done: add rule match log.
+- Done: add create-rule-from-article actions.
+- Done: add multi-condition rule matching and sample-text rule testing.
+- Done: add visible article automation history.
+- Remaining: add remote-account rule sync tests.
 
 ### Phase 2: AI Reading Workflows
 
-- Add list preview summaries.
-- Add current-filter digest.
-- Add article Q&A.
-- Add long article chunking for summaries.
-- Add bounded background generation.
+- Done: add list preview summaries.
+- Done: add current-filter digest.
+- Done: add article Q&A.
+- Done: add long article chunking for summaries.
+- Done: add bounded background preview generation.
+- Remaining: add optional digest worker only if users need automated digests.
+- Remaining: add daily/background AI budgets and charging constraints.
+- Remaining: store API keys in encrypted storage where available.
 
 ### Phase 3: Search and Offline
 
-- Add advanced search parser.
-- Add saved advanced searches.
-- Add offline package table and worker.
-- Add per-feed offline settings.
+- Done: add advanced search parser.
+- Done: add search result batch actions.
+- Done: add offline package table and worker.
+- Done: add per-feed offline settings.
+- Done: add offline storage limit and cleanup preservation policy.
+- Done: add saved advanced searches.
+- Done: add search qualifier chips.
+- Done: add failed-package detail and retry UI.
+- Done: add offline audio file download, local playback resolution, and owned-file cleanup.
+- Done: add an optional charging constraint for offline downloads.
 
 ### Phase 4: Backup and Integrations
 
-- Add backup version 2.
-- Add rules, saved searches, read-later, starred export sections.
-- Add Wallabag or Readwise integration.
-- Add optional automatic backup.
+- Done: add backup version 2 structure.
+- Done: exclude secrets from normal backup.
+- Done: add rules and AI settings sections.
+- Done: add structured saved searches, read-later, and starred export/restore sections.
+- Done: add restore summary before applying changes.
+- Done: add replace and merge restore modes while preserving credentials.
+- Remaining: add Wallabag or Readwise integration.
+- Remaining: add optional automatic backup.
 
 ### Phase 5: Reader Experience
 
-- Add reading progress.
-- Improve bilingual translation view.
-- Add TTS.
-- Add table of contents and image gallery.
+- Done: add reading progress.
+- Done: improve bilingual translation view.
+- Done: add estimated reading time.
+- Remaining: add TTS.
+- Remaining: add table of contents and image gallery.
+- Remaining: improve code block/table rendering and translated paragraph copy.
 
 ## 17. Risks and Mitigations
 
@@ -971,18 +1094,14 @@ Technical metrics:
 - Backup restore success rate.
 - Crash-free sessions after feature rollout.
 
-## 19. Recommended First Implementation Slice
+## 19. Recommended Next Implementation Slice
 
-The highest-impact, lowest-risk slice is:
+The offline reliability and backup merge slices have been completed. The next highest-impact slice is:
 
-1. Persist AI results in SQLDelight.
-2. Add AI cache clearing.
-3. Add list summary preview using cached summaries only at first.
-4. Add rule edit and enable/disable.
-5. Add rule match log.
-6. Add "create rule from article".
+1. Add automatic backup to a user-selected document tree with retention.
+2. Add remote-account integration tests for local automation actions and sync boundaries.
 
-This slice builds directly on current code, avoids new dependencies, does not require background AI generation, and makes both AI and automation more useful immediately.
+This slice builds directly on the existing WorkManager and document-storage foundations while keeping network and storage work user-controlled.
 
 ## 20. Conclusion
 
