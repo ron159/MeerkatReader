@@ -5,6 +5,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.capyreader.app.R
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.notifications.NotificationHelper
 import com.jocmp.capy.Account
@@ -28,7 +30,7 @@ fun TestNotificationRow(account: Account = koinInject()) {
 
     RowItem {
         Button(onClick = { notify() }) {
-            Text("Test Notifications")
+            Text(stringResource(R.string.settings_test_notifications))
         }
     }
 }

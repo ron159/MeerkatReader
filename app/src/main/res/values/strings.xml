@@ -167,6 +167,7 @@
     <string name="notifications_channel_title_feed_update">Feed Updates</string>
     <string name="notification_mark_as_read_action">Mark as read</string>
     <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_test_notifications">Test Notifications</string>
     <string name="settings_section_refresh">Last Updated</string>
     <string name="settings_refresh_on_wifi_only">Refresh on Wi-Fi only</string>
     <string name="settings_section_offline_reading">Offline reading</string>
