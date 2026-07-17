@@ -10,9 +10,11 @@ import com.jocmp.capy.accounts.FeedOption
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.common.launchIO
 import com.jocmp.capy.common.withUIContext
+import com.capyreader.app.transfers.AutomaticBackupScheduler
 
 class AddFeedViewModel(
     val account: Account,
+    private val automaticBackupScheduler: AutomaticBackupScheduler,
 ) : ViewModel() {
     private val _result = mutableStateOf<AddFeedResult?>(null)
     private val _loading = mutableStateOf(false)
@@ -45,6 +47,9 @@ class AddFeedViewModel(
 
             if (result is AddFeedResult.Success && account.source == Source.LOCAL) {
                 viewModelScope.launchIO { account.reloadFavicon(result.feed.id) }
+            }
+            if (result is AddFeedResult.Success) {
+                automaticBackupScheduler.enqueueAfterChange()
             }
 
             withUIContext {

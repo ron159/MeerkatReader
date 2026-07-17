@@ -55,6 +55,7 @@ fun EditFeedView(
     feed: Feed,
     folders: List<Folder>,
     showMultiselect: Boolean,
+    submitting: Boolean = false,
     onSubmit: (feed: EditFeedFormEntry) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -206,10 +207,16 @@ fun EditFeedView(
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        TextButton(onClick = onCancel) {
+        TextButton(
+            onClick = onCancel,
+            enabled = !submitting,
+        ) {
             Text(stringResource(R.string.feed_form_cancel))
         }
-        TextButton(onClick = { submitFeed() }) {
+        TextButton(
+            onClick = { submitFeed() },
+            enabled = !submitting,
+        ) {
             Text(stringResource(R.string.edit_feed_submit))
         }
     }

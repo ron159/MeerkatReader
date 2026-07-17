@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.R
+import com.capyreader.app.ui.articles.AddFeedButton
 import com.capyreader.app.ui.articles.FilterActionMenu
 import com.capyreader.app.ui.articles.FilterAppBarTitle
 import com.capyreader.app.ui.components.ArticleSearch
@@ -50,6 +51,9 @@ fun ArticleListTopBar(
     onMarkSearchResultsRead: () -> Unit,
     onStarSearchResults: () -> Unit,
     onSaveSearchResultsExternally: () -> Unit,
+    onSaveCurrentSearch: () -> Unit,
+    onFeedAdded: (feedID: String) -> Unit,
+    showAddFeedButton: Boolean,
     showAiSummaryPreviewButton: Boolean,
     canSummarizeArticlePreviews: Boolean,
     isAiSummaryPreviewLoading: Boolean,
@@ -148,9 +152,16 @@ fun ArticleListTopBar(
             }
         },
         actions = {
+            if (!enableSearch && showAddFeedButton) {
+                AddFeedButton(
+                    iconOnly = true,
+                    onComplete = onFeedAdded,
+                )
+            }
             if (enableSearch && !search.query.isNullOrBlank()) {
                 SearchBatchActionMenu(
                     canSaveExternally = canSaveSearchResultsExternally,
+                    onSaveSearch = onSaveCurrentSearch,
                     onMarkRead = onMarkSearchResultsRead,
                     onStar = onStarSearchResults,
                     onSaveExternally = onSaveSearchResultsExternally,
@@ -196,6 +207,9 @@ private fun FeedListTopBarPreview() {
         onMarkSearchResultsRead = { },
         onStarSearchResults = { },
         onSaveSearchResultsExternally = { },
+        onSaveCurrentSearch = { },
+        onFeedAdded = { },
+        showAddFeedButton = true,
         showAiSummaryPreviewButton = true,
         canSummarizeArticlePreviews = true,
         isAiSummaryPreviewLoading = false,

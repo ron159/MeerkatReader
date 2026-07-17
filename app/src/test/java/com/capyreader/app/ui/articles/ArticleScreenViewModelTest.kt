@@ -6,12 +6,15 @@ import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.ai.ArticleAiRepository
 import com.capyreader.app.notifications.NotificationHelper
+import com.capyreader.app.offline.ArticleOfflinePackageDownloader
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.ui.articles.feeds.AngleRefreshState
 import com.jocmp.capy.Account
+import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.Feed
@@ -22,6 +25,7 @@ import com.jocmp.capy.persistence.ArticleFullContentRecords
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +33,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -41,6 +46,8 @@ import org.junit.runner.RunWith
 import org.koin.core.context.stopKoin
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.net.URL
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -56,6 +63,8 @@ class ArticleScreenViewModelTest {
     private lateinit var articleImageStore: ArticleImageStore
     private lateinit var articleImageCacheCleaner: ArticleImageCacheCleaner
     private lateinit var articleFullContentRecords: ArticleFullContentRecords
+    private lateinit var articleAiRepository: ArticleAiRepository
+    private lateinit var articleOfflinePackageDownloader: ArticleOfflinePackageDownloader
 
     @Before
     fun setUp() {
@@ -90,6 +99,8 @@ class ArticleScreenViewModelTest {
         articleImageStore = mockk(relaxed = true)
         articleImageCacheCleaner = mockk(relaxed = true)
         articleFullContentRecords = mockk(relaxed = true)
+        articleAiRepository = mockk(relaxed = true)
+        articleOfflinePackageDownloader = mockk(relaxed = true)
         coEvery { articleFullContentRecords.find(any()) } returns null
     }
 
@@ -156,6 +167,44 @@ class ArticleScreenViewModelTest {
 
             assertEquals(AngleRefreshState.SETTLING, awaitItem())
         }
+    }
+
+    @Test
+    fun `selecting a visible article does not wait for initial refresh`() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        coEvery { account.refresh(any()) } coAnswers {
+            refreshGate.await()
+            Result.success(Unit)
+        }
+        val viewModel = buildViewModel()
+        runCurrent()
+        assertTrue(viewModel.refreshingAll)
+
+        val visibleArticle = Article(
+            id = "visible-article",
+            feedID = "feed",
+            title = "Visible article",
+            author = null,
+            contentHTML = "<p>Cached content</p>",
+            url = URL("https://example.com/article"),
+            summary = "Cached summary",
+            imageURL = null,
+            updatedAt = ZonedDateTime.now(),
+            publishedAt = ZonedDateTime.now(),
+            read = false,
+            starred = false,
+        )
+        var selectedArticle: Article? = null
+
+        viewModel.selectArticle(visibleArticle) {
+            selectedArticle = it
+        }
+
+        assertEquals(visibleArticle.id, viewModel.article?.id)
+        assertEquals(visibleArticle.id, selectedArticle?.id)
+
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
     }
 
     @Test
@@ -250,6 +299,8 @@ class ArticleScreenViewModelTest {
             articleImageStore = articleImageStore,
             articleImageCacheCleaner = articleImageCacheCleaner,
             articleFullContentRecords = articleFullContentRecords,
+            articleAiRepository = articleAiRepository,
+            articleOfflinePackageDownloader = articleOfflinePackageDownloader,
             ioDispatcher = testDispatcher,
             syncFlushInterval = syncFlushInterval,
         )

@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -89,6 +91,7 @@ import com.capyreader.app.ui.articles.list.LabelBottomSheet
 import com.capyreader.app.ui.articles.list.LocalMarkAllRead
 import com.capyreader.app.ui.articles.list.MarkAllReadButton
 import com.capyreader.app.ui.articles.list.MarkAllReadDialog
+import com.capyreader.app.ui.articles.list.SearchQualifierChips
 import com.capyreader.app.ui.articles.list.SwipeUpActionBox
 import com.capyreader.app.ui.articles.list.resetScrollBehaviorListener
 import com.capyreader.app.ui.articles.media.ArticleMediaView
@@ -110,12 +113,19 @@ import com.jocmp.capy.MarkRead
 import com.jocmp.capy.SavedSearch
 import com.jocmp.capy.common.launchUI
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleRuleMatchRecord
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
@@ -207,6 +217,7 @@ fun ArticleScreen(
 
     val confirmMarkAllReadEnabled by appPreferences.articleListOptions.confirmMarkAllRead.asState()
     var isMarkAllReadDialogOpen by remember { mutableStateOf(false) }
+    var isSaveSearchDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     CompositionLocalProvider(
         LocalFullContent provides fullContent,
@@ -426,7 +437,7 @@ fun ArticleScreen(
             }
         }
 
-        val onFeedAdded = { feedID: String ->
+        val onFeedAdded: (feedID: String) -> Unit = { feedID ->
             coroutineScope.launch {
                 openNextList { viewModel.selectFeed(feedID) }
 
@@ -440,22 +451,28 @@ fun ArticleScreen(
 
         val linkOpener = LocalLinkOpener.current
 
-        fun selectArticle(articleID: String) {
-            setArticle(articleID) { nextArticle ->
-                if (search.isActive) {
-                    focusManager.clearFocus()
-                }
+        fun openSelectedArticle(nextArticle: Article) {
+            if (search.isActive) {
+                focusManager.clearFocus()
+            }
 
-                val url = nextArticle.url
-                if (nextArticle.openInBrowser && url != null) {
-                    dismissArticle()
-                    linkOpener.open(url.toString().toUri())
-                } else {
-                    coroutineScope.launch {
-                        navigateToDetail()
-                    }
+            val url = nextArticle.url
+            if (nextArticle.openInBrowser && url != null) {
+                dismissArticle()
+                linkOpener.open(url.toString().toUri())
+            } else {
+                coroutineScope.launch {
+                    navigateToDetail()
                 }
             }
+        }
+
+        fun selectArticle(articleID: String) {
+            setArticle(articleID, ::openSelectedArticle)
+        }
+
+        fun selectVisibleArticle(article: Article) {
+            viewModel.selectArticle(article, ::openSelectedArticle)
         }
 
         val selectFilter = {
@@ -479,8 +496,8 @@ fun ArticleScreen(
         }
 
         val selectSavedSearch = { savedSearch: SavedSearch ->
-            if (!filter.isSavedSearchSelected(savedSearch)) {
-                openNextList { viewModel.selectSavedSearch(savedSearch.id) }
+            if (savedSearch.query != null || !filter.isSavedSearchSelected(savedSearch)) {
+                openNextList { viewModel.selectSavedSearch(savedSearch) }
             }
         }
 
@@ -628,6 +645,11 @@ fun ArticleScreen(
                                         }
                                     }
                                 },
+                                onSaveCurrentSearch = {
+                                    isSaveSearchDialogOpen = true
+                                },
+                                onFeedAdded = onFeedAdded,
+                                showAddFeedButton = showFeedNavigation,
                                 showAiSummaryPreviewButton = showAiSummaryPreviewButton,
                                 canSummarizeArticlePreviews = canSummarizeArticlePreviews,
                                 isAiSummaryPreviewLoading = viewModel.isAiSummaryPreviewLoading,
@@ -745,32 +767,40 @@ fun ArticleScreen(
                                     },
                                     modifier = Modifier.fillMaxSize(),
                                 ) {
-                                    SwipeUpActionBox(
-                                        modifier = Modifier.fillMaxSize(),
-                                        enabled = canSwipeBottom,
-                                        onRequestNext = {
-                                            onSwipeUp()
-                                        },
-                                    ) {
-                                        if (isRefreshInitialized && articles.itemCount == 0) {
-                                            ArticleListEmptyView()
-                                        } else {
-                                            ArticleList(
-                                                articles = articles,
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        if (search.isActive) {
+                                            SearchQualifierChips(query = searchQuery)
+                                        }
+
+                                        SwipeUpActionBox(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth(),
+                                            enabled = canSwipeBottom,
+                                            onRequestNext = {
+                                                onSwipeUp()
+                                            },
+                                        ) {
+                                            if (isRefreshInitialized && articles.itemCount == 0) {
+                                                ArticleListEmptyView()
+                                            } else {
+                                                ArticleList(
+                                                    articles = articles,
                                                 selectedArticleKey = article?.id,
                                                 aiSummaryPreviews = viewModel.aiSummaryPreviews,
-                                                offlinePackageStates = viewModel.offlinePackageStates,
-                                                listState = listState,
-                                                enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
-                                                dimReadArticles = filter.status != ArticleStatus.STARRED,
-                                                scrollToTop = { scrollToTop() },
-                                                onMarkAllRead = { range ->
-                                                    onMarkAllRead(range)
-                                                },
-                                                onSelect = { articleID ->
-                                                    selectArticle(articleID)
-                                                },
-                                            )
+                                                offlinePackageRecords = viewModel.offlinePackageRecords,
+                                                    listState = listState,
+                                                    enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
+                                                    dimReadArticles = filter.status != ArticleStatus.STARRED,
+                                                    scrollToTop = { scrollToTop() },
+                                                    onMarkAllRead = { range ->
+                                                        onMarkAllRead(range)
+                                                    },
+                                                    onSelect = { selectedArticle ->
+                                                        selectVisibleArticle(selectedArticle)
+                                                    },
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -863,10 +893,45 @@ fun ArticleScreen(
             )
         }
 
+        if (isSaveSearchDialogOpen) {
+            SaveCurrentSearchDialog(
+                defaultName = searchQuery.ifBlank {
+                    stringResource(R.string.search_save_default_name)
+                },
+                onDismiss = { isSaveSearchDialogOpen = false },
+                onConfirm = { name ->
+                    isSaveSearchDialogOpen = false
+                    viewModel.saveCurrentSearchAsync(name) { result ->
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                result.fold(
+                                    onSuccess = {
+                                        context.getString(R.string.search_save_done)
+                                    },
+                                    onFailure = {
+                                        context.getString(R.string.search_save_failed)
+                                    },
+                                )
+                            )
+                        }
+                    }
+                },
+            )
+        }
+
         if (viewModel.showUnauthorizedMessage) {
             UnauthorizedAlertDialog(
                 onConfirm = openUpdatePasswordDialog,
                 onDismissRequest = viewModel::dismissUnauthorizedMessage,
+            )
+        }
+
+        val automationHistoryState = viewModel.automationHistoryState
+        if (automationHistoryState.isOpen) {
+            AutomationHistoryDialog(
+                articleTitle = automationHistoryState.articleTitle,
+                records = automationHistoryState.records,
+                onDismiss = viewModel::clearAutomationHistory,
             )
         }
 
@@ -974,6 +1039,93 @@ fun ArticleScreen(
 }
 
 @Composable
+private fun AutomationHistoryDialog(
+    articleTitle: String,
+    records: List<ArticleRuleMatchRecord>,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.article_automation_history_title)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                Text(articleTitle)
+                if (records.isEmpty()) {
+                    Text(stringResource(R.string.article_automation_history_empty))
+                } else {
+                    records.forEach { record ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.article_automation_history_rule, record.ruleName))
+                            Text(stringResource(R.string.article_automation_history_actions, record.actionsLabel()))
+                            Text(stringResource(R.string.article_automation_history_time, record.matchedAtLabel()))
+                            Text(record.explanation)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.article_automation_history_close))
+            }
+        },
+    )
+}
+
+private fun ArticleRuleMatchRecord.actionsLabel(): String {
+    return runCatching {
+        Json.parseToJsonElement(actionsJSON)
+            .jsonArray
+            .joinToString(", ") { it.jsonPrimitive.content.lowercase().replace('_', ' ') }
+    }.getOrDefault(actionsJSON)
+}
+
+private fun ArticleRuleMatchRecord.matchedAtLabel(): String {
+    return DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochSecond(matchedAt))
+}
+
+@Composable
+private fun SaveCurrentSearchDialog(
+    defaultName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by rememberSaveable(defaultName) { mutableStateOf(defaultName) }
+    val trimmedName = name.trim()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.search_save_title)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.search_save_name_label)) },
+                singleLine = true,
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.dialog_cancel))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = trimmedName.isNotBlank(),
+                onClick = { onConfirm(trimmedName) },
+            ) {
+                Text(stringResource(R.string.search_save_confirm))
+            }
+        },
+    )
+}
+
+@Composable
 fun rememberArticleActions(viewModel: ArticleScreenViewModel): ArticleActions {
     return remember {
         ArticleActions(
@@ -986,7 +1138,9 @@ fun rememberArticleActions(viewModel: ArticleScreenViewModel): ArticleActions {
             muteFeed = viewModel::createMuteFeedRule,
             muteSimilar = viewModel::createMuteSimilarRule,
             notifyAuthor = viewModel::createNotifyAuthorRule,
+            showAutomationHistory = viewModel::showAutomationHistory,
             downloadOffline = viewModel::downloadOfflineAsync,
+            retryOffline = viewModel::retryOfflineAsync,
             removeOffline = viewModel::removeOfflineAsync,
 
             showSaveForLater = viewModel.source.supportsReadLater,
@@ -1013,8 +1167,8 @@ fun rememberFeedActions(viewModel: ArticleScreenViewModel): FeedActions {
             updateOpenInBrowser = { feedID, openInBrowser ->
                 viewModel.updateOpenInBrowser(feedID, openInBrowser)
             },
-            removeFeed = { feedID ->
-                viewModel.removeFeed(feedID)
+            removeFeed = { feedID, completion ->
+                viewModel.removeFeed(feedID, completion)
             },
             toggleUnreadBadge = { feedID, show ->
                 viewModel.toggleFeedUnreadBadge(feedID, show)

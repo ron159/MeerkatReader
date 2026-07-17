@@ -2,6 +2,7 @@ package com.capyreader.app.ui.articles.list
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Star
@@ -19,6 +20,7 @@ import com.capyreader.app.R
 @Composable
 fun SearchBatchActionMenu(
     canSaveExternally: Boolean,
+    onSaveSearch: () -> Unit,
     onMarkRead: () -> Unit,
     onStar: () -> Unit,
     onSaveExternally: () -> Unit,
@@ -36,6 +38,16 @@ fun SearchBatchActionMenu(
         expanded = expanded,
         onDismissRequest = { setExpanded(false) },
     ) {
+        DropdownMenuItem(
+            leadingIcon = {
+                Icon(Icons.Rounded.Bookmark, contentDescription = null)
+            },
+            text = { Text(stringResource(R.string.search_batch_save_search)) },
+            onClick = {
+                setExpanded(false)
+                onSaveSearch()
+            },
+        )
         DropdownMenuItem(
             leadingIcon = {
                 Icon(Icons.Rounded.DoneAll, contentDescription = null)

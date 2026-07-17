@@ -75,6 +75,7 @@ import com.jocmp.capy.EnclosureType
 import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.articles.relativeTime
+import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import java.net.URL
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -102,7 +103,7 @@ fun ArticleRow(
     currentTime: LocalDateTime,
     options: ArticleRowOptions = ArticleRowOptions(),
     aiSummaryPreview: ArticleAiPreviewState? = null,
-    offlinePackageState: ArticleOfflinePackageState? = null,
+    offlinePackageRecord: ArticleOfflinePackageRecord? = null,
 ) {
     val imageURL = article.imageURL
     val isMonochrome = LocalAppTheme.current.value == AppTheme.MONOCHROME
@@ -191,9 +192,9 @@ fun ArticleRow(
                                         .padding(end = 2.dp)
                                 )
                             }
-                            if (offlinePackageState != null) {
+                            if (offlinePackageRecord != null) {
                                 OfflineStatusIcon(
-                                    state = offlinePackageState,
+                                    state = offlinePackageRecord.state,
                                     tint = feedNameColor,
                                     fontScale = options.fontScale,
                                 )
@@ -293,14 +294,23 @@ fun ArticleRow(
                         scope.launch { snackbarHost.showSnackbar(ruleCreatedMessage) }
                     }
                 },
+                onShowAutomationHistory = {
+                    setArticleMenuOpen(false)
+                    articleActions.showAutomationHistory(article)
+                },
                 onDownloadOffline = {
                     articleActions.downloadOffline(article)
+                    scope.launch { snackbarHost.showSnackbar(offlineQueuedMessage) }
+                },
+                onRetryOffline = {
+                    articleActions.retryOffline(article)
                     scope.launch { snackbarHost.showSnackbar(offlineQueuedMessage) }
                 },
                 onRemoveOffline = {
                     articleActions.removeOffline(article)
                     scope.launch { snackbarHost.showSnackbar(offlineRemovedMessage) }
                 },
+                offlinePackageRecord = offlinePackageRecord,
                 onDismissRequest = {
                     setArticleMenuOpen(false)
                 }

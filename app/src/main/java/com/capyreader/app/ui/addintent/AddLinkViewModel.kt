@@ -3,6 +3,7 @@ package com.capyreader.app.ui.addintent
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.jocmp.capy.Account
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
@@ -15,6 +16,7 @@ import java.net.UnknownHostException
 
 class AddLinkViewModel(
     private val account: Account,
+    private val automaticBackupScheduler: AutomaticBackupScheduler,
 ) : ViewModel() {
     private val _feedResult = mutableStateOf<AddFeedResult?>(null)
     private val _feedLoading = mutableStateOf(false)
@@ -75,6 +77,9 @@ class AddLinkViewModel(
 
             if (result is AddFeedResult.Success && account.source == Source.LOCAL) {
                 viewModelScope.launchIO { account.reloadFavicon(result.feed.id) }
+            }
+            if (result is AddFeedResult.Success) {
+                automaticBackupScheduler.enqueueAfterChange()
             }
 
             withUIContext {

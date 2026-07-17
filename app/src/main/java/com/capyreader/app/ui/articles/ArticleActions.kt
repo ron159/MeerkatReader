@@ -17,7 +17,9 @@ data class ArticleActions(
     val muteFeed: (Article) -> Boolean = { false },
     val muteSimilar: (Article) -> Boolean = { false },
     val notifyAuthor: (Article) -> Boolean = { false },
+    val showAutomationHistory: (Article) -> Unit = {},
     val downloadOffline: (Article) -> Unit = {},
+    val retryOffline: (Article) -> Unit = {},
     val removeOffline: (Article) -> Unit = {},
     val showSaveForLater: Boolean = false,
 )

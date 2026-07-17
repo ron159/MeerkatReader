@@ -13,13 +13,18 @@ import org.koin.androidx.compose.koinViewModel
 fun EditFeedDialog(
     feed: Feed,
     form: EditFeedViewModel = koinViewModel(),
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onComplete: (Result<Feed>) -> Unit = {},
 ) {
     val folders by form.folders.collectAsStateWithLifecycle(emptyList())
 
     fun submit(entry: EditFeedFormEntry) {
-        form.submit(entry)
-        onDismiss()
+        form.submit(entry) { result ->
+            if (result.isSuccess) {
+                onDismiss()
+            }
+            onComplete(result)
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -28,6 +33,7 @@ fun EditFeedDialog(
                 feed = feed,
                 folders = folders,
                 showMultiselect = form.showMultiselect,
+                submitting = form.submitting,
                 onSubmit = ::submit,
                 onCancel = onDismiss
             )

@@ -26,6 +26,7 @@ import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
 import com.capyreader.app.refresher.RefreshInterval
+import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.ui.articles.feeds.AngleRefreshState
 import com.capyreader.app.ui.components.SearchState
 import com.capyreader.app.ui.widget.WidgetUpdater
@@ -54,6 +55,9 @@ import com.jocmp.capy.countToday
 import com.jocmp.capy.logging.CapyLog
 import com.jocmp.capy.persistence.ArticleFullContentRecords
 import com.jocmp.capy.persistence.ArticleImageRecords
+import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
+import com.jocmp.capy.persistence.ArticleRuleMatchRecord
+import com.jocmp.capy.persistence.ArticleRuleMatchRecords
 import com.jocmp.capy.preferences.getAndSet
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +89,14 @@ data class ArticleAiDigestState(
     val error: String? = null,
 )
 
+data class AutomationHistoryState(
+    val articleTitle: String = "",
+    val records: List<ArticleRuleMatchRecord> = emptyList(),
+) {
+    val isOpen: Boolean
+        get() = articleTitle.isNotBlank()
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArticleScreenViewModel(
     private val account: Account,
@@ -99,6 +111,8 @@ class ArticleScreenViewModel(
     private val articleFullContentRecords: ArticleFullContentRecords,
     private val articleAiRepository: ArticleAiRepository,
     private val articleOfflinePackageDownloader: ArticleOfflinePackageDownloader,
+    private val articleRuleMatchRecords: ArticleRuleMatchRecords? = null,
+    private val automaticBackupScheduler: AutomaticBackupScheduler? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val syncFlushInterval: Duration? = SYNC_FLUSH_INTERVAL,
 ) : AndroidViewModel(application) {
@@ -114,7 +128,12 @@ class ArticleScreenViewModel(
 
     val offlinePackageStates = mutableStateMapOf<String, ArticleOfflinePackageState>()
 
+    val offlinePackageRecords = mutableStateMapOf<String, ArticleOfflinePackageRecord>()
+
     var aiDigestState by mutableStateOf(ArticleAiDigestState())
+        private set
+
+    var automationHistoryState by mutableStateOf(AutomationHistoryState())
         private set
 
     val isAiSummaryPreviewLoading: Boolean
@@ -208,7 +227,7 @@ class ArticleScreenViewModel(
         filter,
     ) { searches, latestCounts, filter ->
         searches.map { copySavedSearchCounts(it, latestCounts) }
-            .withPositiveCount(filter.status)
+            .filter { filter.status == ArticleStatus.ALL || it.count > 0 || it.query != null }
     }
 
     val allFeeds = account.taggedFeeds
@@ -391,6 +410,20 @@ class ArticleScreenViewModel(
         )
     }
 
+    fun selectSavedSearch(savedSearch: SavedSearch) {
+        val query = savedSearch.query
+
+        if (query.isNullOrBlank()) {
+            selectSavedSearch(savedSearch.id)
+            return
+        }
+
+        updateFilter(ArticleFilter.Articles(articleStatus = currentStatus))
+        _searchQuery.value = query
+        _searchState.value = SearchState.ACTIVE
+        resetScrollHighWaterMark()
+    }
+
     fun selectFolder(title: String) {
         updateFilter(
             ArticleFilter.Folders(folderTitle = title, folderStatus = currentStatus)
@@ -470,15 +503,17 @@ class ArticleScreenViewModel(
         }
 
         viewModelScope.launchIO {
-            val states = articleOfflinePackageDownloader.findStates(articles.map { it.id })
+            val records = articleOfflinePackageDownloader.findRecords(articles.map { it.id })
 
             withUIContext {
                 articles.forEach { article ->
-                    val state = states[article.id]
-                    if (state == null) {
+                    val record = records[article.id]
+                    if (record == null) {
                         offlinePackageStates.remove(article.id)
+                        offlinePackageRecords.remove(article.id)
                     } else {
-                        offlinePackageStates[article.id] = state
+                        offlinePackageStates[article.id] = record.state
+                        offlinePackageRecords[article.id] = record
                     }
                 }
             }
@@ -595,14 +630,27 @@ class ArticleScreenViewModel(
                 articleID = article.id,
                 includeFullContent = offlineOptions.includeFullContent.get(),
                 includeImages = offlineOptions.includeImages.get(),
-                includeAudio = offlineOptions.includeAudio.get() && article.enclosures.isNotEmpty(),
+                includeAudio = offlineOptions.includeAudio.get() &&
+                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
             )
             withUIContext {
                 offlinePackageStates[article.id] = ArticleOfflinePackageState.QUEUED
+                offlinePackageRecords[article.id] = ArticleOfflinePackageRecord(
+                    articleID = article.id,
+                    state = ArticleOfflinePackageState.QUEUED,
+                    includeFullContent = offlineOptions.includeFullContent.get(),
+                    includeImages = offlineOptions.includeImages.get(),
+                    includeAudio = offlineOptions.includeAudio.get() &&
+                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
+                    bytes = 0,
+                    errorMessage = null,
+                    updatedAt = 0,
+                )
             }
             ArticleOfflinePackageWorker.enqueue(
                 context = application.applicationContext,
                 wiFiOnly = offlineOptions.downloadOnWiFiOnly.get(),
+                requiresCharging = offlineOptions.requireCharging.get(),
             )
         }
     }
@@ -612,7 +660,45 @@ class ArticleScreenViewModel(
             articleOfflinePackageDownloader.remove(article.id)
             withUIContext {
                 offlinePackageStates.remove(article.id)
+                offlinePackageRecords.remove(article.id)
             }
+        }
+    }
+
+    fun retryOfflineAsync(article: Article) {
+        val existing = offlinePackageRecords[article.id]
+
+        viewModelScope.launchIO {
+            val offlineOptions = appPreferences.offlineOptions
+
+            articleOfflinePackageDownloader.queue(
+                articleID = article.id,
+                includeFullContent = existing?.includeFullContent ?: offlineOptions.includeFullContent.get(),
+                includeImages = existing?.includeImages ?: offlineOptions.includeImages.get(),
+                includeAudio = existing?.includeAudio
+                    ?: (offlineOptions.includeAudio.get() &&
+                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }),
+            )
+            withUIContext {
+                offlinePackageStates[article.id] = ArticleOfflinePackageState.QUEUED
+                offlinePackageRecords[article.id] = ArticleOfflinePackageRecord(
+                    articleID = article.id,
+                    state = ArticleOfflinePackageState.QUEUED,
+                    includeFullContent = existing?.includeFullContent ?: offlineOptions.includeFullContent.get(),
+                    includeImages = existing?.includeImages ?: offlineOptions.includeImages.get(),
+                    includeAudio = existing?.includeAudio
+                        ?: (offlineOptions.includeAudio.get() &&
+                            article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }),
+                    bytes = existing?.bytes ?: 0,
+                    errorMessage = null,
+                    updatedAt = existing?.updatedAt ?: 0,
+                )
+            }
+            ArticleOfflinePackageWorker.enqueue(
+                context = application.applicationContext,
+                wiFiOnly = offlineOptions.downloadOnWiFiOnly.get(),
+                requiresCharging = offlineOptions.requireCharging.get(),
+            )
         }
     }
 
@@ -647,13 +733,18 @@ class ArticleScreenViewModel(
 
     fun removeFeed(
         feedID: String,
+        completion: (Result<Unit>) -> Unit = {},
     ) {
         viewModelScope.launchIO {
-            account.removeFeed(feedID = feedID)
+            val result = account.removeFeed(feedID = feedID)
                 .onSuccess {
                     articleImageCacheCleaner.cleanup()
                     resetToDefaultFilter()
+                    automaticBackupScheduler?.enqueueAfterChange()
                 }
+            withUIContext {
+                completion(result)
+            }
         }
     }
 
@@ -666,6 +757,7 @@ class ArticleScreenViewModel(
                 onSuccess = {
                     articleImageCacheCleaner.cleanup()
                     resetToDefaultFilter()
+                    automaticBackupScheduler?.enqueueAfterChange()
                     completion(Result.success(Unit))
                 },
                 onFailure = {
@@ -826,6 +918,38 @@ class ArticleScreenViewModel(
         }
     }
 
+    fun selectArticle(article: Article, onComplete: (article: Article) -> Unit = {}) {
+        if (_article?.id == article.id) {
+            return
+        }
+
+        val preloadedArticle = preloadedArticles.remove(article.id)
+        val selectedArticle = (preloadedArticle ?: article).copy(read = true)
+
+        _article = selectedArticle
+        onComplete(selectedArticle)
+
+        viewModelScope.launchIO {
+            launchIO {
+                markRead(article.id)
+            }
+
+            val hydratedArticle = preloadedArticle ?: buildArticle(article.id)
+            if (hydratedArticle != null && _article?.id == article.id) {
+                _article = hydratedArticle
+
+                if (hydratedArticle.fullContent == Article.FullContentState.LOADING) {
+                    fullContentJob?.cancel()
+                    fullContentJob = viewModelScope.launchIO {
+                        fetchFullContent(hydratedArticle)
+                    }
+                }
+            }
+
+            articleImagePreloader.enqueue()
+        }
+    }
+
     fun preloadAdjacentArticles(articleIDs: List<String?>) {
         val ids = articleIDs
             .filterNotNull()
@@ -968,6 +1092,42 @@ class ArticleScreenViewModel(
                 } else {
                     onComplete(Result.failure(failure))
                 }
+            }
+        }
+    }
+
+    fun showAutomationHistory(article: Article) {
+        viewModelScope.launchIO {
+            val records = articleRuleMatchRecords
+                ?.findByArticleID(article.id)
+                .orEmpty()
+
+            withUIContext {
+                automationHistoryState = AutomationHistoryState(
+                    articleTitle = article.title,
+                    records = records,
+                )
+            }
+        }
+    }
+
+    fun clearAutomationHistory() {
+        automationHistoryState = AutomationHistoryState()
+    }
+
+    fun saveCurrentSearchAsync(name: String, onComplete: (Result<String>) -> Unit = {}) {
+        val query = _searchQuery.value.trim()
+
+        if (query.isBlank()) {
+            onComplete(Result.failure(IllegalArgumentException("Search query is empty")))
+            return
+        }
+
+        viewModelScope.launchIO {
+            val result = account.createSavedSearch(name = name.trim(), query = query)
+
+            withUIContext {
+                onComplete(result)
             }
         }
     }

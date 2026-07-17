@@ -9,7 +9,10 @@ import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,9 +35,11 @@ import com.capyreader.app.ui.components.readAction
 import com.capyreader.app.ui.components.starAction
 import com.capyreader.app.ui.fixtures.ArticleSample
 import com.jocmp.capy.Article
+import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.MarkRead.After
 import com.jocmp.capy.MarkRead.Before
+import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 
 @Composable
 fun ArticleActionMenu(
@@ -49,8 +54,11 @@ fun ArticleActionMenu(
     onMuteFeed: () -> Unit = {},
     onMuteSimilar: () -> Unit = {},
     onNotifyAuthor: () -> Unit = {},
+    onShowAutomationHistory: () -> Unit = {},
     onDownloadOffline: () -> Unit = {},
+    onRetryOffline: () -> Unit = {},
     onRemoveOffline: () -> Unit = {},
+    offlinePackageRecord: ArticleOfflinePackageRecord? = null,
     onDismissRequest: () -> Unit = {},
 ) {
     val unreadCount = LocalUnreadCount.current
@@ -68,6 +76,10 @@ fun ArticleActionMenu(
             LabelMenuItem(onDismissRequest, onOpenLabels)
         }
         DownloadOfflineMenuItem(onDismissRequest, onDownloadOffline)
+        if (offlinePackageRecord?.state == ArticleOfflinePackageState.FAILED) {
+            OfflineFailureMenuItem(onDismissRequest, offlinePackageRecord)
+            RetryOfflineMenuItem(onDismissRequest, onRetryOffline)
+        }
         RemoveOfflineMenuItem(onDismissRequest, onRemoveOffline)
         if (!article.feedURL.isNullOrBlank() || article.feedName.isNotBlank()) {
             MuteFeedMenuItem(onDismissRequest, onMuteFeed)
@@ -78,6 +90,7 @@ fun ArticleActionMenu(
         if (!article.author.isNullOrBlank()) {
             NotifyAuthorMenuItem(onDismissRequest, onNotifyAuthor)
         }
+        AutomationHistoryMenuItem(onDismissRequest, onShowAutomationHistory)
         if (unreadCount > 0) {
             if (index > 0) {
                 DropdownMenuItem(
@@ -105,6 +118,67 @@ fun ArticleActionMenu(
         CopyLinkMenuItem(onDismissRequest, article)
         ShareLinkMenuItem(onDismissRequest, article)
     }
+}
+
+@Composable
+private fun OfflineFailureMenuItem(
+    onDismissRequest: () -> Unit,
+    offlinePackageRecord: ArticleOfflinePackageRecord,
+) {
+    val message = offlinePackageRecord.errorMessage
+        ?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.article_actions_offline_failed_unknown)
+
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.ErrorOutline,
+                contentDescription = null
+            )
+        },
+        text = { Text(message) },
+        onClick = { onDismissRequest() },
+    )
+}
+
+@Composable
+private fun RetryOfflineMenuItem(
+    onDismissRequest: () -> Unit,
+    onRetryOffline: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.Refresh,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_retry_offline)) },
+        onClick = {
+            onDismissRequest()
+            onRetryOffline()
+        },
+    )
+}
+
+@Composable
+private fun AutomationHistoryMenuItem(
+    onDismissRequest: () -> Unit,
+    onShowAutomationHistory: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                Icons.Rounded.History,
+                contentDescription = null
+            )
+        },
+        text = { Text(stringResource(R.string.article_actions_automation_history)) },
+        onClick = {
+            onDismissRequest()
+            onShowAutomationHistory()
+        },
+    )
 }
 
 @Composable

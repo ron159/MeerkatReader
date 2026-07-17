@@ -31,8 +31,8 @@ import androidx.paging.compose.itemKey
 import com.capyreader.app.R
 import com.capyreader.app.preferences.AppPreferences
 import com.jocmp.capy.Article
-import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
+import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import java.time.LocalDateTime
@@ -40,10 +40,10 @@ import java.time.LocalDateTime
 @Composable
 fun ArticleList(
     articles: LazyPagingItems<Article>,
-    onSelect: (articleID: String) -> Unit,
+    onSelect: (article: Article) -> Unit,
     selectedArticleKey: String?,
     aiSummaryPreviews: Map<String, ArticleAiPreviewState> = emptyMap(),
-    offlinePackageStates: Map<String, ArticleOfflinePackageState> = emptyMap(),
+    offlinePackageRecords: Map<String, ArticleOfflinePackageRecord> = emptyMap(),
     listState: LazyListState,
     onMarkAllRead: (range: MarkRead) -> Unit = {},
     enableMarkReadOnScroll: Boolean = false,
@@ -80,13 +80,13 @@ fun ArticleList(
                                     index = index,
                                     selected = selectedArticleKey == item.id,
                                     onSelect = {
-                                        onSelect(it)
+                                        onSelect(item)
                                     },
                                     onMarkAllRead = onMarkAllRead,
                                     currentTime = currentTime,
                                     options = articleOptions,
                                     aiSummaryPreview = aiSummaryPreviews[item.id],
-                                    offlinePackageState = offlinePackageStates[item.id],
+                                    offlinePackageRecord = offlinePackageRecords[item.id],
                                 )
                             }
                         }

@@ -6,10 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
+import com.capyreader.app.R
 import com.capyreader.app.ui.articles.FeedActionMenuItems
 import com.capyreader.app.ui.articles.RemoveFeedDialog
 import com.capyreader.app.ui.articles.feeds.LocalFeedActions
 import com.capyreader.app.ui.articles.feeds.edit.EditFeedDialog
+import com.capyreader.app.ui.components.localSnackbarDisplay
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.common.launchUI
@@ -25,6 +28,11 @@ fun FeedActionMenu(
 ) {
     val actions = LocalFeedActions.current
     val scope = rememberCoroutineScope()
+    val showSnackbar = localSnackbarDisplay()
+    val editSuccessMessage = stringResource(R.string.feed_action_edit_success)
+    val editErrorMessage = stringResource(R.string.feed_action_edit_error)
+    val unsubscribeSuccessMessage = stringResource(R.string.feed_action_unsubscribe_success)
+    val unsubscribeErrorMessage = stringResource(R.string.feed_action_unsubscribe_error)
 
     val (isEditDialogOpen, setEditDialogOpen) = rememberSaveable { mutableStateOf(false) }
     val (isRemoveDialogOpen, setRemoveDialogOpen) = remember { mutableStateOf(false) }
@@ -77,7 +85,15 @@ fun FeedActionMenu(
             feed = feed,
             onConfirm = {
                 setRemoveDialogOpen(false)
-                actions.removeFeed(feed.id)
+                actions.removeFeed(feed.id) { result ->
+                    showSnackbar(
+                        if (result.isSuccess) {
+                            unsubscribeSuccessMessage
+                        } else {
+                            unsubscribeErrorMessage
+                        }
+                    )
+                }
             },
             onDismissRequest = { setRemoveDialogOpen(false) }
         )
@@ -88,6 +104,15 @@ fun FeedActionMenu(
             feed = feed,
             onDismiss = {
                 setEditDialogOpen(false)
+            },
+            onComplete = { result ->
+                showSnackbar(
+                    if (result.isSuccess) {
+                        editSuccessMessage
+                    } else {
+                        editErrorMessage
+                    }
+                )
             },
         )
     }

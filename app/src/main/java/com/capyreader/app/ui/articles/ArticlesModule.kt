@@ -5,6 +5,7 @@ import com.capyreader.app.R
 import com.capyreader.app.ai.AiChatClient
 import com.capyreader.app.ai.ArticleAiRepository
 import com.capyreader.app.ai.OpenAiCompatibleChatClient
+import com.capyreader.app.offline.ArticleOfflineAudioStore
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.ui.addintent.AddLinkViewModel
 import com.capyreader.app.ui.articles.audio.AudioPlayerController
@@ -18,11 +19,13 @@ internal val articlesModule = module {
     factory {
         AddFeedViewModel(
             account = get(),
+            automaticBackupScheduler = get(),
         )
     }
     factory {
         AddLinkViewModel(
             account = get(),
+            automaticBackupScheduler = get(),
         )
     }
     single<AiChatClient> {
@@ -47,6 +50,7 @@ internal val articlesModule = module {
     }
     single {
         val context = get<Context>()
+        val audioStore = get<ArticleOfflineAudioStore>()
         val template = context.resources.openRawResource(R.raw.template)
             .bufferedReader()
             .readText()
@@ -63,6 +67,13 @@ internal val articlesModule = module {
                 play = context.getString(R.string.audio_player_play),
                 pause = context.getString(R.string.audio_player_pause),
             ),
+            audioEnclosureURL = { article, enclosure ->
+                audioStore.localURL(
+                    articleID = article.id,
+                    sourceURL = enclosure.url.toString(),
+                    mimeType = enclosure.type,
+                ) ?: enclosure.url.toString()
+            },
         )
     }
     viewModel {
@@ -81,6 +92,8 @@ internal val articlesModule = module {
             articleFullContentRecords = get(),
             articleAiRepository = get(),
             articleOfflinePackageDownloader = get(),
+            articleRuleMatchRecords = get(),
+            automaticBackupScheduler = get(),
         )
     }
     viewModel {
