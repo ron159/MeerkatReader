@@ -322,6 +322,8 @@
     <string name="audio_player_skip_forward">快进 30 秒</string>
     <string name="freshrss_nav_headline_categories">类别</string>
     <string name="article_list_empty">暂无内容</string>
+    <string name="article_list_load_error">无法加载文章</string>
+    <string name="article_list_retry">重试</string>
     <string name="auth_fields_miniflux_api_token">API 令牌</string>
     <string name="auth_fields_miniflux_use_api_token">改为使用 API 令牌</string>
     <string name="auth_fields_miniflux_use_password">改为使用密码</string>

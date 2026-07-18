@@ -98,6 +98,7 @@ import com.capyreader.app.ui.articles.media.ArticleMediaView
 import com.capyreader.app.ui.collectChangesWithCurrent
 import com.capyreader.app.ui.collectChangesWithDefault
 import com.capyreader.app.ui.components.ArticleSearch
+import com.capyreader.app.ui.components.LoadingView
 import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.capyreader.app.ui.components.SearchState
 import com.capyreader.app.ui.provideLinkOpener
@@ -781,14 +782,18 @@ fun ArticleScreen(
                                                 onSwipeUp()
                                             },
                                         ) {
-                                            if (isRefreshInitialized && articles.itemCount == 0) {
-                                                ArticleListEmptyView()
-                                            } else {
-                                                ArticleList(
+                                            when (
+                                                articleListContentState(
+                                                    itemCount = articles.itemCount,
+                                                    refreshInitialized = isRefreshInitialized,
+                                                    refreshLoadState = articles.loadState.refresh,
+                                                )
+                                            ) {
+                                                ArticleListContentState.ARTICLES -> ArticleList(
                                                     articles = articles,
-                                                selectedArticleKey = article?.id,
-                                                aiSummaryPreviews = viewModel.aiSummaryPreviews,
-                                                offlinePackageRecords = viewModel.offlinePackageRecords,
+                                                    selectedArticleKey = article?.id,
+                                                    aiSummaryPreviews = viewModel.aiSummaryPreviews,
+                                                    offlinePackageRecords = viewModel.offlinePackageRecords,
                                                     listState = listState,
                                                     enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
                                                     dimReadArticles = filter.status != ArticleStatus.STARRED,
@@ -800,6 +805,13 @@ fun ArticleScreen(
                                                         selectVisibleArticle(selectedArticle)
                                                     },
                                                 )
+
+                                                ArticleListContentState.LOADING -> LoadingView()
+                                                ArticleListContentState.ERROR -> ArticleListErrorView(
+                                                    onRetry = articles::retry,
+                                                )
+
+                                                ArticleListContentState.EMPTY -> ArticleListEmptyView()
                                             }
                                         }
                                     }
@@ -820,7 +832,6 @@ fun ArticleScreen(
                     }
                 } else if (article != null) {
                     val isAudioPlaying by audioController.isPlaying.collectAsState()
-                    val currentAudio by audioController.currentAudio.collectAsState()
 
                     ArticleView(
                         article = article,
@@ -850,7 +861,7 @@ fun ArticleScreen(
                         onScrollToArticle = { index ->
                             scrollToArticle(index)
                         },
-                        currentAudioUrl = currentAudio?.url,
+                        currentAudioUrl = audioEnclosure?.url,
                         isAudioPlaying = isAudioPlaying,
                         isFullscreen = paneExpansion.isFullscreen,
                         onToggleFullscreen = { paneExpansion.toggleFullscreen() },

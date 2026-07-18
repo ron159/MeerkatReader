@@ -11,12 +11,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.capyreader.app.R
+import com.capyreader.app.common.asState
 import com.capyreader.app.preferences.AppPreferences
 import com.jocmp.capy.Article
 import com.jocmp.capy.MarkRead
@@ -141,18 +140,13 @@ fun rememberCurrentTime(): LocalDateTime {
 
 @Composable
 fun rememberArticleOptions(appPreferences: AppPreferences = koinInject()): ArticleRowOptions {
-    val scope = rememberCoroutineScope()
-
-    val showSummary by appPreferences.articleListOptions.showSummary.stateIn(scope).collectAsState()
-    val showIcon by appPreferences.articleListOptions.showFeedIcons.stateIn(scope).collectAsState()
-    val showFeedName by appPreferences.articleListOptions.showFeedName.stateIn(scope)
-        .collectAsState()
-    val imagePreview by appPreferences.articleListOptions.imagePreview.stateIn(scope)
-        .collectAsState()
-    val fontScale by appPreferences.articleListOptions.fontScale.stateIn(scope).collectAsState()
-    val shortenTitles by appPreferences.articleListOptions.shortenTitles.stateIn(scope)
-        .collectAsState()
-    val accentColors by appPreferences.accentColors.stateIn(scope).collectAsState()
+    val showSummary by appPreferences.articleListOptions.showSummary.asState()
+    val showIcon by appPreferences.articleListOptions.showFeedIcons.asState()
+    val showFeedName by appPreferences.articleListOptions.showFeedName.asState()
+    val imagePreview by appPreferences.articleListOptions.imagePreview.asState()
+    val fontScale by appPreferences.articleListOptions.fontScale.asState()
+    val shortenTitles by appPreferences.articleListOptions.shortenTitles.asState()
+    val accentColors by appPreferences.accentColors.asState()
 
     return ArticleRowOptions(
         showSummary = showSummary,

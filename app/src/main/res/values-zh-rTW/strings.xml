@@ -308,6 +308,8 @@
     <string name="auth_fields_remove_client_cert">移除用戶端憑證</string>
     <string name="theme_mode_label">模式</string>
     <string name="article_list_empty">這裡什麼都沒有</string>
+    <string name="article_list_load_error">無法載入文章</string>
+    <string name="article_list_retry">重試</string>
     <string name="audio_player_play">播放</string>
     <string name="audio_player_pause">暫停</string>
     <string name="freshrss_nav_headline_categories">類別</string>

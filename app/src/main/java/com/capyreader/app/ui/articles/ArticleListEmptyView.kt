@@ -1,11 +1,13 @@
 package com.capyreader.app.ui.articles
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +33,7 @@ fun ArticleListEmptyView() {
         contentAlignment = Alignment.Center
     ) {
         Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (!isExpanded()) {
@@ -52,6 +55,29 @@ fun ArticleListEmptyView() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     )
+}
+
+@Composable
+fun ArticleListErrorView(onRetry: () -> Unit) {
+    val tint = colorScheme.onSurfaceVariant
+
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.article_list_load_error),
+                color = tint,
+            )
+            Button(onClick = onRetry) {
+                Text(stringResource(R.string.article_list_retry))
+            }
+        }
+    }
 }
 
 @Preview

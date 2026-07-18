@@ -19,6 +19,7 @@ fun Account.buildArticlePager(
         config = PagingConfig(
             pageSize = 100,
             prefetchDistance = 10,
+            initialLoadSize = 100,
         ),
         pagingSourceFactory = {
             ArticlePagerFactory(database).findArticles(
