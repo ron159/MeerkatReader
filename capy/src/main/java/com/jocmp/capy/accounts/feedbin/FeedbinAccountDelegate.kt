@@ -13,6 +13,7 @@ import com.jocmp.capy.accounts.withErrorHandling
 import com.jocmp.capy.common.TimeHelpers
 import com.jocmp.capy.common.UnauthorizedError
 import com.jocmp.capy.common.host
+import com.jocmp.capy.common.stripTitleMarkup
 import com.jocmp.capy.common.toDateTime
 import com.jocmp.capy.common.toDateTimeFromSeconds
 import com.jocmp.capy.common.transactionWithErrorHandling
@@ -42,7 +43,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okio.IOException
-import org.jsoup.Jsoup
 import java.time.ZonedDateTime
 
 internal class FeedbinAccountDelegate(
@@ -470,7 +470,7 @@ internal class FeedbinAccountDelegate(
                 val enclosure = entry.enclosure
                 val enclosureType = enclosure?.enclosure_type
                 val feed = feedAutomationInputs[entry.feed_id.toString()]
-                val title = entry.title?.let { Jsoup.parse(it).text() }
+                val title = entry.title?.stripTitleMarkup()
                 val automation = articleAutomation.evaluate(
                     ArticleAutomationArticle(
                         title = title,
