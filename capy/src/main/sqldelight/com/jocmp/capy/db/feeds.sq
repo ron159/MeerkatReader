@@ -19,6 +19,11 @@ FROM feeds
 WHERE id = :id
 LIMIT 1;
 
+automationInputs:
+SELECT id, title, feed_url
+FROM feeds
+WHERE id IN :feedIDs;
+
 findByFeedURL:
 SELECT *
 FROM feeds

@@ -522,6 +522,9 @@ internal class ReaderAccountDelegate(
         database.transactionWithErrorHandling {
             val labels = savedSearchRecords.remoteIDs()
             val automationIDs = savedSearchRecords.automationIDs()
+            val existingArticleIDs = articleRecords
+                .existingArticleIDs(items.map { it.hexID })
+                .toMutableSet()
 
             items.forEach { item ->
                 val updated = TimeHelpers.nowUTC()
@@ -551,9 +554,7 @@ internal class ReaderAccountDelegate(
                     return@forEach
                 }
 
-                val isNewArticle = !database.articlesQueries
-                    .articleExists(item.hexID)
-                    .executeAsOne()
+                val isNewArticle = existingArticleIDs.add(item.hexID)
 
                 database.articlesQueries.create(
                     id = item.hexID,

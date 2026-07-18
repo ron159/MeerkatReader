@@ -40,6 +40,34 @@ class FeedRecordsTest {
     }
 
     @Test
+    fun automationInputs_returnsOnlyRequestedFeeds() {
+        val records = FeedRecords(database)
+        val first = FeedFixture(database, records = records).create(
+            feedURL = "https://example.com/first",
+            title = "First",
+        )
+        val second = FeedFixture(database, records = records).create(
+            feedURL = "https://example.com/second",
+            title = "Second",
+        )
+        FeedFixture(database, records = records).create(
+            feedURL = "https://example.com/excluded",
+            title = "Excluded",
+        )
+
+        assertEquals(
+            expected = mapOf(
+                first.id to FeedAutomationInput(first.id, first.title, first.feedURL),
+                second.id to FeedAutomationInput(second.id, second.title, second.feedURL),
+            ),
+            actual = records.automationInputs(
+                listOf(first.id, second.id, first.id, "missing")
+            ),
+        )
+        assertEquals(emptyMap(), records.automationInputs(emptyList()))
+    }
+
+    @Test
     fun updateStickyFullContent() = runTest {
         val records = FeedRecords(database)
         var feed = FeedFixture(database, records = records).create()

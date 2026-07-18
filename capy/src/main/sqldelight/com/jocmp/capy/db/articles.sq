@@ -57,6 +57,11 @@ SELECT EXISTS(
   SELECT 1 FROM articles WHERE id = :articleID
 );
 
+findExistingArticleIDs:
+SELECT id
+FROM articles
+WHERE id IN :articleIDs;
+
 filterUnreadStatuses:
 SELECT article_id
 FROM article_statuses

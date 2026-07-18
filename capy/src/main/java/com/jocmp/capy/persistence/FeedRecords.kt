@@ -22,6 +22,19 @@ internal class FeedRecords(private val database: Database) {
         database.feedsQueries.findByFeedURL(feedURL, mapper = ::feedMapper).executeAsOneOrNull()
     }
 
+    fun automationInputs(feedIDs: Collection<String>): Map<String, FeedAutomationInput> {
+        return feedIDs
+            .distinct()
+            .chunked(MAX_IDS_PER_QUERY)
+            .flatMap { batch ->
+                database.feedsQueries.automationInputs(
+                    feedIDs = batch,
+                    mapper = ::FeedAutomationInput,
+                ).executeAsList()
+            }
+            .associateBy { it.id }
+    }
+
     suspend fun findConditionalGet(feedID: String): ConditionalGetInfo = withIOContext {
         val feed = database.feedsQueries.findConditionalGet(feedID).executeAsOneOrNull()
 
@@ -225,4 +238,14 @@ internal class FeedRecords(private val database: Database) {
         showUnreadBadge = showUnreadBadge,
         isReadLater = readLater,
     )
+
+    private companion object {
+        const val MAX_IDS_PER_QUERY = 500
+    }
 }
+
+internal data class FeedAutomationInput(
+    val id: String,
+    val title: String,
+    val feedURL: String,
+)

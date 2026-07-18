@@ -42,6 +42,16 @@ class ArticleRecords(
         ).executeAsOneOrNull()
     }
 
+    fun existingArticleIDs(articleIDs: Collection<String>): Set<String> {
+        return articleIDs
+            .distinct()
+            .chunked(MAX_IDS_PER_QUERY)
+            .flatMap { batch ->
+                database.articlesQueries.findExistingArticleIDs(batch).executeAsList()
+            }
+            .toSet()
+    }
+
     /**
      * Creates a new status record. On conflict it does nothing.
      */
@@ -97,8 +107,8 @@ class ArticleRecords(
         val articleIDs =
             notificationQueries.articlesToNotify(since = since.toEpochSecond()).executeAsList()
 
-        articleIDs.forEach {
-            database.transactionWithErrorHandling {
+        database.transactionWithErrorHandling {
+            articleIDs.forEach {
                 notificationQueries.createNotification(article_id = it)
             }
         }
@@ -400,4 +410,8 @@ class ArticleRecords(
 
     private val notificationQueries
         get() = database.article_notificationsQueries
+
+    private companion object {
+        const val MAX_IDS_PER_QUERY = 500
+    }
 }

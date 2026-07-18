@@ -80,6 +80,20 @@ class ArticleRecordsTest {
     }
 
     @Test
+    fun existingArticleIDs_returnsOnlyStoredArticles() {
+        val first = articleFixture.create()
+        val second = articleFixture.create()
+
+        assertEquals(
+            expected = setOf(first.id, second.id),
+            actual = articleRecords.existingArticleIDs(
+                listOf(first.id, second.id, first.id, "missing")
+            ),
+        )
+        assertEquals(emptySet(), articleRecords.existingArticleIDs(emptyList()))
+    }
+
+    @Test
     fun allByStatus_returnsUnread() {
         val startTime = nowUTC().minusMonths(1)
 

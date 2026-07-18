@@ -394,23 +394,29 @@ internal class MinifluxAccountDelegate(
         val articleIDsToStar = mutableSetOf<String>()
 
         database.transactionWithErrorHandling {
+            val existingArticleIDs = articleRecords
+                .existingArticleIDs(entries.map { it.id.toString() })
+                .toMutableSet()
+            val feedAutomationInputs = feedRecords.automationInputs(
+                entries.map { it.feed_id.toString() }
+            )
+
             entries.forEach { entry ->
                 val updated = TimeHelpers.nowUTC()
                 val articleID = entry.id.toString()
                 val imageURL = MinifluxEnclosureParsing.parsedImageURL(entry)
                 val enclosures = entry.enclosures.orEmpty()
-                val feed = database.feedsQueries
-                    .find(entry.feed_id.toString())
-                    .executeAsOneOrNull()
+                val feed = feedAutomationInputs[entry.feed_id.toString()]
+                val title = Jsoup.parse(entry.title).text()
                 val summary = ContentFormatter.summary(entry.content)
                 val automation = articleAutomation.evaluate(
                     ArticleAutomationArticle(
-                        title = Jsoup.parse(entry.title).text(),
+                        title = title,
                         author = entry.author,
                         summary = summary,
                         contentHTML = entry.content,
                         feedTitle = feed?.title.orEmpty(),
-                        feedURL = feed?.feed_url.orEmpty(),
+                        feedURL = feed?.feedURL.orEmpty(),
                     )
                 )
 
@@ -425,14 +431,12 @@ internal class MinifluxAccountDelegate(
                     return@forEach
                 }
 
-                val isNewArticle = !database.articlesQueries
-                    .articleExists(articleID)
-                    .executeAsOne()
+                val isNewArticle = existingArticleIDs.add(articleID)
 
                 database.articlesQueries.create(
                     id = articleID,
                     feed_id = entry.feed_id.toString(),
-                    title = Jsoup.parse(entry.title).text(),
+                    title = title,
                     author = entry.author,
                     content_html = entry.content,
                     extracted_content_url = null,

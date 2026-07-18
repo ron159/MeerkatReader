@@ -457,14 +457,19 @@ internal class FeedbinAccountDelegate(
         val articleIDsToStar = mutableSetOf<String>()
 
         database.transactionWithErrorHandling {
+            val existingArticleIDs = articleRecords
+                .existingArticleIDs(entries.map { it.id.toString() })
+                .toMutableSet()
+            val feedAutomationInputs = feedRecords.automationInputs(
+                entries.map { it.feed_id.toString() }
+            )
+
             entries.forEach { entry ->
                 val updated = TimeHelpers.nowUTC()
                 val articleID = entry.id.toString()
                 val enclosure = entry.enclosure
                 val enclosureType = enclosure?.enclosure_type
-                val feed = database.feedsQueries
-                    .find(entry.feed_id.toString())
-                    .executeAsOneOrNull()
+                val feed = feedAutomationInputs[entry.feed_id.toString()]
                 val title = entry.title?.let { Jsoup.parse(it).text() }
                 val automation = articleAutomation.evaluate(
                     ArticleAutomationArticle(
@@ -473,7 +478,7 @@ internal class FeedbinAccountDelegate(
                         summary = entry.summary,
                         contentHTML = entry.content,
                         feedTitle = feed?.title.orEmpty(),
-                        feedURL = feed?.feed_url.orEmpty(),
+                        feedURL = feed?.feedURL.orEmpty(),
                     )
                 )
 
@@ -488,9 +493,7 @@ internal class FeedbinAccountDelegate(
                     return@forEach
                 }
 
-                val isNewArticle = !database.articlesQueries
-                    .articleExists(articleID)
-                    .executeAsOne()
+                val isNewArticle = existingArticleIDs.add(articleID)
 
                 database.articlesQueries.create(
                     id = articleID,
