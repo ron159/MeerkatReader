@@ -16,6 +16,18 @@ class ArticleOfflinePackageRecords(
         ).executeAsOneOrNull()
     }
 
+    suspend fun find(articleIDs: Collection<String>): List<ArticleOfflinePackageRecord> = withIOContext {
+        articleIDs
+            .distinct()
+            .chunked(MAX_IDS_PER_QUERY)
+            .flatMap { batch ->
+                database.articleOfflinePackagesQueries.findByArticleIDs(
+                    articleIDs = batch,
+                    mapper = ::mapper,
+                ).executeAsList()
+            }
+    }
+
     suspend fun findByState(state: ArticleOfflinePackageState): List<ArticleOfflinePackageRecord> = withIOContext {
         database.articleOfflinePackagesQueries.findByState(
             state = state.name,
@@ -64,16 +76,15 @@ class ArticleOfflinePackageRecords(
     }
 
     suspend fun deleteByState(state: ArticleOfflinePackageState): Int = withIOContext {
-        val records = database.articleOfflinePackagesQueries.findByState(
-            state = state.name,
-            mapper = ::mapper,
-        ).executeAsList()
+        database.transactionWithResult {
+            val count = database.articleOfflinePackagesQueries
+                .countByState(state = state.name)
+                .executeAsOne()
 
-        records.forEach { record ->
-            database.articleOfflinePackagesQueries.delete(record.articleID)
+            database.articleOfflinePackagesQueries.deleteByState(state = state.name)
+
+            count.toInt()
         }
-
-        records.size
     }
 
     suspend fun pruneReadyPackages(
@@ -108,8 +119,8 @@ class ArticleOfflinePackageRecords(
                 currentBytes -= record.bytes
             }
 
-        removedArticleIDs.forEach { articleID ->
-            database.articleOfflinePackagesQueries.delete(articleID)
+        removedArticleIDs.chunked(MAX_IDS_PER_QUERY).forEach { batch ->
+            database.articleOfflinePackagesQueries.deleteByArticleIDs(batch)
         }
 
         removedArticleIDs.size
@@ -146,6 +157,10 @@ class ArticleOfflinePackageRecords(
     private fun Boolean.toSqlFlag(): Long = if (this) 1L else 0L
 
     private fun Long.toBooleanFlag(): Boolean = this != 0L
+
+    private companion object {
+        const val MAX_IDS_PER_QUERY = 500
+    }
 }
 
 data class ArticleOfflinePackageInput(

@@ -125,8 +125,6 @@ class ArticleScreenViewModel(
 
     val aiSummaryPreviews = mutableStateMapOf<String, ArticleAiPreviewState>()
 
-    val offlinePackageStates = mutableStateMapOf<String, ArticleOfflinePackageState>()
-
     val offlinePackageRecords = mutableStateMapOf<String, ArticleOfflinePackageRecord>()
 
     var aiDigestState by mutableStateOf(ArticleAiDigestState())
@@ -507,10 +505,8 @@ class ArticleScreenViewModel(
                 articles.forEach { article ->
                     val record = records[article.id]
                     if (record == null) {
-                        offlinePackageStates.remove(article.id)
                         offlinePackageRecords.remove(article.id)
                     } else {
-                        offlinePackageStates[article.id] = record.state
                         offlinePackageRecords[article.id] = record
                     }
                 }
@@ -623,23 +619,24 @@ class ArticleScreenViewModel(
     fun downloadOfflineAsync(article: Article) {
         viewModelScope.launchIO {
             val offlineOptions = appPreferences.offlineOptions
+            val includeFullContent = offlineOptions.includeFullContent.get()
+            val includeImages = offlineOptions.includeImages.get()
+            val includeAudio = offlineOptions.includeAudio.get() &&
+                article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }
 
             articleOfflinePackageDownloader.queue(
                 articleID = article.id,
-                includeFullContent = offlineOptions.includeFullContent.get(),
-                includeImages = offlineOptions.includeImages.get(),
-                includeAudio = offlineOptions.includeAudio.get() &&
-                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
+                includeFullContent = includeFullContent,
+                includeImages = includeImages,
+                includeAudio = includeAudio,
             )
             withUIContext {
-                offlinePackageStates[article.id] = ArticleOfflinePackageState.QUEUED
                 offlinePackageRecords[article.id] = ArticleOfflinePackageRecord(
                     articleID = article.id,
                     state = ArticleOfflinePackageState.QUEUED,
-                    includeFullContent = offlineOptions.includeFullContent.get(),
-                    includeImages = offlineOptions.includeImages.get(),
-                    includeAudio = offlineOptions.includeAudio.get() &&
-                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
+                    includeFullContent = includeFullContent,
+                    includeImages = includeImages,
+                    includeAudio = includeAudio,
                     bytes = 0,
                     errorMessage = null,
                     updatedAt = 0,
@@ -657,7 +654,6 @@ class ArticleScreenViewModel(
         viewModelScope.launchIO {
             articleOfflinePackageDownloader.remove(article.id)
             withUIContext {
-                offlinePackageStates.remove(article.id)
                 offlinePackageRecords.remove(article.id)
             }
         }
@@ -668,25 +664,26 @@ class ArticleScreenViewModel(
 
         viewModelScope.launchIO {
             val offlineOptions = appPreferences.offlineOptions
+            val includeFullContent =
+                existing?.includeFullContent ?: offlineOptions.includeFullContent.get()
+            val includeImages = existing?.includeImages ?: offlineOptions.includeImages.get()
+            val includeAudio = existing?.includeAudio
+                ?: (offlineOptions.includeAudio.get() &&
+                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) })
 
             articleOfflinePackageDownloader.queue(
                 articleID = article.id,
-                includeFullContent = existing?.includeFullContent ?: offlineOptions.includeFullContent.get(),
-                includeImages = existing?.includeImages ?: offlineOptions.includeImages.get(),
-                includeAudio = existing?.includeAudio
-                    ?: (offlineOptions.includeAudio.get() &&
-                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }),
+                includeFullContent = includeFullContent,
+                includeImages = includeImages,
+                includeAudio = includeAudio,
             )
             withUIContext {
-                offlinePackageStates[article.id] = ArticleOfflinePackageState.QUEUED
                 offlinePackageRecords[article.id] = ArticleOfflinePackageRecord(
                     articleID = article.id,
                     state = ArticleOfflinePackageState.QUEUED,
-                    includeFullContent = existing?.includeFullContent ?: offlineOptions.includeFullContent.get(),
-                    includeImages = existing?.includeImages ?: offlineOptions.includeImages.get(),
-                    includeAudio = existing?.includeAudio
-                        ?: (offlineOptions.includeAudio.get() &&
-                            article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }),
+                    includeFullContent = includeFullContent,
+                    includeImages = includeImages,
+                    includeAudio = includeAudio,
                     bytes = existing?.bytes ?: 0,
                     errorMessage = null,
                     updatedAt = existing?.updatedAt ?: 0,

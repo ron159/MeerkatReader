@@ -4,6 +4,11 @@ FROM article_offline_packages
 WHERE article_id = :articleID
 LIMIT 1;
 
+findByArticleIDs:
+SELECT article_id, state, include_full_content, include_images, include_audio, bytes, error_message, updated_at
+FROM article_offline_packages
+WHERE article_id IN :articleIDs;
+
 findByState:
 SELECT article_id, state, include_full_content, include_images, include_audio, bytes, error_message, updated_at
 FROM article_offline_packages
@@ -58,6 +63,19 @@ WHERE article_id = :articleID;
 delete:
 DELETE FROM article_offline_packages
 WHERE article_id = :articleID;
+
+deleteByArticleIDs:
+DELETE FROM article_offline_packages
+WHERE article_id IN :articleIDs;
+
+countByState:
+SELECT COUNT(*)
+FROM article_offline_packages
+WHERE state = :state;
+
+deleteByState:
+DELETE FROM article_offline_packages
+WHERE state = :state;
 
 deleteAll:
 DELETE FROM article_offline_packages;

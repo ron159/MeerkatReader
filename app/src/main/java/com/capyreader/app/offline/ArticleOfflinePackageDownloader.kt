@@ -51,27 +51,8 @@ class ArticleOfflinePackageDownloader(
         packageRecords.delete(articleID)
     }
 
-    suspend fun findStates(articleIDs: Collection<String>): Map<String, ArticleOfflinePackageState> = withIOContext {
-        articleIDs
-            .distinct()
-            .mapNotNull { articleID ->
-                packageRecords.find(articleID)?.let { record ->
-                    articleID to record.state
-                }
-            }
-            .toMap()
-    }
-
-    suspend fun findRecords(articleIDs: Collection<String>): Map<String, ArticleOfflinePackageRecord> = withIOContext {
-        articleIDs
-            .distinct()
-            .mapNotNull { articleID ->
-                packageRecords.find(articleID)?.let { record ->
-                    articleID to record
-                }
-            }
-            .toMap()
-    }
+    suspend fun findRecords(articleIDs: Collection<String>): Map<String, ArticleOfflinePackageRecord> =
+        packageRecords.find(articleIDs).associateBy { it.articleID }
 
     suspend fun queueAlwaysKeepOffline(limit: Long = DEFAULT_AUTO_QUEUE_LIMIT): Int = withIOContext {
         val offlineOptions = appPreferences.offlineOptions
@@ -79,30 +60,38 @@ class ArticleOfflinePackageDownloader(
             return@withIOContext 0
         }
 
+        val articles = account.latestArticles(limit = limit).first()
+        val alwaysOfflineFeedIDs = account.allFeeds.first()
+            .asSequence()
+            .filter { it.offlinePolicy == FeedOfflinePolicy.ALWAYS }
+            .map { it.id }
+            .toSet()
+        val existingRecords = packageRecords.find(articles.map { it.id })
+            .associateBy { it.articleID }
+        val includeFullContent = offlineOptions.includeFullContent.get()
+        val includeImages = offlineOptions.includeImages.get()
+        val includeAudio = offlineOptions.includeAudio.get()
         var queued = 0
 
-        account.latestArticles(limit = limit)
-            .first()
-            .forEach { article ->
-                val feed = account.findFeed(article.feedID)
-                if (feed?.offlinePolicy != FeedOfflinePolicy.ALWAYS) {
-                    return@forEach
-                }
-
-                val existing = packageRecords.find(article.id)
-                if (existing?.state in SKIP_AUTO_QUEUE_STATES) {
-                    return@forEach
-                }
-
-                queue(
-                    articleID = article.id,
-                    includeFullContent = offlineOptions.includeFullContent.get(),
-                    includeImages = offlineOptions.includeImages.get(),
-                    includeAudio = offlineOptions.includeAudio.get() &&
-                        article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
-                )
-                queued += 1
+        articles.forEach { article ->
+            if (article.feedID !in alwaysOfflineFeedIDs) {
+                return@forEach
             }
+
+            val existing = existingRecords[article.id]
+            if (existing?.state in SKIP_AUTO_QUEUE_STATES) {
+                return@forEach
+            }
+
+            queue(
+                articleID = article.id,
+                includeFullContent = includeFullContent,
+                includeImages = includeImages,
+                includeAudio = includeAudio &&
+                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
+            )
+            queued += 1
+        }
 
         queued
     }

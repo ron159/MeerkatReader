@@ -80,6 +80,32 @@ class ArticleOfflinePackageRecordsTest {
     }
 
     @Test
+    fun findByArticleIDsReturnsMatchingPackages() = runTest {
+        val first = articleFixture.create()
+        val second = articleFixture.create()
+        val excluded = articleFixture.create()
+
+        listOf(first, second, excluded).forEach { article ->
+            records.upsert(
+                ArticleOfflinePackageInput(
+                    articleID = article.id,
+                    state = ArticleOfflinePackageState.QUEUED,
+                    includeFullContent = true,
+                    includeImages = false,
+                    includeAudio = false,
+                )
+            )
+        }
+
+        assertEquals(
+            expected = setOf(first.id, second.id),
+            actual = records.find(listOf(first.id, second.id, "missing"))
+                .map { it.articleID }
+                .toSet(),
+        )
+    }
+
+    @Test
     fun updateStateRecordsFailure() = runTest {
         val article = articleFixture.create()
 
