@@ -436,7 +436,7 @@ internal class MinifluxAccountDelegate(
                 database.articlesQueries.create(
                     id = articleID,
                     feed_id = entry.feed_id.toString(),
-                    title = title,
+                    title = entry.title.stripTitleMarkup(),
                     author = entry.author,
                     content_html = entry.content,
                     extracted_content_url = null,
