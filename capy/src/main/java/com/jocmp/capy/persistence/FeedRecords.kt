@@ -6,6 +6,8 @@ import com.jocmp.capy.Feed
 import com.jocmp.capy.FeedOfflinePolicy
 import com.jocmp.capy.FeedPriority
 import com.jocmp.capy.Folder
+import com.jocmp.capy.common.TimeHelpers.nowUTC
+import com.jocmp.capy.common.toDateTimeFromSeconds
 import com.jocmp.capy.common.withIOContext
 import com.jocmp.capy.db.Database
 import com.jocmp.rssparser.model.ConditionalGetInfo
@@ -35,13 +37,30 @@ internal class FeedRecords(private val database: Database) {
             .associateBy { it.id }
     }
 
+    /**
+     * Some servers respond 304 to any conditional GET regardless of whether the
+     * feed content changed (observed with YouTube's channel feeds). Dropping the
+     * stored validator periodically forces an unconditional refetch so those feeds
+     * don't get stuck forever. NetNewsWire uses the same 8-day expiry for this reason.
+     */
     suspend fun findConditionalGet(feedID: String): ConditionalGetInfo = withIOContext {
         val feed = database.feedsQueries.findConditionalGet(feedID).executeAsOneOrNull()
+        val refreshedAt = feed?.conditional_get_refreshed_at
+
+        if (refreshedAt == null || isConditionalGetExpired(refreshedAt)) {
+            return@withIOContext ConditionalGetInfo.EMPTY
+        }
 
         ConditionalGetInfo(
-            etag = feed?.etag,
-            lastModified = feed?.last_modified,
+            etag = feed.etag,
+            lastModified = feed.last_modified,
         )
+    }
+
+    private fun isConditionalGetExpired(refreshedAt: Long): Boolean {
+        val expiresAt = refreshedAt.toDateTimeFromSeconds.plusDays(CONDITIONAL_GET_TTL_DAYS)
+
+        return nowUTC() > expiresAt
     }
 
     /**
@@ -241,6 +260,7 @@ internal class FeedRecords(private val database: Database) {
 
     private companion object {
         const val MAX_IDS_PER_QUERY = 500
+        private const val CONDITIONAL_GET_TTL_DAYS = 8L
     }
 }
 
