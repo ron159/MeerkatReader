@@ -36,7 +36,6 @@ internal class FeedRecords(private val database: Database) {
             }
             .associateBy { it.id }
     }
-
     /**
      * Some servers respond 304 to any conditional GET regardless of whether the
      * feed content changed (observed with YouTube's channel feeds). Dropping the
@@ -258,8 +257,12 @@ internal class FeedRecords(private val database: Database) {
         isReadLater = readLater,
     )
 
+<<<<<<< HEAD
     private companion object {
         const val MAX_IDS_PER_QUERY = 500
+=======
+    companion object {
+>>>>>>> 26d349c3 (Expire stale conditional-GET validators (#2201))
         private const val CONDITIONAL_GET_TTL_DAYS = 8L
     }
 }

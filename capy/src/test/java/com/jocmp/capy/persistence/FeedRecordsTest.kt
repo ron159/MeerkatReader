@@ -160,8 +160,6 @@ class FeedRecordsTest {
 
         assertFalse(records.find(feed.id)?.excludeFromAi ?: true)
     }
-
-    @Test
     fun findConditionalGet_returnsStoredValue() = runTest {
         val records = FeedRecords(database)
         val feed = FeedFixture(database, records = records).create()
