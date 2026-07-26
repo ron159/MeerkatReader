@@ -99,8 +99,22 @@ code {
 
 pre {
   white-space: var(--pre-white-space);
-  overflow-x: scroll;
+  overflow-x: var(--code-overflow-x, auto);
+  overflow-wrap: var(--code-overflow-wrap, normal);
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 1em;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+pre > code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font: inherit;
+  white-space: inherit;
 }
 
 img,
@@ -312,13 +326,16 @@ ul:has(img) {
   overflow-x: var(--table-overflow-x, visible);
 
   table {
-    table-layout: fixed;
-    width: 100%;
+    table-layout: var(--table-layout, fixed);
+    width: var(--table-width, 100%);
+    min-width: 100%;
     border-spacing: 0;
   }
 
   table table {
     table-layout: auto;
+    width: 100%;
+    min-width: 0;
     margin-bottom: 0;
     border: none;
 
@@ -332,7 +349,7 @@ ul:has(img) {
   td,
   th {
     border: 1px solid #999;
-    padding: 0.2rem;
+    padding: 0.35rem 0.5rem;
     text-align: left;
     word-wrap: break-word;
   }

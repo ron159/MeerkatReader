@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.automirrored.rounded.Toc
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,11 +66,18 @@ fun ArticleTopBar(
     onDeletePage: () -> Unit = {},
     isFullscreen: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
+    outlineItems: List<ArticleOutlineItem> = emptyList(),
+    onSelectOutlineItem: (ArticleOutlineItem) -> Unit = {},
+    isTtsPlaying: Boolean = false,
+    onToggleTts: () -> Unit = {},
     onClose: () -> Unit,
 ) {
     val containerColor = MaterialTheme.colorScheme.surface
     val labelsActions = LocalLabelsActions.current
     val (isStyleSheetOpen, setStyleSheetOpen) = rememberSaveable { mutableStateOf(false) }
+    val (isOutlineSheetOpen, setOutlineSheetOpen) = rememberSaveable(articleId) {
+        mutableStateOf(false)
+    }
     val (isDeletePageDialogOpen, setDeletePageDialogOpen) = rememberSaveable { mutableStateOf(false) }
 
     Box(
@@ -103,6 +113,23 @@ fun ArticleTopBar(
                     },
                     title = {},
                     actions = {
+                        if (ArticleOutline.shouldShow(outlineItems)) {
+                            ToolbarTooltip(
+                                message = stringResource(R.string.article_outline_open)
+                            ) {
+                                IconButton(onClick = { setOutlineSheetOpen(true) }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Rounded.Toc,
+                                        contentDescription = stringResource(R.string.article_outline_open),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                }
+                            }
+                        }
+                        ArticleTtsToolbarButton(
+                            isPlaying = isTtsPlaying,
+                            onToggle = onToggleTts,
+                        )
                         if (canSaveExternally) {
                             val articleActions = LocalArticleActions.current
                             val snackbar = LocalSnackbarHost.current
@@ -201,6 +228,18 @@ fun ArticleTopBar(
         }
     }
 
+    if (isOutlineSheetOpen && ArticleOutline.shouldShow(outlineItems)) {
+        ModalBottomSheet(onDismissRequest = { setOutlineSheetOpen(false) }) {
+            ArticleOutlineSheet(
+                items = outlineItems,
+                onSelect = {
+                    setOutlineSheetOpen(false)
+                    onSelectOutlineItem(it)
+                },
+            )
+        }
+    }
+
     if (isDeletePageDialogOpen) {
         DeletePageDialog(
             onConfirm = {
@@ -209,6 +248,30 @@ fun ArticleTopBar(
             },
             onDismissRequest = { setDeletePageDialogOpen(false) }
         )
+    }
+}
+
+@Composable
+internal fun ArticleTtsToolbarButton(
+    isPlaying: Boolean,
+    onToggle: () -> Unit,
+) {
+    val label = stringResource(
+        if (isPlaying) {
+            R.string.article_tts_pause
+        } else {
+            R.string.article_tts_listen
+        }
+    )
+
+    ToolbarTooltip(message = label) {
+        IconButton(onClick = onToggle) {
+            Icon(
+                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.Headphones,
+                contentDescription = label,
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
 }
 

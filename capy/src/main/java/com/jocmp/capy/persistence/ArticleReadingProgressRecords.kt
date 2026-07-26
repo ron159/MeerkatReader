@@ -19,24 +19,28 @@ class ArticleReadingProgressRecords(
         articleID: String,
         scrollPercent: Double,
         updatedAt: ZonedDateTime = nowUTC(),
-    ) = withIOContext {
+    ): Unit = withIOContext {
         database.articleReadingProgressQueries.upsert(
             articleID = articleID,
             scrollPercent = scrollPercent.coerceIn(0.0, 1.0),
             updatedAt = updatedAt.toEpochSecond(),
         )
+        Unit
     }
 
-    suspend fun delete(articleID: String) = withIOContext {
+    suspend fun delete(articleID: String): Unit = withIOContext {
         database.articleReadingProgressQueries.delete(articleID)
+        Unit
     }
 
-    suspend fun deleteAll() = withIOContext {
+    suspend fun deleteAll(): Unit = withIOContext {
         database.articleReadingProgressQueries.deleteAll()
+        Unit
     }
 
-    suspend fun deleteOrphans() = withIOContext {
+    suspend fun deleteOrphans(): Unit = withIOContext {
         database.articleReadingProgressQueries.deleteWithoutArticle()
+        Unit
     }
 
     private fun mapper(

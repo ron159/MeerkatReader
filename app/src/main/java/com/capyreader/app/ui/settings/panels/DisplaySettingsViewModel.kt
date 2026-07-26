@@ -17,14 +17,20 @@ import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
 import com.capyreader.app.ui.articles.ArticleListFontScale
 import com.capyreader.app.ui.articles.MarkReadPosition
+import com.capyreader.app.tts.ArticleTtsCapabilities
+import com.capyreader.app.tts.ArticleTtsConfiguration
+import com.capyreader.app.tts.ArticleTtsEngine
+import com.capyreader.app.tts.ArticleTtsVoice
 import com.jocmp.capy.Account
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class DisplaySettingsViewModel(
     val account: Account,
     val appPreferences: AppPreferences,
     private val articleImagePreloader: ArticleImagePreloader,
     private val articleImageCacheCleaner: ArticleImageCacheCleaner,
+    private val articleTtsEngine: ArticleTtsEngine,
 ) : ViewModel() {
     var themeMode by mutableStateOf(appPreferences.themeMode.get())
         private set
@@ -83,6 +89,38 @@ class DisplaySettingsViewModel(
 
     val improveTalkback = appPreferences.readerOptions.improveTalkback
 
+    var ttsLanguageTag by mutableStateOf(appPreferences.readerOptions.ttsLanguageTag.get())
+        private set
+
+    var ttsVoiceID by mutableStateOf(appPreferences.readerOptions.ttsVoiceID.get())
+        private set
+
+    var ttsSpeechRate by mutableStateOf(appPreferences.readerOptions.ttsSpeechRate.get())
+        private set
+
+    var ttsCapabilities by mutableStateOf(
+        ArticleTtsCapabilities(voices = emptyList(), selectedVoiceID = null)
+    )
+        private set
+
+    val ttsLanguageTags: List<String>
+        get() = listOf("") + ttsCapabilities.voices
+            .map(ArticleTtsVoice::languageTag)
+            .distinct()
+            .sortedBy { Locale.forLanguageTag(it).getDisplayName(Locale.getDefault()) }
+
+    val ttsVoices: List<ArticleTtsVoice>
+        get() {
+            val selectedLanguageTag = ttsLanguageTag
+                .ifBlank { Locale.getDefault().toLanguageTag() }
+            val selectedLanguage = selectedLanguageTag.substringBefore('-')
+
+            return ttsCapabilities.voices.filter {
+                it.languageTag == selectedLanguageTag ||
+                    it.languageTag.substringBefore('-') == selectedLanguage
+            }
+        }
+
     val markReadButtonPosition = appPreferences.articleListOptions.markReadButtonPosition
 
     var unreadDisplay by mutableStateOf(appPreferences.articleListOptions.unreadDisplay.get())
@@ -90,6 +128,21 @@ class DisplaySettingsViewModel(
 
     var starredDisplay by mutableStateOf(appPreferences.articleListOptions.starredDisplay.get())
         private set
+
+    init {
+        viewModelScope.launch {
+            articleTtsEngine.initialize(ttsConfiguration())
+                .onSuccess { capabilities ->
+                    ttsCapabilities = capabilities
+                    if (
+                        ttsVoiceID.isNotBlank() &&
+                        capabilities.voices.none { it.id == ttsVoiceID }
+                    ) {
+                        updateTtsVoice("")
+                    }
+                }
+        }
+    }
 
     fun updateThemeMode(themeMode: ThemeMode) {
         appPreferences.themeMode.set(themeMode)
@@ -132,6 +185,28 @@ class DisplaySettingsViewModel(
         appPreferences.readerOptions.imageVisibility.set(option)
 
         this.imageVisibility = option
+    }
+
+    fun updateTtsLanguage(languageTag: String) {
+        appPreferences.readerOptions.ttsLanguageTag.set(languageTag)
+        ttsLanguageTag = languageTag
+        if (ttsVoiceID.isNotBlank() && ttsVoices.none { it.id == ttsVoiceID }) {
+            updateTtsVoice("")
+        }
+    }
+
+    fun updateTtsVoice(voiceID: String) {
+        appPreferences.readerOptions.ttsVoiceID.set(voiceID)
+        ttsVoiceID = voiceID
+    }
+
+    fun updateTtsSpeechRate(speechRate: Float) {
+        val normalized = speechRate.coerceIn(
+            ArticleTtsConfiguration.MIN_SPEECH_RATE,
+            ArticleTtsConfiguration.MAX_SPEECH_RATE,
+        )
+        appPreferences.readerOptions.ttsSpeechRate.set(normalized)
+        ttsSpeechRate = normalized
     }
 
     fun updateArticleImageDownloadMode(mode: ArticleImageDownloadMode) {
@@ -206,4 +281,15 @@ class DisplaySettingsViewModel(
 
         _shortenTitles.value = shortenTitles
     }
+
+    override fun onCleared() {
+        articleTtsEngine.close()
+        super.onCleared()
+    }
+
+    private fun ttsConfiguration() = ArticleTtsConfiguration(
+        languageTag = ttsLanguageTag,
+        voiceID = ttsVoiceID,
+        speechRate = ttsSpeechRate,
+    )
 }

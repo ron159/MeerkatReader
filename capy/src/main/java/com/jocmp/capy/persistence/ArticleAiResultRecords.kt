@@ -36,7 +36,10 @@ class ArticleAiResultRecords(
         ).executeAsOneOrNull()
     }
 
-    suspend fun upsert(input: ArticleAiResultInput, resultText: String) = withIOContext {
+    suspend fun upsert(
+        input: ArticleAiResultInput,
+        resultText: String,
+    ): Unit = withIOContext {
         val now = nowUTC().toEpochSecond()
 
         database.articleAiResultsQueries.upsert(
@@ -53,6 +56,7 @@ class ArticleAiResultRecords(
             createdAt = now,
             updatedAt = now,
         )
+        Unit
     }
 
     suspend fun deleteAll() = withIOContext {

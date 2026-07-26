@@ -180,6 +180,7 @@ dependencies {
     testImplementation(libs.tests.mockk.mockk)
     testImplementation(libs.tests.robolectric)
     testImplementation(libs.tests.turbine)
+    testImplementation(libs.tests.androidx.ui.junit4)
     testImplementation(libs.tests.work.testing)
     androidTestImplementation(libs.tests.androidx.test.ext)
     androidTestImplementation(libs.tests.androidx.espresso.core)

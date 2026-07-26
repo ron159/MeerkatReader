@@ -7,6 +7,9 @@ import com.capyreader.app.ai.ArticleAiRepository
 import com.capyreader.app.ai.OpenAiCompatibleChatClient
 import com.capyreader.app.offline.ArticleOfflineAudioStore
 import com.capyreader.app.preferences.AppPreferences
+import com.capyreader.app.tts.AndroidArticleTtsEngine
+import com.capyreader.app.tts.ArticleTtsController
+import com.capyreader.app.tts.ArticleTtsEngine
 import com.capyreader.app.ui.addintent.AddLinkViewModel
 import com.capyreader.app.ui.articles.audio.AudioPlayerController
 import com.capyreader.app.ui.articles.feeds.edit.EditFeedViewModel
@@ -48,6 +51,15 @@ internal val articlesModule = module {
             context = get()
         )
     }
+    factory<ArticleTtsEngine> {
+        AndroidArticleTtsEngine(context = get())
+    }
+    factory {
+        ArticleTtsController(
+            engine = get(),
+            progressRecords = get(),
+        )
+    }
     single {
         val context = get<Context>()
         val audioStore = get<ArticleOfflineAudioStore>()
@@ -62,7 +74,7 @@ internal val articlesModule = module {
             titleFontSize = get<AppPreferences>().readerOptions.titleFontSize,
             textAlignment = get<AppPreferences>().readerOptions.titleTextAlignment,
             titleFollowsBodyFont = get<AppPreferences>().readerOptions.titleFollowsBodyFont,
-            enableHorizontalScroll = get<AppPreferences>().readerOptions.enableHorizontaPagination,
+            enableHorizontalPagination = get<AppPreferences>().readerOptions.enableHorizontaPagination,
             audioPlayerLabels = AudioPlayerLabels(
                 play = context.getString(R.string.audio_player_play),
                 pause = context.getString(R.string.audio_player_pause),
@@ -92,6 +104,7 @@ internal val articlesModule = module {
             articleFullContentRecords = get(),
             articleAiRepository = get(),
             articleOfflinePackageDownloader = get(),
+            wallabagArticleExporter = get(),
             articleRuleMatchRecords = get(),
             automaticBackupScheduler = get(),
         )

@@ -14,6 +14,9 @@ class WebViewInterface(
     private val onPauseAudio: () -> Unit = {},
 ) {
     var onRequestAudioState: () -> Unit = {}
+    var onArticleOutlineChanged: (json: String) -> Unit = {}
+    var onRequestTextCopyDialog: (text: String) -> Unit = {}
+
     @JavascriptInterface
     fun openImageGallery(imagesJson: String, clickedIndex: Int) {
         try {
@@ -45,6 +48,14 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
+    fun showTextCopyDialog(text: String) {
+        val safeText = text.trim()
+        if (safeText.isNotEmpty() && safeText.length <= MAX_COPY_TEXT_LENGTH) {
+            onRequestTextCopyDialog(safeText)
+        }
+    }
+
+    @JavascriptInterface
     fun openAudioPlayer(audioJson: String) {
         try {
             val audio = Json.decodeFromString<AudioEnclosure>(audioJson)
@@ -64,7 +75,13 @@ class WebViewInterface(
         onRequestAudioState()
     }
 
+    @JavascriptInterface
+    fun updateArticleOutline(json: String) {
+        onArticleOutlineChanged(json)
+    }
+
     companion object {
         const val INTERFACE_NAME = "Android"
+        private const val MAX_COPY_TEXT_LENGTH = 20_000
     }
 }

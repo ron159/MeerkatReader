@@ -1,0 +1,40 @@
+find:
+SELECT article_id, source, content_key, sentence_index, updated_at
+FROM article_tts_progress
+WHERE article_id = :articleID
+AND source = :source
+LIMIT 1;
+
+upsert:
+INSERT INTO article_tts_progress(
+  article_id,
+  source,
+  content_key,
+  sentence_index,
+  updated_at
+)
+VALUES (
+  :articleID,
+  :source,
+  :contentKey,
+  :sentenceIndex,
+  :updatedAt
+)
+ON CONFLICT(article_id, source)
+DO UPDATE SET
+  content_key = excluded.content_key,
+  sentence_index = excluded.sentence_index,
+  updated_at = excluded.updated_at;
+
+delete:
+DELETE FROM article_tts_progress
+WHERE article_id = :articleID;
+
+deleteAll:
+DELETE FROM article_tts_progress;
+
+deleteWithoutArticle:
+DELETE FROM article_tts_progress
+WHERE article_id NOT IN (
+  SELECT id FROM articles
+);

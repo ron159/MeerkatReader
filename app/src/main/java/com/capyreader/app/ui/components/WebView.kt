@@ -31,6 +31,8 @@ import com.capyreader.app.common.Media
 import com.capyreader.app.common.WebViewInterface
 import com.capyreader.app.ui.LocalTimeFormats
 import com.capyreader.app.ui.articles.detail.articleTemplateColors
+import com.capyreader.app.ui.articles.detail.ArticleOutline
+import com.capyreader.app.ui.articles.detail.ArticleOutlineItem
 import com.capyreader.app.ui.articles.detail.byline
 import com.capyreader.app.ui.articles.displayFeedName
 import com.jocmp.capy.Article
@@ -167,12 +169,14 @@ class WebViewState(
     private val colors: Map<String, String>,
     private val enableNativeScroll: Boolean,
     internal val webView: WebView,
+    private val onArticleOutlineChanged: (List<ArticleOutlineItem>) -> Unit,
 ) {
     private var htmlId: String? = null
     private var contentHash: Int = 0
     private var restoredScrollArticleId: String? = null
     private var currentAudioUrl: String? = null
     private var isAudioPlaying: Boolean = false
+    private var articleOutlineTargetIDs = emptySet<String>()
 
     init {
         loadEmpty()
@@ -195,6 +199,8 @@ class WebViewState(
         htmlId = id
         contentHash = hash
         restoredScrollArticleId = null
+        articleOutlineTargetIDs = emptySet()
+        onArticleOutlineChanged(emptyList())
         webView.scrollTo(0, 0)
 
         val client = webView.webViewClient as? AccompanistWebViewClient
@@ -233,7 +239,34 @@ class WebViewState(
     fun reset() {
         htmlId = null
         restoredScrollArticleId = null
+        articleOutlineTargetIDs = emptySet()
+        onArticleOutlineChanged(emptyList())
         loadEmpty()
+    }
+
+    internal fun updateArticleOutline(json: String) {
+        webView.post {
+            val items = try {
+                ArticleOutline.build(ArticleOutline.decodeCandidates(json))
+            } catch (e: Exception) {
+                CapyLog.error("article_outline_update", e)
+                emptyList()
+            }
+
+            articleOutlineTargetIDs = items.mapTo(mutableSetOf(), ArticleOutlineItem::targetID)
+            webView.evaluateJavascript(ArticleOutline.applyScript(items), null)
+            onArticleOutlineChanged(items)
+        }
+    }
+
+    fun jumpToArticleHeading(targetID: String) {
+        if (targetID !in articleOutlineTargetIDs) {
+            return
+        }
+
+        webView.post {
+            webView.evaluateJavascript(ArticleOutline.jumpScript(targetID), null)
+        }
     }
 
     fun updateAudioPlayState(url: String?, isPlaying: Boolean) {
@@ -272,11 +305,13 @@ fun rememberWebViewState(
     onNavigateToMedia: (media: Media) -> Unit,
     onRequestLinkDialog: (link: ShareLink) -> Unit,
     onRequestImageDialog: (imageUrl: String) -> Unit = {},
+    onRequestTextCopyDialog: (text: String) -> Unit = {},
     onOpenLink: (url: Uri) -> Unit,
     onOpenAudioPlayer: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
     onScrollChanged: (scrollY: Int, oldScrollY: Int) -> Unit = { _, _ -> },
     onScrollProgressChanged: (scrollPercent: Double) -> Unit = {},
+    onArticleOutlineChanged: (List<ArticleOutlineItem>) -> Unit = {},
     enableTopSwipe: Boolean = false,
     enableBottomSwipe: Boolean = false,
     onSwipeDownFromTop: () -> Unit = {},
@@ -291,6 +326,8 @@ fun rememberWebViewState(
     val isAudioPlayingState by rememberUpdatedState(isAudioPlaying)
     val scrollChangedState by rememberUpdatedState(onScrollChanged)
     val scrollProgressChangedState by rememberUpdatedState(onScrollProgressChanged)
+    val articleOutlineChangedState by rememberUpdatedState(onArticleOutlineChanged)
+    val textCopyDialogState by rememberUpdatedState(onRequestTextCopyDialog)
     val enableTopSwipeState = rememberUpdatedState(enableTopSwipe)
     val enableBottomSwipeState = rememberUpdatedState(enableBottomSwipe)
     val swipeDownFromTopState = rememberUpdatedState(onSwipeDownFromTop)
@@ -359,10 +396,17 @@ fun rememberWebViewState(
             colors,
             enableNativeScroll = true,
             webView,
+            onArticleOutlineChanged = { articleOutlineChangedState(it) },
         ).also {
             client.state = it
             webViewInterface.onRequestAudioState = {
                 it.updateAudioPlayState(currentAudioUrlState, isAudioPlayingState)
+            }
+            webViewInterface.onArticleOutlineChanged = it::updateArticleOutline
+            webViewInterface.onRequestTextCopyDialog = { text ->
+                webView.post {
+                    textCopyDialogState(text)
+                }
             }
         }
     }

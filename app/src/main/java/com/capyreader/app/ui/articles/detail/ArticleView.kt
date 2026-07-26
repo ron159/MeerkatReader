@@ -17,8 +17,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +54,11 @@ import com.capyreader.app.preferences.ArticleVerticalSwipe.LOAD_FULL_CONTENT
 import com.capyreader.app.preferences.ArticleVerticalSwipe.NEXT_ARTICLE
 import com.capyreader.app.preferences.ArticleVerticalSwipe.OPEN_ARTICLE_IN_BROWSER
 import com.capyreader.app.preferences.ArticleVerticalSwipe.PREVIOUS_ARTICLE
+import com.capyreader.app.tts.ArticleTtsController
+import com.capyreader.app.tts.ArticleTtsConfiguration
+import com.capyreader.app.tts.ArticleTtsContent
+import com.capyreader.app.tts.ArticleTtsState
+import com.capyreader.app.tts.ArticleTtsStatus
 import com.capyreader.app.ui.LocalLinkOpener
 import com.capyreader.app.ui.articles.LocalFullContent
 import com.capyreader.app.ui.collectChangesWithDefault
@@ -59,6 +66,7 @@ import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.capyreader.app.ui.components.pullrefresh.SwipeRefresh
 import com.jocmp.capy.Article
 import com.jocmp.capy.persistence.ArticleReadingProgressRecords
+import com.jocmp.capy.persistence.ArticleTtsSource
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.abs
@@ -86,6 +94,7 @@ fun ArticleView(
     appPreferences: AppPreferences = koinInject(),
     articleAiRepository: ArticleAiRepository = koinInject(),
     articleReadingProgressRecords: ArticleReadingProgressRecords = koinInject(),
+    articleTtsController: ArticleTtsController = koinInject(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     val enableHorizontalPager by appPreferences.readerOptions.enableHorizontaPagination.collectChangesWithDefault()
@@ -156,7 +165,11 @@ fun ArticleView(
 
     val aiEnabled by appPreferences.aiOptions.enabled.collectChangesWithDefault()
     val aiTranslationMode by appPreferences.aiOptions.translationMode.collectChangesWithDefault()
+    val ttsLanguageTag by appPreferences.readerOptions.ttsLanguageTag.collectChangesWithDefault()
+    val ttsVoiceID by appPreferences.readerOptions.ttsVoiceID.collectChangesWithDefault()
+    val ttsSpeechRate by appPreferences.readerOptions.ttsSpeechRate.collectChangesWithDefault()
     val scrollState = rememberArticleScrollState()
+    val outlineController = remember(article.id) { ArticleOutlineController() }
     val showToolBar = pinToolbars || !scrollState.isScrollingDown
     var isAiSheetOpen by rememberSaveable(article.id) { mutableStateOf(false) }
     var topAiState by remember(article.id) { mutableStateOf<ArticleAiDisplayState?>(null) }
@@ -171,6 +184,7 @@ fun ArticleView(
         answer = stringResource(R.string.article_ai_label_answer),
         digest = stringResource(R.string.article_ai_label_digest),
         workingOnIt = stringResource(R.string.article_ai_working_on_it),
+        copyText = stringResource(R.string.actions_copy_text),
     )
     val aiErrorMessages = ArticleAiErrorMessages(
         requestFailed = stringResource(R.string.article_ai_error_request_failed),
@@ -181,6 +195,25 @@ fun ArticleView(
         contentEmpty = stringResource(R.string.article_ai_error_content_empty),
         questionRequired = stringResource(R.string.article_ai_error_question_required),
         noDigestArticles = stringResource(R.string.article_ai_error_no_digest_articles),
+        invalidConfiguration = stringResource(R.string.article_ai_error_invalid_configuration),
+        authentication = stringResource(R.string.article_ai_error_authentication),
+        rateLimit = stringResource(R.string.article_ai_error_rate_limit),
+        timeout = stringResource(R.string.article_ai_error_timeout),
+        connectivity = stringResource(R.string.article_ai_error_connectivity),
+        server = stringResource(R.string.article_ai_error_server),
+        providerRejected = stringResource(R.string.article_ai_error_provider_rejected),
+        invalidResponse = stringResource(R.string.article_ai_error_invalid_response),
+    )
+    val ttsState by articleTtsController.state.collectAsState()
+
+    DisposableEffect(articleTtsController) {
+        onDispose(articleTtsController::close)
+    }
+
+    DismissTtsForOtherArticleEffect(
+        articleID = article.id,
+        ttsArticleID = ttsState.articleID,
+        onDismiss = articleTtsController::dismiss,
     )
 
     fun runAiAction(action: ArticleAiAction, forceRefresh: Boolean, question: String? = null) {
@@ -230,6 +263,53 @@ fun ArticleView(
             translationMode = aiTranslationMode,
             labels = aiLabels,
         )
+    }
+    val ttsContents = remember(article, topAiState, translationAiState) {
+        buildMap {
+            put(ArticleTtsSource.ORIGINAL, ArticleTtsContent.original(article))
+            topAiState
+                ?.takeIf { it.action == ArticleAiAction.SUMMARIZE }
+                ?.result
+                ?.takeIf(String::isNotBlank)
+                ?.let {
+                    put(
+                        ArticleTtsSource.AI_SUMMARY,
+                        ArticleTtsContent.generated(article, ArticleTtsSource.AI_SUMMARY, it),
+                    )
+                }
+            translationAiState
+                ?.result
+                ?.takeIf(String::isNotBlank)
+                ?.let {
+                    put(
+                        ArticleTtsSource.TRANSLATION,
+                        ArticleTtsContent.generated(article, ArticleTtsSource.TRANSLATION, it),
+                    )
+                }
+        }
+    }
+    var selectedTtsSourceName by rememberSaveable(article.id) {
+        mutableStateOf(ArticleTtsSource.ORIGINAL.name)
+    }
+    val selectedTtsSource = ArticleTtsSource.from(selectedTtsSourceName)
+    val ttsConfiguration = remember(ttsLanguageTag, ttsVoiceID, ttsSpeechRate) {
+        ArticleTtsConfiguration(
+            languageTag = ttsLanguageTag,
+            voiceID = ttsVoiceID,
+            speechRate = ttsSpeechRate,
+        )
+    }
+
+    fun playTts(source: ArticleTtsSource = selectedTtsSource) {
+        val content = ttsContents[source] ?: ttsContents.getValue(ArticleTtsSource.ORIGINAL)
+        selectedTtsSourceName = content.source.name
+        articleTtsController.play(content, ttsConfiguration)
+    }
+
+    LaunchedEffect(ttsContents.keys, selectedTtsSource) {
+        if (selectedTtsSource !in ttsContents) {
+            selectedTtsSourceName = ArticleTtsSource.ORIGINAL.name
+        }
     }
 
     LaunchedEffect(article.id) {
@@ -287,8 +367,15 @@ fun ArticleView(
                         ArticleReaderPool(
                             article = displayArticle,
                             pinToolbars = pinToolbars,
+                            outlineController = outlineController,
                             onSelectMedia = onSelectMedia,
-                            onSelectAudio = onSelectAudio,
+                            onSelectAudio = { audio ->
+                                selectArticleAudio(
+                                    audio = audio,
+                                    onDismissTts = articleTtsController::dismiss,
+                                    onSelectAudio = onSelectAudio,
+                                )
+                            },
                             onPauseAudio = onPauseAudio,
                             currentAudioUrl = currentAudioUrl,
                             isAudioPlaying = isAudioPlaying,
@@ -313,6 +400,18 @@ fun ArticleView(
                 onDeletePage = onDeletePage,
                 isFullscreen = isFullscreen,
                 onToggleFullscreen = onToggleFullscreen,
+                outlineItems = outlineController.items,
+                onSelectOutlineItem = outlineController::select,
+                onToggleTts = {
+                    toggleArticleTtsFromToolbar(
+                        state = ttsState,
+                        articleID = article.id,
+                        onPauseAudio = onPauseAudio,
+                        onPauseTts = articleTtsController::pause,
+                        onPlayTts = { playTts() },
+                    )
+                },
+                isTtsPlaying = ttsState.articleID == article.id && ttsState.isPlaying,
                 onClose = onBackPressed,
             )
 
@@ -327,6 +426,25 @@ fun ArticleView(
                 showAiAction = aiEnabled,
                 isAiLoading = topAiState?.isLoading == true || translationAiState?.isLoading == true,
                 onOpenAi = { isAiSheetOpen = true },
+            )
+
+            ArticleTtsPlayer(
+                state = ttsState,
+                onPlayPause = {
+                    when (ttsState.status) {
+                        ArticleTtsStatus.PLAYING -> articleTtsController.pause()
+                        ArticleTtsStatus.PAUSED -> articleTtsController.resume()
+                        else -> {
+                            playTts()
+                        }
+                    }
+                },
+                onSkipPrevious = articleTtsController::skipPrevious,
+                onSkipNext = articleTtsController::skipNext,
+                onDismiss = articleTtsController::dismiss,
+                availableSources = ttsContents.keys.toList(),
+                onSelectSource = ::playTts,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
 
             if (isAiSheetOpen) {
@@ -357,9 +475,47 @@ fun ArticleView(
 }
 
 @Composable
+internal fun DismissTtsForOtherArticleEffect(
+    articleID: String,
+    ttsArticleID: String?,
+    onDismiss: () -> Unit,
+) {
+    LaunchedEffect(articleID, ttsArticleID) {
+        if (ttsArticleID != null && ttsArticleID != articleID) {
+            onDismiss()
+        }
+    }
+}
+
+internal fun toggleArticleTtsFromToolbar(
+    state: ArticleTtsState,
+    articleID: String,
+    onPauseAudio: () -> Unit,
+    onPauseTts: () -> Unit,
+    onPlayTts: () -> Unit,
+) {
+    if (state.articleID == articleID && state.status == ArticleTtsStatus.PLAYING) {
+        onPauseTts()
+    } else {
+        onPauseAudio()
+        onPlayTts()
+    }
+}
+
+internal fun selectArticleAudio(
+    audio: AudioEnclosure,
+    onDismissTts: () -> Unit,
+    onSelectAudio: (AudioEnclosure) -> Unit,
+) {
+    onDismissTts()
+    onSelectAudio(audio)
+}
+
+@Composable
 private fun ArticleReaderPool(
     article: Article,
     pinToolbars: Boolean,
+    outlineController: ArticleOutlineController,
     onSelectMedia: (media: Media) -> Unit,
     onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
     onPauseAudio: () -> Unit = {},
@@ -378,6 +534,7 @@ private fun ArticleReaderPool(
             ArticleReader(
                 article = article,
                 pinToolbars = pinToolbars,
+                outlineController = outlineController,
                 modifier = Modifier.fillMaxSize(),
                 onSelectMedia = onSelectMedia,
                 onSelectAudio = onSelectAudio,

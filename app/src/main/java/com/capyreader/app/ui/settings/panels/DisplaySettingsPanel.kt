@@ -19,6 +19,7 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -29,6 +30,8 @@ import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.AppTheme
 import com.capyreader.app.preferences.ReaderImageVisibility
 import com.capyreader.app.preferences.ThemeMode
+import com.capyreader.app.tts.ArticleTtsConfiguration
+import com.capyreader.app.tts.ArticleTtsVoice
 import com.capyreader.app.ui.collectChangesWithCurrent
 import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
@@ -36,6 +39,7 @@ import com.capyreader.app.ui.components.ThemePicker
 import com.capyreader.app.ui.settings.PreferenceSelect
 import com.capyreader.app.ui.theme.CapyTheme
 import org.koin.androidx.compose.koinViewModel
+import java.util.Locale
 
 @Composable
 fun DisplaySettingsPanel(
@@ -59,6 +63,14 @@ fun DisplaySettingsPanel(
         enablePinArticleBars = !improveTalkback,
         updateImageVisibility = viewModel::updateImageVisibility,
         imageVisibility = viewModel.imageVisibility,
+        ttsLanguageTag = viewModel.ttsLanguageTag,
+        ttsLanguageTags = viewModel.ttsLanguageTags,
+        updateTtsLanguage = viewModel::updateTtsLanguage,
+        ttsVoiceID = viewModel.ttsVoiceID,
+        ttsVoices = viewModel.ttsVoices,
+        updateTtsVoice = viewModel::updateTtsVoice,
+        ttsSpeechRate = viewModel.ttsSpeechRate,
+        updateTtsSpeechRate = viewModel::updateTtsSpeechRate,
     )
 }
 
@@ -77,6 +89,14 @@ fun DisplaySettingsPanelView(
     enablePinArticleBars: Boolean,
     imageVisibility: ReaderImageVisibility,
     updateImageVisibility: (option: ReaderImageVisibility) -> Unit,
+    ttsLanguageTag: String,
+    ttsLanguageTags: List<String>,
+    updateTtsLanguage: (String) -> Unit,
+    ttsVoiceID: String,
+    ttsVoices: List<ArticleTtsVoice>,
+    updateTtsVoice: (String) -> Unit,
+    ttsSpeechRate: Float,
+    updateTtsSpeechRate: (Float) -> Unit,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -131,6 +151,16 @@ fun DisplaySettingsPanelView(
                     stringResource(it.translationKey)
                 }
             )
+            ArticleTtsPreferences(
+                languageTag = ttsLanguageTag,
+                languageTags = ttsLanguageTags,
+                onSelectLanguage = updateTtsLanguage,
+                voiceID = ttsVoiceID,
+                voices = ttsVoices,
+                onSelectVoice = updateTtsVoice,
+                speechRate = ttsSpeechRate,
+                onSelectSpeechRate = updateTtsSpeechRate,
+            )
             RowItem {
                 TextSwitch(
                     enabled = enablePinArticleBars,
@@ -142,6 +172,66 @@ fun DisplaySettingsPanelView(
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+internal fun ArticleTtsPreferences(
+    languageTag: String,
+    languageTags: List<String>,
+    onSelectLanguage: (String) -> Unit,
+    voiceID: String,
+    voices: List<ArticleTtsVoice>,
+    onSelectVoice: (String) -> Unit,
+    speechRate: Float,
+    onSelectSpeechRate: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val displayLocale = LocalLocale.current.platformLocale
+
+    Column(modifier = modifier) {
+        PreferenceSelect(
+            selected = languageTag,
+            update = onSelectLanguage,
+            options = languageTags,
+            label = R.string.article_tts_language,
+            optionText = { option ->
+                if (option.isBlank()) {
+                    stringResource(R.string.article_tts_system_default)
+                } else {
+                    Locale.forLanguageTag(option).getDisplayName(displayLocale)
+                }
+            },
+        )
+        PreferenceSelect(
+            selected = voiceID,
+            update = onSelectVoice,
+            options = listOf("") + voices.map(ArticleTtsVoice::id),
+            label = R.string.article_tts_voice,
+            optionText = { option ->
+                val voice = voices.find { it.id == option }
+                when {
+                    option.isBlank() -> stringResource(R.string.article_tts_engine_default)
+                    voice?.requiresNetwork == true -> stringResource(
+                        R.string.article_tts_voice_requires_network,
+                        voice.id,
+                    )
+                    else -> voice?.id ?: option
+                }
+            },
+        )
+        PreferenceSelect(
+            selected = speechRate,
+            update = onSelectSpeechRate,
+            options = TTS_SPEECH_RATES,
+            label = R.string.article_tts_speech_rate,
+            optionText = { option ->
+                stringResource(
+                    R.string.article_tts_speech_rate_value,
+                    option.toString().removeSuffix(".0"),
+                )
+            },
+        )
     }
 }
 
@@ -190,7 +280,17 @@ private fun DisplaySettingsPanelViewPreview() {
                 updateImageVisibility = {},
                 imageVisibility = ReaderImageVisibility.ALWAYS_SHOW,
                 enablePinArticleBars = false,
+                ttsLanguageTag = "",
+                ttsLanguageTags = listOf(""),
+                updateTtsLanguage = {},
+                ttsVoiceID = "",
+                ttsVoices = emptyList(),
+                updateTtsVoice = {},
+                ttsSpeechRate = ArticleTtsConfiguration.DEFAULT_SPEECH_RATE,
+                updateTtsSpeechRate = {},
             )
         }
     }
 }
+
+private val TTS_SPEECH_RATES = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)

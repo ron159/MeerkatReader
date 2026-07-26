@@ -3,10 +3,12 @@ package com.capyreader.app.ui.articles.detail
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -39,6 +41,7 @@ import kotlin.math.roundToInt
 fun ArticleReader(
     article: Article,
     pinToolbars: Boolean,
+    outlineController: ArticleOutlineController,
     modifier: Modifier = Modifier,
     onSelectMedia: (media: Media) -> Unit,
     onSelectAudio: (audio: AudioEnclosure) -> Unit = {},
@@ -55,6 +58,7 @@ fun ArticleReader(
 ) {
     val (shareLink, setShareLink) = rememberSaveableShareLink()
     val (shareImageUrl, setImageUrl) = rememberSaveable { mutableStateOf<String?>(null) }
+    var copyText by remember { mutableStateOf<String?>(null) }
     val linkOpener = LocalLinkOpener.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -109,11 +113,13 @@ fun ArticleReader(
         onNavigateToMedia = onSelectMedia,
         onRequestLinkDialog = { setShareLink(it) },
         onRequestImageDialog = { setImageUrl(it) },
+        onRequestTextCopyDialog = { copyText = it },
         onOpenLink = { linkOpener.open(it) },
         onOpenAudioPlayer = onSelectAudio,
         onPauseAudio = onPauseAudio,
         onScrollChanged = onScrollChanged,
         onScrollProgressChanged = onScrollProgressChanged,
+        onArticleOutlineChanged = outlineController::update,
         enableTopSwipe = enableTopSwipe,
         enableBottomSwipe = enableBottomSwipe,
         onSwipeDownFromTop = onSwipeDownFromTop,
@@ -121,6 +127,13 @@ fun ArticleReader(
         currentAudioUrl = currentAudioUrl,
         isAudioPlaying = isAudioPlaying,
     )
+
+    DisposableEffect(outlineController, webViewState) {
+        outlineController.bind(webViewState)
+        onDispose {
+            outlineController.unbind(webViewState)
+        }
+    }
 
     LaunchedEffect(currentAudioUrl, isAudioPlaying) {
         webViewState.updateAudioPlayState(currentAudioUrl, isAudioPlaying)
@@ -174,6 +187,13 @@ fun ArticleReader(
             imageUrl = shareImageUrl,
             onSave = { saveImage(shareImageUrl) },
             onShare = { shareImage(shareImageUrl) },
+        )
+    }
+
+    copyText?.let { text ->
+        CopyTextDialog(
+            text = text,
+            onClose = { copyText = null },
         )
     }
 }

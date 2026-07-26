@@ -21,7 +21,7 @@ class ArticleFullContentRecords(
         ).executeAsOneOrNull()
     }
 
-    suspend fun upsert(articleID: String, contentHTML: String) = withIOContext {
+    suspend fun upsert(articleID: String, contentHTML: String): Unit = withIOContext {
         val now = nowUTC().toEpochSecond()
 
         database.articleFullContentCacheQueries.upsert(
@@ -30,10 +30,12 @@ class ArticleFullContentRecords(
             createdAt = now,
             updatedAt = now,
         )
+        Unit
     }
 
-    suspend fun deleteOrphans() = withIOContext {
+    suspend fun deleteOrphans(): Unit = withIOContext {
         database.articleFullContentCacheQueries.deleteWithoutArticle()
+        Unit
     }
 }
 

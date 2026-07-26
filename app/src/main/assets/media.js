@@ -30,6 +30,11 @@ function addImageClickListeners() {
   }));
 
   images.forEach((img, index) => {
+    if (img.dataset.capyImageClickListener === "true") {
+      return;
+    }
+
+    img.dataset.capyImageClickListener = "true";
     img.addEventListener("click", (e) => {
       e.preventDefault();
       Android.openImageGallery(JSON.stringify(galleryImages), index);
@@ -38,6 +43,40 @@ function addImageClickListeners() {
     longPress(img, (e) => {
       e.preventDefault();
       Android.showImageDialog(img.dataset.capyOriginalSrc || img.src);
+    });
+  });
+}
+
+function addTextCopyListeners() {
+  const copyTargets = document.querySelectorAll(
+    ".ai-card__content > p, .ai-card__content > ul, " +
+      ".ai-translation-row__original, .ai-translation-row__translated",
+  );
+
+  copyTargets.forEach((element) => {
+    if (element.dataset.capyTextCopyListener === "true") {
+      return;
+    }
+
+    element.dataset.capyTextCopyListener = "true";
+    const requestCopy = (event) => {
+      const text = element.textContent?.trim();
+      if (!text) return;
+
+      event.preventDefault();
+      Android.showTextCopyDialog(text);
+    };
+
+    longPress(element, requestCopy);
+    element.addEventListener("click", (event) => {
+      if (event.detail === 0) {
+        requestCopy(event);
+      }
+    });
+    element.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        requestCopy(event);
+      }
     });
   });
 }
@@ -310,8 +349,11 @@ function postProcessContent(baseUrl, hideImages) {
     wrapper.appendChild(table);
   });
 
+  addImageClickListeners();
+  addTextCopyListeners();
   addImageLoadFailureListeners();
   primeArticleImages();
+  refreshArticleOutline();
 }
 
 /**
@@ -500,6 +542,7 @@ function resetAudioPlayState() {
 
 window.onload = () => {
   addImageClickListeners();
+  addTextCopyListeners();
   addEmbedListeners();
   configureVideoTags();
   addImageLoadFailureListeners();

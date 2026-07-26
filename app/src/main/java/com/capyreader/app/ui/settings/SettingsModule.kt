@@ -1,12 +1,14 @@
 package com.capyreader.app.ui.settings
 
-import com.capyreader.app.transfers.OPMLImportWorker
+import com.capyreader.app.integrations.webdav.WebDavBackupWorker
 import com.capyreader.app.transfers.AutomaticBackupWorker
+import com.capyreader.app.transfers.OPMLImportWorker
 import com.capyreader.app.ui.settings.panels.AccountSettingsViewModel
 import com.capyreader.app.ui.settings.panels.AiSettingsViewModel
 import com.capyreader.app.ui.settings.panels.DisplaySettingsViewModel
 import com.capyreader.app.ui.settings.panels.GeneralSettingsViewModel
 import com.capyreader.app.ui.settings.panels.GesturesSettingsViewModel
+import com.capyreader.app.ui.settings.panels.IntegrationSettingsViewModel
 import com.capyreader.app.ui.settings.panels.SettingsViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.androidx.workmanager.dsl.worker
@@ -19,9 +21,11 @@ val settingsModule = module {
             account = get(),
             appPreferences = get(),
             articleImageCacheCleaner = get(),
-            articleOfflinePackageRecords = get(),
+            articleOfflinePackageDownloader = get(),
             articleReadingProgressRecords = get(),
+            articleTtsProgressRecords = get(),
             articleRuleMatchRecords = get(),
+            appContext = get(),
         )
     }
     viewModel {
@@ -30,6 +34,8 @@ val settingsModule = module {
             accountManager = get(),
             appPreferences = get(),
             automaticBackupScheduler = get(),
+            backupFile = get(),
+            webDavBackupScheduler = get(),
             application = get()
         )
     }
@@ -39,6 +45,7 @@ val settingsModule = module {
             appPreferences = get(),
             articleImagePreloader = get(),
             articleImageCacheCleaner = get(),
+            articleTtsEngine = get(),
         )
     }
     viewModel {
@@ -53,6 +60,13 @@ val settingsModule = module {
         )
     }
     viewModel {
+        IntegrationSettingsViewModel(
+            appPreferences = get(),
+            webDavBackupClient = get(),
+            webDavBackupScheduler = get(),
+        )
+    }
+    viewModel {
        SettingsViewModel(
            account = get(),
            appPreferences = get(),
@@ -60,4 +74,5 @@ val settingsModule = module {
     }
     worker { OPMLImportWorker(get(), get()) }
     worker { AutomaticBackupWorker(get(), get()) }
+    worker { WebDavBackupWorker(get(), get()) }
 }

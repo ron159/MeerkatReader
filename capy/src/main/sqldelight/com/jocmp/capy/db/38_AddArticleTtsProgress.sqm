@@ -1,0 +1,8 @@
+CREATE TABLE article_tts_progress (
+  article_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  content_key TEXT NOT NULL,
+  sentence_index INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(article_id, source)
+);
