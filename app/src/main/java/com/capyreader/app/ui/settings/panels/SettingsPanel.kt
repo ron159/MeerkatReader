@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
@@ -46,6 +47,12 @@ sealed class SettingsPanel(@StringRes val title: Int) {
     }
 
     @Parcelize
+    data object Integrations : SettingsPanel(title = R.string.settings_panel_integrations_title),
+        Parcelable {
+        override fun icon() = Icons.Rounded.CloudUpload
+    }
+
+    @Parcelize
     data object DataStorage : SettingsPanel(title = R.string.settings_panel_data_storage_title),
         Parcelable {
         override fun icon() = Icons.Rounded.Storage
@@ -82,6 +89,7 @@ sealed class SettingsPanel(@StringRes val title: Int) {
                 Display,
                 ArticleList,
                 AI,
+                Integrations,
                 Gestures,
                 DataStorage,
                 Account,

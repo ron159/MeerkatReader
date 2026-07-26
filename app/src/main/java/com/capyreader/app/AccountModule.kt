@@ -4,6 +4,10 @@ import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.integrations.wallabag.WallabagArticleExporter
+import com.capyreader.app.integrations.wallabag.WallabagClient
+import com.capyreader.app.integrations.wallabag.WallabagIntegration
+import com.capyreader.app.integrations.webdav.WebDavBackupUploader
 import com.capyreader.app.offline.ArticleOfflineAudioDownloader
 import com.capyreader.app.offline.ArticleOfflineAudioStore
 import com.capyreader.app.offline.ArticleOfflinePackageDownloader
@@ -21,6 +25,7 @@ import com.jocmp.capy.persistence.ArticleIntegrationExportRecords
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
 import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import com.jocmp.capy.persistence.ArticleRuleMatchRecords
+import com.jocmp.capy.persistence.ArticleTtsProgressRecords
 import org.koin.dsl.module
 import java.io.File
 
@@ -43,6 +48,25 @@ val accountModule = module {
     single { ArticleOfflinePackageRecords(database = get()) }
     single { ArticleReadingProgressRecords(database = get()) }
     single { ArticleRuleMatchRecords(database = get()) }
+    single { ArticleTtsProgressRecords(database = get()) }
+    single { WallabagClient(httpClient = get(), appPreferences = get()) }
+    single { WallabagIntegration(client = get()) }
+    single {
+        WallabagArticleExporter(
+            account = get(),
+            records = get(),
+            integration = get(),
+            appPreferences = get(),
+        )
+    }
+    single {
+        WebDavBackupUploader(
+            account = get(),
+            appPreferences = get(),
+            backupFile = get(),
+            client = get(),
+        )
+    }
     single { ArticleImageStore(context = get()) }
     single { ArticleOfflineAudioStore(accountDirectory = File(get<Account>().path)) }
     single { ArticleOfflineAudioDownloader(httpClient = get(), store = get()) }

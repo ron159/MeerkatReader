@@ -5,6 +5,11 @@ import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.common.TimeHelpers.nowUTC
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.ArticleFixture
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import kotlin.test.Test
@@ -78,6 +83,67 @@ class ArticleIntegrationExportRecordsTest {
             expected = listOf(first.id, second.id),
             actual = records.findByState(ArticleIntegrationExportState.QUEUED).map { it.articleID },
         )
+    }
+
+    @Test
+    fun findByArticleIDsFiltersIntegration() = runTest {
+        val first = articleFixture.create()
+        val second = articleFixture.create()
+        records.upsert(
+            ArticleIntegrationExportInput(
+                articleID = first.id,
+                integrationID = "wallabag",
+                state = ArticleIntegrationExportState.QUEUED,
+            )
+        )
+        records.upsert(
+            ArticleIntegrationExportInput(
+                articleID = second.id,
+                integrationID = "readwise",
+                state = ArticleIntegrationExportState.QUEUED,
+            )
+        )
+
+        val found = records.findByArticleIDsAndIntegration(
+            articleIDs = listOf(first.id, second.id),
+            integrationID = "wallabag",
+        )
+
+        assertEquals(listOf(first.id), found.map { it.articleID })
+    }
+
+    @Test
+    fun observeByArticleIDsEmitsStateChanges() = runTest {
+        val article = articleFixture.create()
+        records.upsert(
+            ArticleIntegrationExportInput(
+                id = "export-1",
+                articleID = article.id,
+                integrationID = "wallabag",
+                state = ArticleIntegrationExportState.QUEUED,
+            )
+        )
+        val initialSeen = CompletableDeferred<Unit>()
+        val updated = async {
+            records.observeByArticleIDsAndIntegration(
+                articleIDs = listOf(article.id),
+                integrationID = "wallabag",
+            )
+                .onEach { initialSeen.complete(Unit) }
+                .drop(1)
+                .first()
+        }
+        initialSeen.await()
+
+        records.updateState(
+            id = "export-1",
+            state = ArticleIntegrationExportState.EXPORTED,
+            remoteID = "42",
+        )
+
+        val record = updated.await().single()
+        assertEquals(ArticleIntegrationExportState.EXPORTED, record.state)
+        assertEquals("42", record.remoteID)
     }
 
     @Test

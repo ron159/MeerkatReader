@@ -34,6 +34,7 @@ import com.capyreader.app.ui.settings.panels.DataStorageSettingsPanel
 import com.capyreader.app.ui.settings.panels.DisplaySettingsPanel
 import com.capyreader.app.ui.settings.panels.GeneralSettingsPanel
 import com.capyreader.app.ui.settings.panels.GesturesSettingPanel
+import com.capyreader.app.ui.settings.panels.IntegrationSettingsPanel
 import com.capyreader.app.ui.settings.panels.NotificationsSettingsPanel
 import com.capyreader.app.ui.settings.panels.SettingsPanel
 import com.capyreader.app.ui.settings.panels.SettingsViewModel
@@ -146,6 +147,7 @@ fun SettingsView(
 
                                 SettingsPanel.Display -> DisplaySettingsPanel()
                                 SettingsPanel.AI -> AiSettingsPanel()
+                                SettingsPanel.Integrations -> IntegrationSettingsPanel()
                                 SettingsPanel.Gestures -> GesturesSettingPanel()
                                 SettingsPanel.DataStorage -> DataStorageSettingsPanel()
                                 SettingsPanel.Account -> AccountSettingsPanel(onRemoveAccount = onRemoveAccount)

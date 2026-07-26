@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.capyreader.app.integrations.webdav.WebDavBackupScheduler
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.R
 import com.capyreader.app.common.toast
@@ -24,6 +25,7 @@ import com.jocmp.capy.Account
 import com.jocmp.capy.AccountManager
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.opml.ImportProgress
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -34,6 +36,8 @@ class AccountSettingsViewModel(
     val account: Account,
     private val appPreferences: AppPreferences,
     private val automaticBackupScheduler: AutomaticBackupScheduler,
+    private val backupFile: CapyBackupFile,
+    private val webDavBackupScheduler: WebDavBackupScheduler,
     application: Application
 ) : AndroidViewModel(application) {
     val accountSource: Source = account.source
@@ -48,6 +52,7 @@ class AccountSettingsViewModel(
         private set
 
     private var backupRestoreUri: Uri? = null
+    private var backupPreviewJob: Job? = null
 
     var automaticBackupEnabled by mutableStateOf(appPreferences.automaticBackupEnabled.get())
         private set
@@ -87,6 +92,7 @@ class AccountSettingsViewModel(
 
     fun removeAccount() {
         automaticBackupScheduler.clear()
+        webDavBackupScheduler.clear()
         appPreferences.clearAll()
         accountManager.removeAccount(accountID = account.id)
     }
@@ -151,8 +157,11 @@ class AccountSettingsViewModel(
     fun prepareBackupImport(uri: Uri?) {
         uri ?: return
 
-        viewModelScope.launch {
-            val preview = CapyBackupFile(applicationContext).restorePreview(account, uri)
+        backupPreviewJob?.cancel()
+        backupRestoreUri = null
+        backupRestorePreview = null
+        backupPreviewJob = viewModelScope.launch {
+            val preview = backupFile.restorePreview(account, uri)
 
             if (preview != null) {
                 backupRestoreUri = uri
@@ -162,6 +171,8 @@ class AccountSettingsViewModel(
     }
 
     fun cancelBackupImport() {
+        backupPreviewJob?.cancel()
+        backupPreviewJob = null
         backupRestoreUri = null
         backupRestorePreview = null
     }
@@ -183,7 +194,7 @@ class AccountSettingsViewModel(
             backupImportInProgress = true
 
             try {
-                CapyBackupFile(applicationContext).restore(account, uri, mode)
+                backupFile.restore(account, uri, mode)
             } finally {
                 backupImportInProgress = false
             }

@@ -11,6 +11,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import coil3.video.VideoFrameDecoder
 import com.capyreader.app.common.AndroidLogging
+import com.capyreader.app.integrations.webdav.WebDavBackupScheduler
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.ui.widget.HeadlinesWidgetReceiver
@@ -40,6 +41,7 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
         if (get<AppPreferences>().isLoggedIn) {
             loadAccountModules()
             get<AutomaticBackupScheduler>().initialize()
+            get<WebDavBackupScheduler>().initialize()
         }
 
         loadWidgetPreview()

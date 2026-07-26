@@ -11,6 +11,12 @@ WHERE article_id = :articleID
 AND integration_id = :integrationID
 LIMIT 1;
 
+findByArticleIDsAndIntegration:
+SELECT id, article_id, integration_id, state, remote_id, error_message, updated_at
+FROM article_integration_exports
+WHERE article_id IN :articleIDs
+AND integration_id = :integrationID;
+
 findByState:
 SELECT id, article_id, integration_id, state, remote_id, error_message, updated_at
 FROM article_integration_exports

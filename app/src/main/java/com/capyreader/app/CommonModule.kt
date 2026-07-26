@@ -5,6 +5,8 @@ import com.capyreader.app.common.AndroidDatabaseProvider
 import com.capyreader.app.common.AndroidClientCertManager
 import com.capyreader.app.common.AppFaviconPolicy
 import com.capyreader.app.common.SharedPreferenceStoreProvider
+import com.capyreader.app.integrations.webdav.WebDavBackupClient
+import com.capyreader.app.integrations.webdav.WebDavBackupScheduler
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.refresher.RefreshScheduler
 import com.capyreader.app.transfers.AutomaticBackupScheduler
@@ -43,6 +45,8 @@ internal val common = module {
     single { RefreshScheduler(get(), get()) }
     single { CapyBackupFile(get()) }
     single { AutomaticBackupScheduler(get(), get()) }
+    single { WebDavBackupClient(get(), get()) }
+    single { WebDavBackupScheduler(get(), get()) }
 }
 
 private fun Locale.toAcceptLanguageTag(): String {

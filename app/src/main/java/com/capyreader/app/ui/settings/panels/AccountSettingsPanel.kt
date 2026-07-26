@@ -383,7 +383,7 @@ fun AccountSettingsPanelView(
 }
 
 @Composable
-private fun BackupRestorePreviewDialog(
+internal fun BackupRestorePreviewDialog(
     preview: BackupRestorePreview,
     onDismiss: () -> Unit,
     onConfirm: (BackupRestoreMode) -> Unit,
