@@ -21,5 +21,7 @@ data class ArticleActions(
     val downloadOffline: (Article) -> Unit = {},
     val retryOffline: (Article) -> Unit = {},
     val removeOffline: (Article) -> Unit = {},
+    val exportToWallabag: (Article) -> Unit = {},
     val showSaveForLater: Boolean = false,
+    val showWallabag: Boolean = false,
 )

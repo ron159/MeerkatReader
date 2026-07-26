@@ -51,6 +51,11 @@ class ArticleOfflinePackageDownloader(
         packageRecords.delete(articleID)
     }
 
+    suspend fun clearAll() = withIOContext {
+        audioStore.deleteAll()
+        packageRecords.deleteAll()
+    }
+
     suspend fun findRecords(articleIDs: Collection<String>): Map<String, ArticleOfflinePackageRecord> =
         packageRecords.find(articleIDs).associateBy { it.articleID }
 

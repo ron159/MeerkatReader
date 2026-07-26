@@ -81,6 +81,22 @@ class ArticleOfflineAudioStoreTest {
         )
     }
 
+    @Test
+    fun `delete all removes every article directory`() {
+        val store = ArticleOfflineAudioStore(temporaryFolder.root)
+        write(store, "article-1", "https://example.com/one.mp3", "one")
+        write(store, "article-2", "https://example.com/two.mp3", "two")
+
+        store.deleteAll()
+
+        assertNull(
+            store.localURL("article-1", "https://example.com/one.mp3", "audio/mpeg")
+        )
+        assertNull(
+            store.localURL("article-2", "https://example.com/two.mp3", "audio/mpeg")
+        )
+    }
+
     private fun write(
         store: ArticleOfflineAudioStore,
         articleID: String,

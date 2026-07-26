@@ -290,7 +290,9 @@ fun ArticleScreen(
                 .distinctUntilChanged()
                 .debounce(250)
                 .collect {
-                    viewModel.loadOfflinePackageStates(visibleArticles())
+                    val visible = visibleArticles()
+                    viewModel.loadOfflinePackageStates(visible)
+                    viewModel.observeWallabagExportStates(visible)
                 }
         }
 
@@ -794,6 +796,7 @@ fun ArticleScreen(
                                                     selectedArticleKey = article?.id,
                                                     aiSummaryPreviews = viewModel.aiSummaryPreviews,
                                                     offlinePackageRecords = viewModel.offlinePackageRecords,
+                                                    wallabagExportRecords = viewModel.wallabagExportRecords,
                                                     listState = listState,
                                                     enableMarkReadOnScroll = viewModel.markReadOnScrollEnabled,
                                                     dimReadArticles = filter.status != ArticleStatus.STARRED,
@@ -956,6 +959,14 @@ fun ArticleScreen(
             contentEmpty = stringResource(R.string.article_ai_error_content_empty),
             questionRequired = stringResource(R.string.article_ai_error_question_required),
             noDigestArticles = stringResource(R.string.article_ai_error_no_digest_articles),
+            invalidConfiguration = stringResource(R.string.article_ai_error_invalid_configuration),
+            authentication = stringResource(R.string.article_ai_error_authentication),
+            rateLimit = stringResource(R.string.article_ai_error_rate_limit),
+            timeout = stringResource(R.string.article_ai_error_timeout),
+            connectivity = stringResource(R.string.article_ai_error_connectivity),
+            server = stringResource(R.string.article_ai_error_server),
+            providerRejected = stringResource(R.string.article_ai_error_provider_rejected),
+            invalidResponse = stringResource(R.string.article_ai_error_invalid_response),
         )
         if (aiDigestState.isLoading || aiDigestState.result != null || aiDigestState.error != null) {
             AlertDialog(
@@ -1153,8 +1164,10 @@ fun rememberArticleActions(viewModel: ArticleScreenViewModel): ArticleActions {
             downloadOffline = viewModel::downloadOfflineAsync,
             retryOffline = viewModel::retryOfflineAsync,
             removeOffline = viewModel::removeOfflineAsync,
+            exportToWallabag = viewModel::exportToWallabagAsync,
 
             showSaveForLater = viewModel.source.supportsReadLater,
+            showWallabag = viewModel.isWallabagConfigured,
         )
     }
 }

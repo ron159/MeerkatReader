@@ -42,7 +42,7 @@ class ArticleOfflinePackageRecords(
     suspend fun upsert(
         input: ArticleOfflinePackageInput,
         updatedAt: ZonedDateTime = nowUTC(),
-    ) = withIOContext {
+    ): Unit = withIOContext {
         database.articleOfflinePackagesQueries.upsert(
             articleID = input.articleID,
             state = input.state.name,
@@ -53,6 +53,7 @@ class ArticleOfflinePackageRecords(
             errorMessage = input.errorMessage,
             updatedAt = updatedAt.toEpochSecond(),
         )
+        Unit
     }
 
     suspend fun updateState(
@@ -61,7 +62,7 @@ class ArticleOfflinePackageRecords(
         bytes: Long = 0,
         errorMessage: String? = null,
         updatedAt: ZonedDateTime = nowUTC(),
-    ) = withIOContext {
+    ): Unit = withIOContext {
         database.articleOfflinePackagesQueries.updateState(
             articleID = articleID,
             state = state.name,
@@ -69,10 +70,12 @@ class ArticleOfflinePackageRecords(
             errorMessage = errorMessage,
             updatedAt = updatedAt.toEpochSecond(),
         )
+        Unit
     }
 
-    suspend fun delete(articleID: String) = withIOContext {
+    suspend fun delete(articleID: String): Unit = withIOContext {
         database.articleOfflinePackagesQueries.delete(articleID)
+        Unit
     }
 
     suspend fun deleteByState(state: ArticleOfflinePackageState): Int = withIOContext {
@@ -126,12 +129,14 @@ class ArticleOfflinePackageRecords(
         removedArticleIDs.size
     }
 
-    suspend fun deleteAll() = withIOContext {
+    suspend fun deleteAll(): Unit = withIOContext {
         database.articleOfflinePackagesQueries.deleteAll()
+        Unit
     }
 
-    suspend fun deleteOrphans() = withIOContext {
+    suspend fun deleteOrphans(): Unit = withIOContext {
         database.articleOfflinePackagesQueries.deleteWithoutArticle()
+        Unit
     }
 
     private fun mapper(

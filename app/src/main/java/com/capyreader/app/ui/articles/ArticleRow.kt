@@ -1,6 +1,7 @@
 package com.capyreader.app.ui.articles
 
 import android.content.res.Configuration
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -42,12 +43,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +81,7 @@ import com.jocmp.capy.EnclosureType
 import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.articles.relativeTime
+import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import java.net.URL
 import kotlinx.coroutines.launch
@@ -104,6 +111,7 @@ fun ArticleRow(
     options: ArticleRowOptions = ArticleRowOptions(),
     aiSummaryPreview: ArticleAiPreviewState? = null,
     offlinePackageRecord: ArticleOfflinePackageRecord? = null,
+    wallabagExportRecord: ArticleIntegrationExportRecord? = null,
 ) {
     val imageURL = article.imageURL
     val isMonochrome = LocalAppTheme.current.value == AppTheme.MONOCHROME
@@ -127,6 +135,7 @@ fun ArticleRow(
     val ruleCreatedMessage = stringResource(R.string.article_actions_rule_created)
     val offlineQueuedMessage = stringResource(R.string.article_actions_offline_queued)
     val offlineRemovedMessage = stringResource(R.string.article_actions_offline_removed)
+    val wallabagQueuedMessage = stringResource(R.string.article_actions_wallabag_queued)
     val openArticleMenu = {
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         setArticleMenuOpen(true)
@@ -169,46 +178,18 @@ fun ArticleRow(
                             )
                             Spacer(Modifier.width(16.dp))
                         }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (article.starred) {
-                                Icon(
-                                    Icons.Rounded.Star,
-                                    contentDescription = null,
-                                    tint = feedNameColor,
-                                    modifier = Modifier
-                                        .width(12.dp.relative(options.fontScale))
-                                )
-                            }
-                            if (article.enclosureType == EnclosureType.AUDIO) {
-                                Icon(
-                                    Icons.Rounded.PlayArrow,
-                                    contentDescription = null,
-                                    tint = feedNameColor,
-                                    modifier = Modifier
-                                        .width(16.dp.relative(options.fontScale))
-                                        .padding(end = 2.dp)
-                                )
-                            }
-                            if (offlinePackageRecord != null) {
-                                OfflineStatusIcon(
-                                    state = offlinePackageRecord.state,
-                                    tint = feedNameColor,
-                                    fontScale = options.fontScale,
-                                )
-                            }
-                            Text(
-                                text = relativeTime(
-                                    time = article.publishedAt,
-                                    currentTime = currentTime,
-                                    formats = LocalTimeFormats.current,
-                                ),
-                                color = feedNameColor,
-                                maxLines = 1,
-                            )
-                        }
+                        ArticleRowStatusMetadata(
+                            starred = article.starred,
+                            hasAudio = article.enclosureType == EnclosureType.AUDIO,
+                            offlineState = offlinePackageRecord?.state,
+                            relativeTimeText = relativeTime(
+                                time = article.publishedAt,
+                                currentTime = currentTime,
+                                formats = LocalTimeFormats.current,
+                            ),
+                            tint = feedNameColor,
+                            fontScale = options.fontScale,
+                        )
                     }
                 },
                 supportingContent = {
@@ -311,6 +292,12 @@ fun ArticleRow(
                     scope.launch { snackbarHost.showSnackbar(offlineRemovedMessage) }
                 },
                 offlinePackageRecord = offlinePackageRecord,
+                showWallabag = articleActions.showWallabag,
+                wallabagExportRecord = wallabagExportRecord,
+                onExportWallabag = {
+                    articleActions.exportToWallabag(article)
+                    scope.launch { snackbarHost.showSnackbar(wallabagQueuedMessage) }
+                },
                 onDismissRequest = {
                     setArticleMenuOpen(false)
                 }
@@ -319,41 +306,123 @@ fun ArticleRow(
     }
 }
 
+internal data class OfflineStatusVisual(
+    val icon: ImageVector,
+    @param:StringRes val descriptionRes: Int,
+    val announcesChanges: Boolean,
+)
+
+internal fun offlineStatusVisual(state: ArticleOfflinePackageState): OfflineStatusVisual {
+    return when (state) {
+        ArticleOfflinePackageState.READY -> OfflineStatusVisual(
+            icon = Icons.Rounded.DownloadDone,
+            descriptionRes = R.string.article_offline_status_ready,
+            announcesChanges = true,
+        )
+        ArticleOfflinePackageState.FAILED -> OfflineStatusVisual(
+            icon = Icons.Rounded.ErrorOutline,
+            descriptionRes = R.string.article_offline_status_failed,
+            announcesChanges = true,
+        )
+        ArticleOfflinePackageState.QUEUED -> OfflineStatusVisual(
+            icon = Icons.Rounded.Download,
+            descriptionRes = R.string.article_offline_status_queued,
+            announcesChanges = true,
+        )
+        ArticleOfflinePackageState.DOWNLOADING -> OfflineStatusVisual(
+            icon = Icons.Rounded.Download,
+            descriptionRes = R.string.article_offline_status_downloading,
+            announcesChanges = true,
+        )
+        ArticleOfflinePackageState.STALE -> OfflineStatusVisual(
+            icon = Icons.Rounded.Download,
+            descriptionRes = R.string.article_offline_status_stale,
+            announcesChanges = true,
+        )
+        ArticleOfflinePackageState.NOT_DOWNLOADED -> OfflineStatusVisual(
+            icon = Icons.Rounded.Download,
+            descriptionRes = R.string.article_offline_status_not_downloaded,
+            announcesChanges = false,
+        )
+    }
+}
+
 @Composable
-private fun OfflineStatusIcon(
+internal fun ArticleRowStatusMetadata(
+    starred: Boolean,
+    hasAudio: Boolean,
+    offlineState: ArticleOfflinePackageState?,
+    relativeTimeText: String,
+    tint: Color,
+    fontScale: ArticleListFontScale,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
+    ) {
+        if (starred) {
+            Icon(
+                Icons.Rounded.Star,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.width(12.dp.relative(fontScale)),
+            )
+        }
+        if (hasAudio) {
+            Icon(
+                Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier
+                    .width(16.dp.relative(fontScale))
+                    .padding(end = 2.dp),
+            )
+        }
+        if (offlineState != null) {
+            OfflineStatusIcon(
+                state = offlineState,
+                tint = tint,
+                fontScale = fontScale,
+            )
+        }
+        Text(
+            text = relativeTimeText,
+            color = tint,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+internal fun OfflineStatusIcon(
     state: ArticleOfflinePackageState,
     tint: Color,
     fontScale: ArticleListFontScale,
+    modifier: Modifier = Modifier,
 ) {
-    val icon = when (state) {
-        ArticleOfflinePackageState.READY -> Icons.Rounded.DownloadDone
-        ArticleOfflinePackageState.FAILED -> Icons.Rounded.ErrorOutline
-        ArticleOfflinePackageState.QUEUED,
-        ArticleOfflinePackageState.DOWNLOADING,
-        ArticleOfflinePackageState.STALE,
-        ArticleOfflinePackageState.NOT_DOWNLOADED -> Icons.Rounded.Download
-    }
-    val description = when (state) {
-        ArticleOfflinePackageState.READY -> stringResource(R.string.article_offline_status_ready)
-        ArticleOfflinePackageState.FAILED -> stringResource(R.string.article_offline_status_failed)
-        ArticleOfflinePackageState.QUEUED -> stringResource(R.string.article_offline_status_queued)
-        ArticleOfflinePackageState.DOWNLOADING -> stringResource(R.string.article_offline_status_downloading)
-        ArticleOfflinePackageState.STALE -> stringResource(R.string.article_offline_status_stale)
-        ArticleOfflinePackageState.NOT_DOWNLOADED -> stringResource(R.string.article_offline_status_not_downloaded)
-    }
+    val visual = offlineStatusVisual(state)
+    val description = stringResource(visual.descriptionRes)
 
     Icon(
-        icon,
-        contentDescription = description,
+        visual.icon,
+        contentDescription = null,
         tint = tint,
-        modifier = Modifier
+        modifier = modifier
             .width(14.dp.relative(fontScale))
-            .padding(end = 2.dp),
+            .padding(end = 2.dp)
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (visual.announcesChanges) {
+                    liveRegion = LiveRegionMode.Polite
+                }
+            },
     )
 }
 
 @Composable
-private fun ArticleAiSummaryPreview(
+internal fun ArticleAiSummaryPreview(
     state: ArticleAiPreviewState,
     deEmphasizeFontWeight: Boolean,
 ) {
@@ -371,12 +440,31 @@ private fun ArticleAiSummaryPreview(
     }
 
     val tint = if (isError) colorScheme.error else colorScheme.primary
+    val label = stringResource(R.string.article_ai_label_preview_summary)
+    val status = when {
+        state.isLoading -> null
+        isError -> null
+        state.isCached -> stringResource(R.string.article_ai_preview_cached)
+        else -> stringResource(R.string.article_ai_preview_ready)
+    }
+    val description = buildList {
+        add(label)
+        status?.let(::add)
+        add(text)
+    }.joinToString(". ")
 
     Surface(
         color = colorScheme.surfaceContainer,
         contentColor = if (isError) colorScheme.error else colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (state.isLoading || isError) {
+                    liveRegion = LiveRegionMode.Polite
+                }
+            },
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),

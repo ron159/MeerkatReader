@@ -1,11 +1,20 @@
 package com.capyreader.app.ui.articles.list
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -17,10 +26,15 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.DpOffset
@@ -35,10 +49,12 @@ import com.capyreader.app.ui.components.readAction
 import com.capyreader.app.ui.components.starAction
 import com.capyreader.app.ui.fixtures.ArticleSample
 import com.jocmp.capy.Article
+import com.jocmp.capy.ArticleIntegrationExportState
 import com.jocmp.capy.ArticleOfflinePackageState
 import com.jocmp.capy.MarkRead
 import com.jocmp.capy.MarkRead.After
 import com.jocmp.capy.MarkRead.Before
+import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 
 @Composable
@@ -59,6 +75,9 @@ fun ArticleActionMenu(
     onRetryOffline: () -> Unit = {},
     onRemoveOffline: () -> Unit = {},
     offlinePackageRecord: ArticleOfflinePackageRecord? = null,
+    showWallabag: Boolean = false,
+    wallabagExportRecord: ArticleIntegrationExportRecord? = null,
+    onExportWallabag: () -> Unit = {},
     onDismissRequest: () -> Unit = {},
 ) {
     val unreadCount = LocalUnreadCount.current
@@ -81,6 +100,21 @@ fun ArticleActionMenu(
             RetryOfflineMenuItem(onDismissRequest, onRetryOffline)
         }
         RemoveOfflineMenuItem(onDismissRequest, onRemoveOffline)
+        if (showWallabag && article.url != null) {
+            val exportFailure = wallabagExportRecord
+                ?.takeIf {
+                    it.state == ArticleIntegrationExportState.FAILED ||
+                        !it.errorMessage.isNullOrBlank()
+                }
+            if (exportFailure != null) {
+                WallabagFailureMenuItem(exportFailure)
+            }
+            WallabagMenuItem(
+                onDismissRequest = onDismissRequest,
+                record = wallabagExportRecord,
+                onExportWallabag = onExportWallabag,
+            )
+        }
         if (!article.feedURL.isNullOrBlank() || article.feedName.isNotBlank()) {
             MuteFeedMenuItem(onDismissRequest, onMuteFeed)
         }
@@ -121,7 +155,90 @@ fun ArticleActionMenu(
 }
 
 @Composable
-private fun OfflineFailureMenuItem(
+internal fun WallabagFailureMenuItem(
+    record: ArticleIntegrationExportRecord,
+) {
+    val message = record.errorMessage
+        ?.takeIf(::isSafeWallabagError)
+        ?: stringResource(R.string.article_actions_wallabag_failed)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clearAndSetSemantics {
+                contentDescription = message
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Icon(
+            Icons.Rounded.ErrorOutline,
+            contentDescription = null,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+@Composable
+internal fun WallabagMenuItem(
+    onDismissRequest: () -> Unit,
+    record: ArticleIntegrationExportRecord?,
+    onExportWallabag: () -> Unit,
+) {
+    val state = record?.state
+    val icon = when (state) {
+        ArticleIntegrationExportState.EXPORTED -> Icons.Rounded.CheckCircle
+        ArticleIntegrationExportState.FAILED -> Icons.Rounded.Refresh
+        else -> Icons.Rounded.CloudUpload
+    }
+    val label = when (state) {
+        ArticleIntegrationExportState.QUEUED,
+        ArticleIntegrationExportState.EXPORTING,
+            -> R.string.article_actions_wallabag_queued
+
+        ArticleIntegrationExportState.EXPORTED -> R.string.article_actions_wallabag_exported
+        ArticleIntegrationExportState.FAILED -> R.string.article_actions_wallabag_retry
+        null -> R.string.article_actions_wallabag_save
+    }
+    val enabled = state != ArticleIntegrationExportState.QUEUED &&
+        state != ArticleIntegrationExportState.EXPORTING &&
+        state != ArticleIntegrationExportState.EXPORTED
+
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(
+                icon,
+                contentDescription = null,
+            )
+        },
+        text = { Text(stringResource(label)) },
+        enabled = enabled,
+        onClick = {
+            onDismissRequest()
+            onExportWallabag()
+        },
+    )
+}
+
+private fun isSafeWallabagError(message: String): Boolean {
+    return message == "Wallabag authentication failed" ||
+        message == "Wallabag is not configured" ||
+        message == "Wallabag connection failed" ||
+        message == "Wallabag export failed" ||
+        WALLABAG_HTTP_ERROR.matches(message)
+}
+
+private val WALLABAG_HTTP_ERROR = Regex(
+    """Wallabag request failed \(HTTP \d{3}\)"""
+)
+
+@Composable
+internal fun OfflineFailureMenuItem(
     onDismissRequest: () -> Unit,
     offlinePackageRecord: ArticleOfflinePackageRecord,
 ) {
@@ -129,20 +246,26 @@ private fun OfflineFailureMenuItem(
         ?.takeIf { it.isNotBlank() }
         ?: stringResource(R.string.article_actions_offline_failed_unknown)
 
-    DropdownMenuItem(
-        leadingIcon = {
-            Icon(
-                Icons.Rounded.ErrorOutline,
-                contentDescription = null
-            )
-        },
-        text = { Text(message) },
-        onClick = { onDismissRequest() },
-    )
+    Box(
+        modifier = Modifier.clearAndSetSemantics {
+            contentDescription = message
+        }
+    ) {
+        DropdownMenuItem(
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.ErrorOutline,
+                    contentDescription = null
+                )
+            },
+            text = { Text(message) },
+            onClick = { onDismissRequest() },
+        )
+    }
 }
 
 @Composable
-private fun RetryOfflineMenuItem(
+internal fun RetryOfflineMenuItem(
     onDismissRequest: () -> Unit,
     onRetryOffline: () -> Unit,
 ) {

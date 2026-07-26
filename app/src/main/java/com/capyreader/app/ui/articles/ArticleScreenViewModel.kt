@@ -13,12 +13,15 @@ import androidx.paging.PagingData
 import com.capyreader.app.R
 import com.capyreader.app.ai.ArticleAiAction
 import com.capyreader.app.ai.ArticleAiRepository
+import com.capyreader.app.ai.ArticleAiRuleWorker
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.articleimages.ArticleImageStore
 import com.capyreader.app.common.isOnWifi
 import com.capyreader.app.common.toast
+import com.capyreader.app.integrations.wallabag.WallabagArticleExporter
+import com.capyreader.app.integrations.wallabag.WallabagExportWorker
 import com.capyreader.app.notifications.NotificationHelper
 import com.capyreader.app.offline.ArticleOfflinePackageDownloader
 import com.capyreader.app.offline.ArticleOfflinePackageWorker
@@ -54,6 +57,7 @@ import com.jocmp.capy.countToday
 import com.jocmp.capy.logging.CapyLog
 import com.jocmp.capy.persistence.ArticleFullContentRecords
 import com.jocmp.capy.persistence.ArticleImageRecords
+import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import com.jocmp.capy.persistence.ArticleRuleMatchRecord
 import com.jocmp.capy.persistence.ArticleRuleMatchRecords
@@ -80,6 +84,7 @@ data class ArticleAiPreviewState(
     val isLoading: Boolean = false,
     val result: String? = null,
     val error: String? = null,
+    val isCached: Boolean = false,
 )
 
 data class ArticleAiDigestState(
@@ -110,6 +115,10 @@ class ArticleScreenViewModel(
     private val articleFullContentRecords: ArticleFullContentRecords,
     private val articleAiRepository: ArticleAiRepository,
     private val articleOfflinePackageDownloader: ArticleOfflinePackageDownloader,
+    private val wallabagArticleExporter: WallabagArticleExporter,
+    private val enqueueWallabagExport: () -> Unit = {
+        WallabagExportWorker.enqueue(application.applicationContext)
+    },
     private val articleRuleMatchRecords: ArticleRuleMatchRecords? = null,
     private val automaticBackupScheduler: AutomaticBackupScheduler? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -121,11 +130,15 @@ class ArticleScreenViewModel(
 
     private var aiSummaryPreviewJob: Job? = null
 
+    private var wallabagExportStateJob: Job? = null
+
     val preloadedArticles = mutableStateMapOf<String, Article>()
 
     val aiSummaryPreviews = mutableStateMapOf<String, ArticleAiPreviewState>()
 
     val offlinePackageRecords = mutableStateMapOf<String, ArticleOfflinePackageRecord>()
+
+    val wallabagExportRecords = mutableStateMapOf<String, ArticleIntegrationExportRecord>()
 
     var aiDigestState by mutableStateOf(ArticleAiDigestState())
         private set
@@ -471,17 +484,27 @@ class ArticleScreenViewModel(
             }
         }
 
-        aiSummaryPreviewJob = viewModelScope.launchIO {
+        aiSummaryPreviewJob = viewModelScope.launch(ioDispatcher) {
             articleBatch.forEach { article ->
-                val result = articleAiRepository.run(
+                val cachedResult = articleAiRepository.cachedResult(
                     action = ArticleAiAction.PREVIEW_SUMMARY,
                     article = article,
-                    forceRefresh = false,
-                )
+                )?.trim()?.takeIf { it.isNotBlank() }
+                val result = cachedResult?.let(Result.Companion::success)
+                    ?: articleAiRepository.run(
+                        action = ArticleAiAction.PREVIEW_SUMMARY,
+                        article = article,
+                        forceRefresh = true,
+                    )
 
                 withUIContext {
                     aiSummaryPreviews[article.id] = result.fold(
-                        onSuccess = { ArticleAiPreviewState(result = it.trim()) },
+                        onSuccess = {
+                            ArticleAiPreviewState(
+                                result = it.trim(),
+                                isCached = cachedResult != null,
+                            )
+                        },
                         onFailure = {
                             ArticleAiPreviewState(
                                 error = it.localizedMessage ?: it.message ?: it.toString(),
@@ -509,6 +532,35 @@ class ArticleScreenViewModel(
                     } else {
                         offlinePackageRecords[article.id] = record
                     }
+                }
+            }
+        }
+    }
+
+    fun observeWallabagExportStates(articles: List<Article>) {
+        if (articles.isEmpty() || !wallabagArticleExporter.isConfigured()) {
+            wallabagExportStateJob?.cancel()
+            wallabagExportRecords.clear()
+            return
+        }
+
+        wallabagExportStateJob?.cancel()
+        wallabagExportStateJob = viewModelScope.launch(ioDispatcher) {
+            wallabagArticleExporter.observeRecords(articles.map { it.id }).collect { records ->
+                withUIContext {
+                    articles.forEach { article ->
+                        val record = records[article.id]
+                        if (record == null) {
+                            wallabagExportRecords.remove(article.id)
+                        } else {
+                            wallabagExportRecords[article.id] = record
+                        }
+                    }
+
+                    val visibleIDs = articles.mapTo(mutableSetOf()) { it.id }
+                    wallabagExportRecords.keys
+                        .filter { it !in visibleIDs }
+                        .forEach(wallabagExportRecords::remove)
                 }
             }
         }
@@ -697,6 +749,23 @@ class ArticleScreenViewModel(
         }
     }
 
+    val isWallabagConfigured: Boolean
+        get() = wallabagArticleExporter.isConfigured()
+
+    fun exportToWallabagAsync(article: Article) {
+        if (!isWallabagConfigured || article.url == null) {
+            return
+        }
+
+        viewModelScope.launch(ioDispatcher) {
+            val record = wallabagArticleExporter.queue(article.id)
+            withUIContext {
+                wallabagExportRecords[article.id] = record
+            }
+            enqueueWallabagExport()
+        }
+    }
+
     private fun addAutomationRule(rule: ArticleAutomationRule) {
         account.preferences.automationRules.getAndSet { rules ->
             rules + rule
@@ -776,11 +845,19 @@ class ArticleScreenViewModel(
                 return@launch
             }
 
-            account.refresh(filter).onFailure { throwable ->
-                if (throwable is UnauthorizedError && _showUnauthorizedMessage == UnauthorizedMessageState.HIDE) {
-                    _showUnauthorizedMessage = UnauthorizedMessageState.SHOW
+            account.refresh(filter)
+                .onSuccess {
+                    ArticleAiRuleWorker.enqueueIfEligible(
+                        context = application,
+                        appPreferences = appPreferences,
+                        rules = { account.preferences.automationRules.get() },
+                    )
                 }
-            }
+                .onFailure { throwable ->
+                    if (throwable is UnauthorizedError && _showUnauthorizedMessage == UnauthorizedMessageState.HIDE) {
+                        _showUnauthorizedMessage = UnauthorizedMessageState.SHOW
+                    }
+                }
             articleImageCacheCleaner.cleanup()
             articleImagePreloader.enqueue()
 

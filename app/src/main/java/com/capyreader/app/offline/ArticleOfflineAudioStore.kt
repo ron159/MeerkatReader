@@ -2,6 +2,7 @@ package com.capyreader.app.offline
 
 import okhttp3.ResponseBody
 import java.io.File
+import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -98,6 +99,12 @@ class ArticleOfflineAudioStore(accountDirectory: File) {
 
     fun deleteArticle(articleID: String) {
         articleDirectory(articleID).deleteRecursively()
+    }
+
+    fun deleteAll() {
+        if (root.exists() && !root.deleteRecursively()) {
+            throw IOException("Could not clear offline audio")
+        }
     }
 
     fun deleteUnreferencedArticles(articleIDs: Collection<String>) {

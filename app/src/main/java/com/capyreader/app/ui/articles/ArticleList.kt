@@ -31,6 +31,7 @@ import com.capyreader.app.common.asState
 import com.capyreader.app.preferences.AppPreferences
 import com.jocmp.capy.Article
 import com.jocmp.capy.MarkRead
+import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
@@ -43,6 +44,7 @@ fun ArticleList(
     selectedArticleKey: String?,
     aiSummaryPreviews: Map<String, ArticleAiPreviewState> = emptyMap(),
     offlinePackageRecords: Map<String, ArticleOfflinePackageRecord> = emptyMap(),
+    wallabagExportRecords: Map<String, ArticleIntegrationExportRecord> = emptyMap(),
     listState: LazyListState,
     onMarkAllRead: (range: MarkRead) -> Unit = {},
     enableMarkReadOnScroll: Boolean = false,
@@ -86,6 +88,7 @@ fun ArticleList(
                                     options = articleOptions,
                                     aiSummaryPreview = aiSummaryPreviews[item.id],
                                     offlinePackageRecord = offlinePackageRecords[item.id],
+                                    wallabagExportRecord = wallabagExportRecords[item.id],
                                 )
                             }
                         }

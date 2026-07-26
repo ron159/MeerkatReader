@@ -6,7 +6,10 @@ import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.articleimages.ArticleImageStore
+import com.capyreader.app.ai.ArticleAiAction
 import com.capyreader.app.ai.ArticleAiRepository
+import com.capyreader.app.integrations.wallabag.WallabagArticleExporter
+import com.capyreader.app.integrations.wallabag.WallabagIntegration
 import com.capyreader.app.notifications.NotificationHelper
 import com.capyreader.app.offline.ArticleOfflinePackageDownloader
 import com.capyreader.app.preferences.AppPreferences
@@ -16,13 +19,16 @@ import com.capyreader.app.ui.articles.feeds.AngleRefreshState
 import com.jocmp.capy.Account
 import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleFilter
+import com.jocmp.capy.ArticleIntegrationExportState
 import com.jocmp.capy.ArticleStatus
 import com.jocmp.capy.Feed
 import com.jocmp.capy.Folder
 import com.jocmp.capy.accounts.Source
-import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleFullContentRecords
+import com.jocmp.capy.persistence.ArticleImageRecords
+import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -65,6 +71,7 @@ class ArticleScreenViewModelTest {
     private lateinit var articleFullContentRecords: ArticleFullContentRecords
     private lateinit var articleAiRepository: ArticleAiRepository
     private lateinit var articleOfflinePackageDownloader: ArticleOfflinePackageDownloader
+    private lateinit var wallabagArticleExporter: WallabagArticleExporter
 
     @Before
     fun setUp() {
@@ -106,6 +113,7 @@ class ArticleScreenViewModelTest {
         articleFullContentRecords = mockk(relaxed = true)
         articleAiRepository = mockk(relaxed = true)
         articleOfflinePackageDownloader = mockk(relaxed = true)
+        wallabagArticleExporter = mockk(relaxed = true)
         coEvery { articleFullContentRecords.find(any()) } returns null
     }
 
@@ -291,8 +299,192 @@ class ArticleScreenViewModelTest {
         )
     }
 
+    @Test
+    fun `cached article preview is identified without another provider request`() = runTest {
+        val article = previewArticle("cached")
+        coEvery {
+            articleAiRepository.cachedResult(ArticleAiAction.PREVIEW_SUMMARY, article)
+        } returns "Cached summary"
+        val viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.summarizeArticlePreviews(listOf(article))
+        advanceUntilIdle()
+
+        assertEquals(
+            ArticleAiPreviewState(
+                result = "Cached summary",
+                isCached = true,
+            ),
+            viewModel.aiSummaryPreviews[article.id],
+        )
+        coVerify(exactly = 0) {
+            articleAiRepository.run(
+                action = ArticleAiAction.PREVIEW_SUMMARY,
+                article = article,
+                forceRefresh = true,
+            )
+        }
+    }
+
+    @Test
+    fun `uncached article preview performs one fresh request`() = runTest {
+        val article = previewArticle("fresh")
+        coEvery {
+            articleAiRepository.cachedResult(ArticleAiAction.PREVIEW_SUMMARY, article)
+        } returns null
+        coEvery {
+            articleAiRepository.run(
+                action = ArticleAiAction.PREVIEW_SUMMARY,
+                article = article,
+                forceRefresh = true,
+            )
+        } returns Result.success("Fresh summary")
+        val viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.summarizeArticlePreviews(listOf(article))
+        advanceUntilIdle()
+
+        assertEquals(
+            ArticleAiPreviewState(result = "Fresh summary"),
+            viewModel.aiSummaryPreviews[article.id],
+        )
+        coVerify(exactly = 1) {
+            articleAiRepository.run(
+                action = ArticleAiAction.PREVIEW_SUMMARY,
+                article = article,
+                forceRefresh = true,
+            )
+        }
+    }
+
+    @Test
+    fun `Wallabag export ignores unconfigured integration and missing URL`() = runTest {
+        var enqueueCount = 0
+        val viewModel = buildViewModel(
+            enqueueWallabagExport = { enqueueCount += 1 },
+        )
+        val article = previewArticle("wallabag-no-op")
+
+        every { wallabagArticleExporter.isConfigured() } returns false
+        viewModel.exportToWallabagAsync(article)
+        every { wallabagArticleExporter.isConfigured() } returns true
+        viewModel.exportToWallabagAsync(article.copy(url = null))
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { wallabagArticleExporter.queue(any()) }
+        assertEquals(0, enqueueCount)
+        assertTrue(viewModel.wallabagExportRecords.isEmpty())
+    }
+
+    @Test
+    fun `Wallabag export queues and schedules exactly once`() = runTest {
+        var enqueueCount = 0
+        val article = previewArticle("wallabag-valid")
+        val queuedRecord = wallabagRecord(
+            articleID = article.id,
+            state = ArticleIntegrationExportState.QUEUED,
+        )
+        every { wallabagArticleExporter.isConfigured() } returns true
+        coEvery {
+            wallabagArticleExporter.queue(article.id)
+        } returns queuedRecord
+        val viewModel = buildViewModel(
+            enqueueWallabagExport = { enqueueCount += 1 },
+        )
+
+        viewModel.exportToWallabagAsync(article)
+        advanceUntilIdle()
+
+        assertEquals(queuedRecord, viewModel.wallabagExportRecords[article.id])
+        coVerify(exactly = 1) { wallabagArticleExporter.queue(article.id) }
+        assertEquals(1, enqueueCount)
+    }
+
+    @Test
+    fun `Wallabag observation replaces removes and prunes visible records`() = runTest {
+        val firstArticle = previewArticle("wallabag-first")
+        val secondArticle = previewArticle("wallabag-second")
+        val firstQueued = wallabagRecord(
+            articleID = firstArticle.id,
+            state = ArticleIntegrationExportState.QUEUED,
+        )
+        val secondQueued = wallabagRecord(
+            articleID = secondArticle.id,
+            state = ArticleIntegrationExportState.QUEUED,
+        )
+        val firstExported = wallabagRecord(
+            articleID = firstArticle.id,
+            state = ArticleIntegrationExportState.EXPORTED,
+        )
+        val firstVisibleRecords = MutableStateFlow(
+            mapOf(
+                firstArticle.id to firstQueued,
+                secondArticle.id to secondQueued,
+            )
+        )
+        val narrowedRecords = MutableStateFlow(
+            mapOf(firstArticle.id to firstExported)
+        )
+        every { wallabagArticleExporter.isConfigured() } returns true
+        every {
+            wallabagArticleExporter.observeRecords(
+                listOf(firstArticle.id, secondArticle.id)
+            )
+        } returns firstVisibleRecords
+        every {
+            wallabagArticleExporter.observeRecords(listOf(firstArticle.id))
+        } returns narrowedRecords
+        val viewModel = buildViewModel()
+
+        viewModel.observeWallabagExportStates(
+            listOf(firstArticle, secondArticle)
+        )
+        runCurrent()
+        assertEquals(firstQueued, viewModel.wallabagExportRecords[firstArticle.id])
+        assertEquals(secondQueued, viewModel.wallabagExportRecords[secondArticle.id])
+
+        firstVisibleRecords.value = mapOf(
+            firstArticle.id to firstExported,
+            secondArticle.id to secondQueued,
+        )
+        runCurrent()
+        assertEquals(firstExported, viewModel.wallabagExportRecords[firstArticle.id])
+
+        viewModel.observeWallabagExportStates(listOf(firstArticle))
+        runCurrent()
+        assertEquals(firstExported, viewModel.wallabagExportRecords[firstArticle.id])
+        assertFalse(viewModel.wallabagExportRecords.containsKey(secondArticle.id))
+
+        narrowedRecords.value = emptyMap()
+        runCurrent()
+        assertTrue(viewModel.wallabagExportRecords.isEmpty())
+
+        viewModel.observeWallabagExportStates(emptyList())
+    }
+
+    private fun previewArticle(id: String): Article {
+        val now = ZonedDateTime.parse("2026-07-25T00:00:00Z")
+        return Article(
+            id = id,
+            feedID = "feed",
+            title = "Article $id",
+            author = null,
+            contentHTML = "<p>Content</p>",
+            url = URL("https://example.com/$id"),
+            summary = "",
+            imageURL = null,
+            updatedAt = now,
+            publishedAt = now,
+            read = false,
+            starred = false,
+        )
+    }
+
     private fun buildViewModel(
         syncFlushInterval: kotlin.time.Duration? = null,
+        enqueueWallabagExport: () -> Unit = {},
     ): ArticleScreenViewModel {
         val application = RuntimeEnvironment.getApplication() as Application
 
@@ -309,8 +501,23 @@ class ArticleScreenViewModelTest {
             articleFullContentRecords = articleFullContentRecords,
             articleAiRepository = articleAiRepository,
             articleOfflinePackageDownloader = articleOfflinePackageDownloader,
+            wallabagArticleExporter = wallabagArticleExporter,
+            enqueueWallabagExport = enqueueWallabagExport,
             ioDispatcher = testDispatcher,
             syncFlushInterval = syncFlushInterval,
         )
     }
+
+    private fun wallabagRecord(
+        articleID: String,
+        state: ArticleIntegrationExportState,
+    ) = ArticleIntegrationExportRecord(
+        id = "$articleID-$state",
+        articleID = articleID,
+        integrationID = WallabagIntegration.ID,
+        state = state,
+        remoteID = null,
+        errorMessage = null,
+        updatedAt = 0L,
+    )
 }
