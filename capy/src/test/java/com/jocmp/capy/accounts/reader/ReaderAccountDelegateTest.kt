@@ -8,6 +8,8 @@ import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.accounts.AddFeedResult
 import com.jocmp.capy.accounts.Source
+import com.jocmp.capy.accounts.assertAutomationApplied
+import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
@@ -219,6 +221,51 @@ class ReaderAccountDelegateTest {
 
         val enclosures = EnclosureRecords(database).findByArticle("0000000000000010")
         assertEquals(expected = 1, actual = enclosures.size)
+    }
+
+    @Test
+    fun refresh_appliesAutomationLocallyAndSyncsRemoteStatus() = runTest {
+        val itemRefs = listOf(ItemRef("16"))
+        preferences.automationRules.set(
+            listOf(automationTestRule(titleText = "Rocket Report"))
+        )
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        stubUnread(itemRefs)
+        stubStreamItemsIDs(itemRefs)
+        coEvery {
+            googleReader.editTag(
+                ids = listOf(unreadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Read().id,
+            )
+        } returns Response.success("OK")
+        coEvery {
+            googleReader.editTag(
+                ids = listOf(unreadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Starred().id,
+            )
+        } returns Response.success("OK")
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertAutomationApplied(database, unreadItem.hexID)
+        coVerify {
+            googleReader.editTag(
+                ids = listOf(unreadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Read().id,
+            )
+        }
+        coVerify {
+            googleReader.editTag(
+                ids = listOf(unreadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Starred().id,
+            )
+        }
     }
 
     @Test

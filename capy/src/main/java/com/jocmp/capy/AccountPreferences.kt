@@ -12,8 +12,10 @@ import kotlinx.serialization.json.Json
 
 class AccountPreferences(
     private val store: PreferenceStore,
+    passwordPreference: Preference<String> = store.getString("password", ""),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    val password: Preference<String> = passwordPreference
 
     val source: Preference<Source>
         get() = store.getEnum("source", Source.LOCAL)
@@ -26,9 +28,6 @@ class AccountPreferences(
 
     val clientCertAlias: Preference<String>
         get() = store.getString("client_cert_alias", "")
-
-    val password: Preference<String>
-        get() = store.getString("password", "")
 
     val autoDelete: Preference<AutoDelete>
         get() = store.getEnum("auto_delete_articles", AutoDelete.default)

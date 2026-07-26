@@ -28,41 +28,52 @@ class ArticleAiPreviewWorker(
     override suspend fun doWork(): Result {
         val aiOptions = appPreferences.aiOptions
 
-        if (!aiOptions.enabled.get() ||
-            !aiOptions.backgroundPreviewsEnabled.get() ||
-            aiOptions.apiKey.get().isBlank()
-        ) {
+        if (!aiOptions.canRunBackgroundPreviews()) {
             return Result.success()
         }
 
         return try {
-            val articles = account.latestArticles(limit = DEFAULT_LIMIT.toLong()).first()
-            var processed = 0
-
-            articles.forEach { article ->
-                if (!articleAiRepository.cachedResult(ArticleAiAction.PREVIEW_SUMMARY, article).isNullOrBlank()) {
-                    return@forEach
-                }
-
-                articleAiRepository.run(
-                    action = ArticleAiAction.PREVIEW_SUMMARY,
-                    article = article,
-                    forceRefresh = false,
-                ).onSuccess {
-                    processed += 1
-                }.onFailure { error ->
-                    CapyLog.warn(
-                        "article_ai_preview_worker",
-                        mapOf(
-                            "article_id" to article.id,
-                            "error_type" to error::class.simpleName,
-                            "error_message" to error.message,
-                        )
-                    )
-                }
+            val dailyBudget = ArticleAiDailyBudget(aiOptions)
+            val remaining = dailyBudget.remaining()
+            if (remaining == 0) {
+                CapyLog.info(
+                    "article_ai_preview_worker:daily_limit_reached",
+                    mapOf("daily_limit" to aiOptions.backgroundPreviewsDailyLimit.get()),
+                )
+                return Result.success()
             }
 
-            CapyLog.info("article_ai_preview_worker:success", mapOf("processed" to processed))
+            val articles = account.latestArticles(limit = MAX_CANDIDATES.toLong()).first()
+            val run = ArticleAiPreviewProcessor(
+                articleAiRepository = articleAiRepository,
+                dailyBudget = dailyBudget,
+            ).process(
+                articles = articles,
+                maxRequests = MAX_REQUESTS_PER_RUN,
+                maxSuccesses = minOf(MAX_REQUESTS_PER_RUN, remaining),
+            )
+
+            run.failures.forEach { failure ->
+                CapyLog.warn(
+                    "article_ai_preview_worker",
+                    mapOf(
+                        "article_id" to failure.articleID,
+                        "error_type" to failure.error::class.simpleName,
+                        "error_reason" to
+                            (failure.error as? ArticleAiException)?.reason?.name,
+                    )
+                )
+            }
+
+            CapyLog.info(
+                "article_ai_preview_worker:success",
+                mapOf(
+                    "cached" to run.cached,
+                    "requested" to run.requested,
+                    "generated" to run.generated,
+                    "remaining" to dailyBudget.remaining(),
+                ),
+            )
             Result.success()
         } catch (e: CancellationException) {
             throw e
@@ -74,24 +85,16 @@ class ArticleAiPreviewWorker(
 
     companion object {
         private const val WORK_NAME = "article-ai-previews"
-        private const val DEFAULT_LIMIT = 10
+        private const val MAX_REQUESTS_PER_RUN = 10
+        private const val MAX_CANDIDATES = 30
 
         fun enqueue(
             context: Context,
             wiFiOnly: Boolean = true,
+            requiresCharging: Boolean = false,
         ) {
             val request = OneTimeWorkRequestBuilder<ArticleAiPreviewWorker>()
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(
-                            if (wiFiOnly) {
-                                NetworkType.UNMETERED
-                            } else {
-                                NetworkType.CONNECTED
-                            }
-                        )
-                        .build()
-                )
+                .setConstraints(articleAiPreviewConstraints(wiFiOnly, requiresCharging))
                 .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
@@ -101,4 +104,26 @@ class ArticleAiPreviewWorker(
             )
         }
     }
+}
+
+internal fun articleAiPreviewConstraints(
+    wiFiOnly: Boolean,
+    requiresCharging: Boolean,
+): Constraints {
+    return Constraints.Builder()
+        .setRequiredNetworkType(
+            if (wiFiOnly) {
+                NetworkType.UNMETERED
+            } else {
+                NetworkType.CONNECTED
+            }
+        )
+        .setRequiresCharging(requiresCharging)
+        .build()
+}
+
+internal fun AppPreferences.AiOptions.canRunBackgroundPreviews(): Boolean {
+    return enabled.get() &&
+        backgroundPreviewsEnabled.get() &&
+        apiKey.get().isNotBlank()
 }

@@ -6,6 +6,8 @@ import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.accounts.AddFeedResult
+import com.jocmp.capy.accounts.assertAutomationApplied
+import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.persistence.EnclosureRecords
@@ -43,6 +45,7 @@ class MinifluxAccountDelegateTest {
     private lateinit var miniflux: Miniflux
     private lateinit var feedFixture: FeedFixture
     private lateinit var delegate: AccountDelegate
+    private lateinit var preferences: AccountPreferences
 
     private val category = Category(
         id = 1,
@@ -172,7 +175,8 @@ class MinifluxAccountDelegateTest {
         database = InMemoryDatabaseProvider.build(accountID)
         feedFixture = FeedFixture(database)
         miniflux = mockk()
-        delegate = MinifluxAccountDelegate(database, miniflux, AccountPreferences(InMemoryDataStore()))
+        preferences = AccountPreferences(InMemoryDataStore())
+        delegate = MinifluxAccountDelegate(database, miniflux, preferences)
     }
 
     @Test
@@ -238,6 +242,59 @@ class MinifluxAccountDelegateTest {
 
         val enclosures = EnclosureRecords(database).findByArticle(vergeArticle.id.toString())
         assertEquals(expected = 1, actual = enclosures.size)
+    }
+
+    @Test
+    fun refresh_appliesAutomationLocallyAndSyncsRemoteStatus() = runTest {
+        preferences.automationRules.set(
+            listOf(automationTestRule(titleText = "Reddit admits"))
+        )
+        coEvery { miniflux.feeds() } returns Response.success(feeds)
+        coEvery { miniflux.icon(1) } returns
+            Response.success(IconData(id = 1, data = "image/png;base64,abc", mime_type = "image/png"))
+        coEvery {
+            miniflux.entries(starred = true, limit = 250, offset = 0)
+        } returns Response.success(EntryResultSet(total = 0, entries = emptyList()))
+        coEvery {
+            miniflux.entries(status = EntryStatus.UNREAD.value, limit = 250, offset = 0)
+        } returns Response.success(
+            EntryResultSet(total = 1, entries = listOf(arsTechnicaArticle))
+        )
+        coEvery {
+            miniflux.entries(
+                limit = 250,
+                offset = 0,
+                order = "published_at",
+                direction = "desc",
+                changedAfter = null,
+            )
+        } returns Response.success(
+            EntryResultSet(total = 1, entries = listOf(arsTechnicaArticle))
+        )
+        coEvery {
+            miniflux.updateEntries(
+                UpdateEntriesRequest(
+                    entry_ids = listOf(arsTechnicaArticle.id),
+                    status = EntryStatus.READ,
+                )
+            )
+        } returns Response.success(Unit)
+        coEvery { miniflux.toggleBookmark(arsTechnicaArticle.id) } returns
+            Response.success(Unit)
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        val articleID = arsTechnicaArticle.id.toString()
+        assertAutomationApplied(database, articleID)
+        coVerify {
+            miniflux.updateEntries(
+                UpdateEntriesRequest(
+                    entry_ids = listOf(arsTechnicaArticle.id),
+                    status = EntryStatus.READ,
+                )
+            )
+        }
+        coVerify { miniflux.toggleBookmark(arsTechnicaArticle.id) }
     }
 
     @Test

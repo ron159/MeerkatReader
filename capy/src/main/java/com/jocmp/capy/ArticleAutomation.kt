@@ -21,20 +21,26 @@ class ArticleAutomation(
         }
 
         return preferences.automationRules.get()
-            .filter { it.enabled && it.automationConditions().isNotEmpty() && it.actions.isNotEmpty() }
+            .filter {
+                it.enabled &&
+                    !it.aiEnabled &&
+                    it.automationConditions().isNotEmpty() &&
+                    it.actions.isNotEmpty()
+            }
             .filter { it.matchesAutomationArticle(article) }
             .fold(ArticleAutomationResult(mute = legacyMuted)) { result, rule ->
-                val keep = ArticleRuleAction.KEEP in rule.actions
-
-                result.copy(
-                    mute = (result.mute || ArticleRuleAction.MUTE in rule.actions) && !keep,
-                    markRead = result.markRead || ArticleRuleAction.MARK_READ in rule.actions,
-                    star = result.star || ArticleRuleAction.STAR in rule.actions,
-                    categoryName = result.categoryName ?: rule.categoryName(),
-                    notify = result.notify || ArticleRuleAction.NOTIFY in rule.actions,
-                    matches = result.matches + rule.toMatch(),
-                )
+                result.withRuleMatch(rule)
             }
+    }
+
+    fun resultForAiMatch(
+        rule: ArticleAutomationRule,
+        explanation: String,
+    ): ArticleAutomationResult {
+        return ArticleAutomationResult().withRuleMatch(
+            rule = rule,
+            explanation = explanation,
+        )
     }
 
     fun applyLocalActions(
@@ -109,15 +115,36 @@ class ArticleAutomation(
         return categoryName.trim().ifBlank { name.trim() }.ifBlank { null }
     }
 
-    private fun ArticleAutomationRule.toMatch(): ArticleAutomationMatch {
+    private fun ArticleAutomationResult.withRuleMatch(
+        rule: ArticleAutomationRule,
+        explanation: String? = null,
+    ): ArticleAutomationResult {
+        val keep = ArticleRuleAction.KEEP in rule.actions
+
+        return copy(
+            mute = (mute || ArticleRuleAction.MUTE in rule.actions) && !keep,
+            markRead = markRead || ArticleRuleAction.MARK_READ in rule.actions,
+            star = star || ArticleRuleAction.STAR in rule.actions,
+            categoryName = categoryName ?: rule.categoryName(),
+            notify = notify || ArticleRuleAction.NOTIFY in rule.actions,
+            matches = matches + rule.toMatch(explanation),
+        )
+    }
+
+    private fun ArticleAutomationRule.toMatch(
+        providedExplanation: String? = null,
+    ): ArticleAutomationMatch {
         val activeConditions = automationConditions()
-        val displayName = name.trim().ifBlank { pattern.trim() }.ifBlank { id }
-        val explanation = if (activeConditions.size == 1) {
-            val condition = activeConditions.single()
-            "Matched ${condition.field.name.lowercase()} rule \"$displayName\" with ${condition.operator.name.lowercase()} \"${condition.value.trim()}\"."
-        } else {
-            "Matched ${matchMode.name.lowercase()} rule \"$displayName\" with ${activeConditions.size} conditions."
-        }
+        val displayName = name.trim()
+            .ifBlank { if (aiEnabled) aiCriterion.trim() else pattern.trim() }
+            .ifBlank { id }
+        val explanation = providedExplanation?.trim()?.ifBlank { null }
+            ?: if (activeConditions.size == 1) {
+                val condition = activeConditions.single()
+                "Matched ${condition.field.name.lowercase()} rule \"$displayName\" with ${condition.operator.name.lowercase()} \"${condition.value.trim()}\"."
+            } else {
+                "Matched ${matchMode.name.lowercase()} rule \"$displayName\" with ${activeConditions.size} conditions."
+            }
 
         return ArticleAutomationMatch(
             ruleID = id,

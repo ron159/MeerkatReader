@@ -21,6 +21,7 @@ data class ArticleAiLabels(
     val answer: String,
     val digest: String,
     val workingOnIt: String,
+    val copyText: String,
 ) {
     fun labelFor(action: ArticleAiAction): String = when (action) {
         ArticleAiAction.TRANSLATE -> translation
@@ -44,7 +45,10 @@ fun Article.withAiDisplayContent(
         translationState?.isLoading == true -> originalContent
         translationState?.error != null -> translationState.toErrorCardHtml(labels) + originalContent
         translationState?.result != null -> when (translationMode) {
-            AiTranslationMode.REPLACE_ORIGINAL -> translatedHtmlPreservingMedia(originalContent, translationState.result)
+            AiTranslationMode.REPLACE_ORIGINAL -> translatedHtmlPreservingStructure(
+                originalContent,
+                translationState.result,
+            )
             AiTranslationMode.PARALLEL -> parallelTranslationHtml(originalContent, translationState.result, labels)
         }
         else -> originalContent
@@ -62,21 +66,30 @@ fun Article.plainTextContent(): String {
 }
 
 private fun ArticleAiDisplayState.toTopCardHtml(labels: ArticleAiLabels): String {
+    val label = labels.labelFor(action).escapeHtml()
+
     return when {
-        isLoading -> """
-            <section class="ai-card ai-card--loading" data-capy-ai-preserve="true">
-              <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
+        isLoading -> {
+            val statusLabel = "${labels.labelFor(action)}. ${labels.workingOnIt}".escapeHtml()
+            """
+            <section class="ai-card ai-card--loading" data-capy-ai-preserve="true"
+              role="status" aria-live="polite" aria-atomic="true" aria-label="$statusLabel">
+              <div class="ai-card__eyebrow" aria-hidden="true">$label</div>
               <div class="ai-card__title">${labels.workingOnIt.escapeHtml()}</div>
-              <div class="ai-shimmer ai-shimmer--wide"></div>
-              <div class="ai-shimmer"></div>
-              <div class="ai-shimmer ai-shimmer--short"></div>
+              <div aria-hidden="true">
+                <div class="ai-shimmer ai-shimmer--wide"></div>
+                <div class="ai-shimmer"></div>
+                <div class="ai-shimmer ai-shimmer--short"></div>
+              </div>
             </section>
-        """.trimIndent()
+            """.trimIndent()
+        }
         error != null -> toErrorCardHtml(labels)
         result != null -> """
-            <section class="ai-card" data-capy-ai-preserve="true">
-              <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
-              <div class="ai-card__content">${result.toArticleHtml()}</div>
+            <section class="ai-card" data-capy-ai-preserve="true"
+              role="region" aria-label="$label">
+              <div class="ai-card__eyebrow" aria-hidden="true">$label</div>
+              <div class="ai-card__content">${result.toAccessibleArticleHtml(labels)}</div>
             </section>
         """.trimIndent()
         else -> ""
@@ -84,9 +97,13 @@ private fun ArticleAiDisplayState.toTopCardHtml(labels: ArticleAiLabels): String
 }
 
 private fun ArticleAiDisplayState.toErrorCardHtml(labels: ArticleAiLabels): String {
+    val label = labels.labelFor(action).escapeHtml()
+    val statusLabel = "${labels.labelFor(action)}. ${error.orEmpty()}".escapeHtml()
+
     return """
-        <section class="ai-card ai-card--error" data-capy-ai-preserve="true">
-          <div class="ai-card__eyebrow">${labels.labelFor(action).escapeHtml()}</div>
+        <section class="ai-card ai-card--error" data-capy-ai-preserve="true"
+          role="status" aria-live="polite" aria-atomic="true" aria-label="$statusLabel">
+          <div class="ai-card__eyebrow" aria-hidden="true">$label</div>
           <div class="ai-card__content">${error.orEmpty().escapeHtml()}</div>
         </section>
     """.trimIndent()
@@ -100,31 +117,38 @@ private fun parallelTranslationHtml(
     val document = Jsoup.parseBodyFragment(originalHtml)
     val translatedBlocks = translatedText.toPlainBlocks().toMutableList()
     val rows = document.body().children().joinToString("") { element ->
-        parallelElementHtml(element, translatedBlocks)
+        parallelElementHtml(element, translatedBlocks, labels)
     }
+    val label = labels.translation.escapeHtml()
 
     return """
-        <section class="ai-translation" data-capy-ai-preserve="true">
-          <div class="ai-card__eyebrow">${labels.translation.escapeHtml()}</div>
+        <section class="ai-translation" data-capy-ai-preserve="true"
+          role="region" aria-label="$label">
+          <div class="ai-card__eyebrow" aria-hidden="true">$label</div>
           $rows
         </section>
     """.trimIndent()
 }
 
-private fun parallelElementHtml(element: Element, translatedBlocks: MutableList<String>): String {
-    if (element.isMediaElement()) {
+private fun parallelElementHtml(
+    element: Element,
+    translatedBlocks: MutableList<String>,
+    labels: ArticleAiLabels,
+): String {
+    if (element.shouldPreserveWholeElement()) {
         return element.outerHtml()
     }
 
-    if (element.isTextBlock() && !element.hasMediaDescendant()) {
+    if (element.isTextBlock() && !element.hasPreservedDescendant()) {
         return parallelRowHtml(
             original = element.text(),
             translated = translatedBlocks.removeFirstOrNull().orEmpty(),
+            labels = labels,
         )
     }
 
     val children = element.children().joinToString("") { child ->
-        parallelElementHtml(child, translatedBlocks)
+        parallelElementHtml(child, translatedBlocks, labels)
     }
     val ownText = element.ownText()
 
@@ -134,20 +158,55 @@ private fun parallelElementHtml(element: Element, translatedBlocks: MutableList<
         parallelRowHtml(
             original = ownText,
             translated = translatedBlocks.removeFirstOrNull().orEmpty(),
+            labels = labels,
         ) + children
     }
 }
 
-private fun parallelRowHtml(original: String, translated: String): String {
+private fun parallelRowHtml(
+    original: String,
+    translated: String,
+    labels: ArticleAiLabels,
+): String {
+    val originalLabel = copyAccessibilityLabel(original, labels.copyText)
+    val translatedLabel = copyAccessibilityLabel(translated, labels.copyText)
+
     return """
         <div class="ai-translation-row">
-          <div class="ai-translation-row__original">${original.escapeHtml()}</div>
-          <div class="ai-translation-row__translated">${translated.escapeHtml()}</div>
+          <div class="ai-translation-row__original" role="button" tabindex="0"
+            aria-haspopup="dialog" aria-label="$originalLabel">${original.escapeHtml()}</div>
+          <div class="ai-translation-row__translated" role="button" tabindex="0"
+            aria-haspopup="dialog" aria-label="$translatedLabel">${translated.escapeHtml()}</div>
         </div>
     """.trimIndent()
 }
 
-private fun translatedHtmlPreservingMedia(originalHtml: String, translatedText: String): String {
+private fun String.toAccessibleArticleHtml(labels: ArticleAiLabels): String {
+    val document = Jsoup.parseBodyFragment(toArticleHtml())
+
+    document.body().children()
+        .filter { it.tagName() == "p" || it.tagName() == "ul" }
+        .forEach { element ->
+            element.attr("role", "button")
+            element.attr("tabindex", "0")
+            element.attr("aria-haspopup", "dialog")
+            element.attr(
+                "aria-label",
+                copyAccessibilityLabel(element.text(), labels.copyText),
+            )
+        }
+
+    return document.body().html()
+}
+
+private fun copyAccessibilityLabel(text: String, copyText: String): String {
+    return "$text. $copyText".escapeHtml()
+}
+
+private fun translatedHtmlPreservingStructure(
+    originalHtml: String,
+    translatedText: String,
+): String {
     val document = Jsoup.parseBodyFragment(originalHtml)
     val translatedBlocks = translatedText.toPlainBlocks().toMutableList()
     val clearUntranslatedText = translatedBlocks.size < countTextBlocks(document.body())
@@ -164,11 +223,11 @@ private fun translateTextIn(
     translatedBlocks: MutableList<String>,
     clearUntranslatedText: Boolean,
 ) {
-    if (element.isMediaElement()) {
+    if (element.shouldPreserveWholeElement()) {
         return
     }
 
-    if (element.isTextBlock() && !element.hasMediaDescendant()) {
+    if (element.isTextBlock() && !element.hasPreservedDescendant()) {
         val replacement = translatedBlocks.removeFirstOrNull()
         if (replacement == null) {
             if (clearUntranslatedText) {
@@ -201,11 +260,11 @@ private fun translateTextIn(
 }
 
 private fun countTextBlocks(element: Element): Int {
-    if (element.isMediaElement()) {
+    if (element.shouldPreserveWholeElement()) {
         return 0
     }
 
-    if (element.isTextBlock() && !element.hasMediaDescendant() && element.text().isNotBlank()) {
+    if (element.isTextBlock() && !element.hasPreservedDescendant() && element.text().isNotBlank()) {
         return 1
     }
 
@@ -229,8 +288,17 @@ private fun Element.isTextBlock(): Boolean {
     )
 }
 
-private fun Element.hasMediaDescendant(): Boolean {
-    return allElements.any { it != this && it.isMediaElement() }
+private fun Element.hasPreservedDescendant(): Boolean {
+    return allElements.any { it != this && it.isPreservedElement() }
+}
+
+private fun Element.shouldPreserveWholeElement(): Boolean {
+    return isPreservedElement() ||
+        (isTextBlock() && allElements.any { it != this && it.tagName() in STRUCTURED_TAGS })
+}
+
+private fun Element.isPreservedElement(): Boolean {
+    return isMediaElement() || tagName() in STRUCTURED_TAGS
 }
 
 private fun Element.isMediaElement(): Boolean {
@@ -247,6 +315,12 @@ private fun Element.isMediaElement(): Boolean {
         "canvas",
     )
 }
+
+private val STRUCTURED_TAGS = setOf(
+    "pre",
+    "code",
+    "table",
+)
 
 private fun String.toArticleHtml(): String {
     val blocks = toPlainBlocks()

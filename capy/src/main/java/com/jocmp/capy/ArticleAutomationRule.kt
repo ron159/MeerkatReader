@@ -13,6 +13,8 @@ data class ArticleAutomationRule(
     val actions: Set<ArticleRuleAction> = emptySet(),
     val matchMode: RuleMatchMode = RuleMatchMode.ALL,
     val conditions: List<ArticleRuleCondition> = emptyList(),
+    val aiEnabled: Boolean = false,
+    val aiCriterion: String = "",
 )
 
 @Serializable

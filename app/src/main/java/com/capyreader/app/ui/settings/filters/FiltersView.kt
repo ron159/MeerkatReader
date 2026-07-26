@@ -38,10 +38,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.R
+import com.capyreader.app.ai.ArticleAiRuleRunAvailability
+import com.capyreader.app.ai.ArticleAiRuleRunStatus
 import com.capyreader.app.ui.theme.CapyTheme
 import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.ArticleAutomationArticle
@@ -62,6 +66,10 @@ fun FiltersView(
     onRemoveRule: (rule: ArticleAutomationRule) -> Unit,
     onMoveRule: (rule: ArticleAutomationRule, direction: Int) -> Unit,
     rules: List<ArticleAutomationRule>,
+    aiRuleRunStatus: ArticleAiRuleRunStatus = ArticleAiRuleRunStatus.Never,
+    aiRuleRunAvailability: ArticleAiRuleRunAvailability =
+        ArticleAiRuleRunAvailability.NO_AI_RULES,
+    onRunAiRules: () -> Unit = {},
 ) {
     val containerColor = CardDefaults.cardColors().containerColor
 
@@ -71,6 +79,8 @@ fun FiltersView(
     var ruleMatchMode by remember { mutableStateOf(RuleMatchMode.ALL) }
     var ruleConditions by remember { mutableStateOf(listOf(emptyCondition())) }
     var ruleActions by remember { mutableStateOf(setOf(ArticleRuleAction.MUTE)) }
+    var ruleAiEnabled by remember { mutableStateOf(false) }
+    var ruleAiCriterion by remember { mutableStateOf("") }
     var ruleSampleText by remember { mutableStateOf("") }
     var editingRule by remember { mutableStateOf<ArticleAutomationRule?>(null) }
 
@@ -81,6 +91,8 @@ fun FiltersView(
         ruleMatchMode = RuleMatchMode.ALL
         ruleConditions = listOf(emptyCondition())
         ruleActions = setOf(ArticleRuleAction.MUTE)
+        ruleAiEnabled = false
+        ruleAiCriterion = ""
         ruleSampleText = ""
     }
 
@@ -106,6 +118,8 @@ fun FiltersView(
             )
         }
         ruleActions = rule.actions
+        ruleAiEnabled = rule.aiEnabled
+        ruleAiCriterion = rule.aiCriterion
     }
 
     val saveRule = {
@@ -114,23 +128,33 @@ fun FiltersView(
             .filter { it.value.isNotBlank() }
         val primaryCondition = conditions.firstOrNull()
 
-        if (primaryCondition != null && ruleActions.isNotEmpty()) {
+        val hasCriterion = if (ruleAiEnabled) {
+            ruleAiCriterion.isNotBlank()
+        } else {
+            primaryCondition != null
+        }
+
+        if (hasCriterion && ruleActions.isNotEmpty()) {
             val updatedRule = editingRule?.copy(
                 name = ruleName.trim(),
-                field = primaryCondition.field,
-                pattern = primaryCondition.value,
+                field = primaryCondition?.field ?: editingRule?.field ?: ArticleRuleField.ANY,
+                pattern = primaryCondition?.value ?: editingRule?.pattern.orEmpty(),
                 matchMode = ruleMatchMode,
                 conditions = conditions,
                 categoryName = categoryName.trim(),
                 actions = ruleActions,
+                aiEnabled = ruleAiEnabled,
+                aiCriterion = ruleAiCriterion.trim(),
             ) ?: ArticleAutomationRule(
                     name = ruleName.trim(),
-                    field = primaryCondition.field,
-                    pattern = primaryCondition.value,
+                    field = primaryCondition?.field ?: ArticleRuleField.ANY,
+                    pattern = primaryCondition?.value.orEmpty(),
                     matchMode = ruleMatchMode,
                     conditions = conditions,
                     categoryName = categoryName.trim(),
                     actions = ruleActions,
+                    aiEnabled = ruleAiEnabled,
+                    aiCriterion = ruleAiCriterion.trim(),
                 )
 
             if (editingRule == null) {
@@ -161,6 +185,14 @@ fun FiltersView(
                 .heightIn(min = 240.dp)
                 .weight(0.1f)
         ) {
+            AiRuleRunStatusItem(
+                hasAiRules = rules.any {
+                    it.aiEnabled && it.aiCriterion.isNotBlank()
+                },
+                status = aiRuleRunStatus,
+                availability = aiRuleRunAvailability,
+                onRun = onRunAiRules,
+            )
             if (rules.isNotEmpty()) {
                 Text(
                     stringResource(R.string.rules_section_title),
@@ -197,34 +229,76 @@ fun FiltersView(
                     .padding(horizontal = 16.dp, vertical = 4.dp)
                     .fillMaxWidth()
             )
-            TextButton(
-                onClick = { ruleMatchMode = ruleMatchMode.next() },
-                modifier = Modifier.padding(horizontal = 8.dp)
+            val aiAssistedEvaluationLabel =
+                stringResource(R.string.rules_ai_enabled)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
             ) {
-                Text(ruleMatchMode.label())
-            }
-            ruleConditions.forEachIndexed { index, condition ->
-                RuleConditionRow(
-                    condition = condition,
-                    canRemove = ruleConditions.size > 1,
-                    onUpdate = { updated ->
-                        ruleConditions = ruleConditions.mapIndexed { conditionIndex, existing ->
-                            if (conditionIndex == index) updated else existing
-                        }
+                Text(
+                    text = aiAssistedEvaluationLabel,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = ruleAiEnabled,
+                    onCheckedChange = { ruleAiEnabled = it },
+                    modifier = Modifier.semantics {
+                        contentDescription = aiAssistedEvaluationLabel
                     },
-                    onRemove = {
-                        ruleConditions = ruleConditions.filterIndexed { conditionIndex, _ ->
-                            conditionIndex != index
-                        }
-                    },
-                    onSubmit = saveRule,
                 )
             }
-            TextButton(
-                onClick = { ruleConditions = ruleConditions + emptyCondition() },
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                Text(stringResource(R.string.rules_add_condition))
+            if (ruleAiEnabled) {
+                Text(
+                    text = stringResource(R.string.rules_ai_notice),
+                    style = typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+                OutlinedTextField(
+                    value = ruleAiCriterion,
+                    onValueChange = {
+                        ruleAiCriterion = it.take(MAX_AI_CRITERION_CHARACTERS)
+                    },
+                    placeholder = {
+                        Text(stringResource(R.string.rules_ai_criterion_placeholder))
+                    },
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = true),
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .fillMaxWidth(),
+                    minLines = 2,
+                )
+            } else {
+                TextButton(
+                    onClick = { ruleMatchMode = ruleMatchMode.next() },
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Text(ruleMatchMode.label())
+                }
+                ruleConditions.forEachIndexed { index, condition ->
+                    RuleConditionRow(
+                        condition = condition,
+                        canRemove = ruleConditions.size > 1,
+                        onUpdate = { updated ->
+                            ruleConditions = ruleConditions.mapIndexed { conditionIndex, existing ->
+                                if (conditionIndex == index) updated else existing
+                            }
+                        },
+                        onRemove = {
+                            ruleConditions = ruleConditions.filterIndexed { conditionIndex, _ ->
+                                conditionIndex != index
+                            }
+                        },
+                        onSubmit = saveRule,
+                    )
+                }
+                TextButton(
+                    onClick = { ruleConditions = ruleConditions + emptyCondition() },
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Text(stringResource(R.string.rules_add_condition))
+                }
             }
             ArticleRuleAction.entries.forEach { action ->
                 RuleActionCheckbox(
@@ -251,18 +325,20 @@ fun FiltersView(
                         .fillMaxWidth()
                 )
             }
-            RuleTestBox(
-                rule = ruleFromForm(
-                    editingRule = editingRule,
-                    name = ruleName,
-                    matchMode = ruleMatchMode,
-                    conditions = ruleConditions,
-                    categoryName = categoryName,
-                    actions = ruleActions,
-                ),
-                sampleText = ruleSampleText,
-                onSampleTextChange = { ruleSampleText = it },
-            )
+            if (!ruleAiEnabled) {
+                RuleTestBox(
+                    rule = ruleFromForm(
+                        editingRule = editingRule,
+                        name = ruleName,
+                        matchMode = ruleMatchMode,
+                        conditions = ruleConditions,
+                        categoryName = categoryName,
+                        actions = ruleActions,
+                    ),
+                    sampleText = ruleSampleText,
+                    onSampleTextChange = { ruleSampleText = it },
+                )
+            }
             Row(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier
@@ -381,7 +457,9 @@ private fun RuleListItem(
 
     ListItem(
         colors = ListItemDefaults.colors(containerColor = containerColor),
-        headlineContent = { Text(rule.name.ifBlank { rule.pattern }) },
+        headlineContent = {
+            Text(rule.name.ifBlank { rule.aiCriterion.ifBlank { rule.pattern } })
+        },
         supportingContent = {
             val disabledLabel = stringResource(R.string.rules_disabled)
             val statusPrefix = if (rule.enabled) "" else "$disabledLabel\n"
@@ -657,6 +735,13 @@ private fun ArticleRuleAction.label(): String {
 
 @Composable
 private fun ArticleAutomationRule.conditionSummary(): String {
+    if (aiEnabled) {
+        return stringResource(
+            R.string.rules_ai_summary,
+            aiCriterion.trim(),
+        )
+    }
+
     val anyFieldLabel = stringResource(R.string.rules_field_any)
     val feedFieldLabel = stringResource(R.string.rules_field_feed)
     val authorFieldLabel = stringResource(R.string.rules_field_author)
@@ -709,6 +794,8 @@ private fun ArticleAutomationRule.conditionSummary(): String {
         ""
     }
 }
+
+private const val MAX_AI_CRITERION_CHARACTERS = 500
 
 @Preview
 @Composable

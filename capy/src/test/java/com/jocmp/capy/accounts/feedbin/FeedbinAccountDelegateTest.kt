@@ -8,6 +8,8 @@ import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.accounts.AddFeedResult
 import com.jocmp.capy.accounts.SubscriptionChoice
+import com.jocmp.capy.accounts.assertAutomationApplied
+import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
@@ -195,6 +197,44 @@ class FeedbinAccountDelegateTest {
 
         val enclosures = EnclosureRecords(database).findByArticle(vergeArticle.id.toString())
         assertEquals(expected = 1, actual = enclosures.size)
+    }
+
+    @Test
+    fun refresh_appliesAutomationLocallyAndSyncsRemoteStatus() = runTest {
+        preferences.automationRules.set(
+            listOf(automationTestRule(titleText = "Reddit admits"))
+        )
+        coEvery { feedbin.subscriptions() } returns Response.success(subscriptions)
+        coEvery { feedbin.unreadEntries() } returns
+            Response.success(listOf(arsTechnicaArticle.id))
+        coEvery { feedbin.starredEntries() } returns Response.success(emptyList())
+        coEvery { feedbin.taggings() } returns Response.success(taggings)
+        coEvery { feedbin.savedSearches() } returns Response.success(emptyList())
+        coEvery {
+            feedbin.entries(
+                since = any(),
+                perPage = any(),
+                page = any(),
+                ids = null,
+            )
+        } returns Response.success(listOf(arsTechnicaArticle))
+        coEvery {
+            feedbin.deleteUnreadEntries(UnreadEntriesRequest(listOf(arsTechnicaArticle.id)))
+        } returns Response.success(null)
+        coEvery {
+            feedbin.createStarredEntries(StarredEntriesRequest(listOf(arsTechnicaArticle.id)))
+        } returns Response.success(listOf(arsTechnicaArticle.id))
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        val articleID = arsTechnicaArticle.id.toString()
+        assertAutomationApplied(database, articleID)
+        coVerify {
+            feedbin.deleteUnreadEntries(UnreadEntriesRequest(listOf(arsTechnicaArticle.id)))
+        }
+        coVerify {
+            feedbin.createStarredEntries(StarredEntriesRequest(listOf(arsTechnicaArticle.id)))
+        }
     }
 
     @Test

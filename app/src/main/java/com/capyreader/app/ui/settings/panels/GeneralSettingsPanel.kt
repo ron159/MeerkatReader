@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +62,10 @@ fun GeneralSettingsPanel(
 ) {
     val keywords by viewModel.filterKeywords.collectAsStateWithLifecycle()
     val rules by viewModel.automationRules.collectAsStateWithLifecycle()
+    val aiRuleRunStatus by viewModel.aiRuleRunStatus.collectAsStateWithLifecycle()
+    val aiRuleRunAvailability = remember(rules, aiRuleRunStatus) {
+        viewModel.aiRuleRunAvailability(rules)
+    }
 
     val filterKeywords = FilterKeywords(
         keywords = keywords.toList().sortedWith(compareBy(CASE_INSENSITIVE_ORDER) { it }),
@@ -71,6 +76,9 @@ fun GeneralSettingsPanel(
         addRule = viewModel::addAutomationRule,
         updateRule = viewModel::updateAutomationRule,
         moveRule = viewModel::moveAutomationRule,
+        aiRuleRunStatus = aiRuleRunStatus,
+        aiRuleRunAvailability = aiRuleRunAvailability,
+        runAiRules = viewModel::runAiRules,
     )
 
     CompositionLocalProvider(

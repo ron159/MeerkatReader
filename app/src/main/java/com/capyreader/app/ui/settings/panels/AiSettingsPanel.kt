@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.R
+import com.capyreader.app.ai.ArticleAiDailyBudget
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.preferences.AiProvider
 import com.capyreader.app.preferences.AiTranslationMode
@@ -54,6 +55,10 @@ fun AiSettingsPanel(
         updateBackgroundPreviewsEnabled = viewModel::updateBackgroundPreviewsEnabled,
         backgroundPreviewsOnWiFiOnly = viewModel.backgroundPreviewsOnWiFiOnly,
         updateBackgroundPreviewsOnWiFiOnly = viewModel::updateBackgroundPreviewsOnWiFiOnly,
+        backgroundPreviewsRequireCharging = viewModel.backgroundPreviewsRequireCharging,
+        updateBackgroundPreviewsRequireCharging = viewModel::updateBackgroundPreviewsRequireCharging,
+        backgroundPreviewsDailyLimit = viewModel.backgroundPreviewsDailyLimit,
+        updateBackgroundPreviewsDailyLimit = viewModel::updateBackgroundPreviewsDailyLimit,
         translationMode = viewModel.translationMode,
         updateTranslationMode = viewModel::updateTranslationMode,
         translatePrompt = viewModel.translatePrompt,
@@ -89,6 +94,10 @@ fun AiSettingsPanelView(
     updateBackgroundPreviewsEnabled: (Boolean) -> Unit,
     backgroundPreviewsOnWiFiOnly: Boolean,
     updateBackgroundPreviewsOnWiFiOnly: (Boolean) -> Unit,
+    backgroundPreviewsRequireCharging: Boolean,
+    updateBackgroundPreviewsRequireCharging: (Boolean) -> Unit,
+    backgroundPreviewsDailyLimit: Int,
+    updateBackgroundPreviewsDailyLimit: (Int) -> Unit,
     translationMode: AiTranslationMode,
     updateTranslationMode: (AiTranslationMode) -> Unit,
     translatePrompt: String,
@@ -193,6 +202,29 @@ fun AiSettingsPanelView(
                     title = stringResource(R.string.ai_settings_background_previews_wifi_only),
                 )
             }
+
+            RowItem {
+                TextSwitch(
+                    checked = backgroundPreviewsRequireCharging,
+                    onCheckedChange = updateBackgroundPreviewsRequireCharging,
+                    title = stringResource(
+                        R.string.ai_settings_background_previews_charging_only
+                    ),
+                )
+            }
+
+            PreferenceSelect(
+                selected = backgroundPreviewsDailyLimit,
+                update = updateBackgroundPreviewsDailyLimit,
+                options = ArticleAiDailyBudget.DAILY_LIMIT_OPTIONS,
+                label = R.string.ai_settings_background_previews_daily_limit,
+                optionText = {
+                    stringResource(
+                        R.string.ai_settings_background_previews_daily_limit_value,
+                        it,
+                    )
+                },
+            )
 
             PreferenceSelect(
                 selected = translationMode,

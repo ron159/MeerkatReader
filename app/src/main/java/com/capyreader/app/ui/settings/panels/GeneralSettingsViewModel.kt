@@ -1,11 +1,17 @@
 package com.capyreader.app.ui.settings.panels
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.capyreader.app.ai.ArticleAiRuleRunAvailability
+import com.capyreader.app.ai.ArticleAiRuleRunStatus
+import com.capyreader.app.ai.ArticleAiRuleWorker
+import com.capyreader.app.ai.articleAiRuleRunAvailability
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
+import com.capyreader.app.offline.ArticleOfflinePackageDownloader
 import com.capyreader.app.preferences.AfterReadAllBehavior
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.DefaultHomeTab
@@ -15,12 +21,14 @@ import com.jocmp.capy.Account
 import com.jocmp.capy.ArticleAutomationRule
 import com.jocmp.capy.accounts.AutoDelete
 import com.jocmp.capy.articles.SortOrder
-import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
 import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import com.jocmp.capy.persistence.ArticleRuleMatchRecords
+import com.jocmp.capy.persistence.ArticleTtsProgressRecords
 import com.jocmp.capy.preferences.getAndSet
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class GeneralSettingsViewModel(
@@ -28,9 +36,11 @@ class GeneralSettingsViewModel(
     val account: Account,
     private val appPreferences: AppPreferences,
     private val articleImageCacheCleaner: ArticleImageCacheCleaner,
-    private val articleOfflinePackageRecords: ArticleOfflinePackageRecords,
+    private val articleOfflinePackageDownloader: ArticleOfflinePackageDownloader,
     private val articleReadingProgressRecords: ArticleReadingProgressRecords,
+    private val articleTtsProgressRecords: ArticleTtsProgressRecords,
     private val articleRuleMatchRecords: ArticleRuleMatchRecords,
+    private val appContext: Context,
 ) : ViewModel() {
     val source = account.source
 
@@ -172,6 +182,34 @@ class GeneralSettingsViewModel(
         .automationRules
         .stateIn(viewModelScope)
 
+    val aiRuleRunStatus = appPreferences.aiOptions.ruleEvaluationRunStatus
+        .changes()
+        .map(ArticleAiRuleRunStatus::deserialize)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            ArticleAiRuleRunStatus.deserialize(
+                appPreferences.aiOptions.ruleEvaluationRunStatus.get()
+            ),
+        )
+
+    fun aiRuleRunAvailability(
+        rules: List<ArticleAutomationRule>,
+    ): ArticleAiRuleRunAvailability {
+        return articleAiRuleRunAvailability(
+            aiOptions = appPreferences.aiOptions,
+            rules = rules,
+        )
+    }
+
+    fun runAiRules() {
+        ArticleAiRuleWorker.enqueueIfEligible(
+            context = appContext,
+            appPreferences = appPreferences,
+            rules = { account.preferences.automationRules.get() },
+        )
+    }
+
     fun updateRefreshInterval(interval: RefreshInterval) {
         refreshScheduler.update(interval)
 
@@ -235,19 +273,22 @@ class GeneralSettingsViewModel(
     fun clearAllArticles() {
         viewModelScope.launch(Dispatchers.IO) {
             account.clearAllArticles()
+            articleReadingProgressRecords.deleteOrphans()
+            articleTtsProgressRecords.deleteOrphans()
             articleImageCacheCleaner.cleanup()
         }
     }
 
     fun clearOfflinePackages() {
         viewModelScope.launch(Dispatchers.IO) {
-            articleOfflinePackageRecords.deleteAll()
+            articleOfflinePackageDownloader.clearAll()
         }
     }
 
     fun clearReadingProgress() {
         viewModelScope.launch(Dispatchers.IO) {
             articleReadingProgressRecords.deleteAll()
+            articleTtsProgressRecords.deleteAll()
         }
     }
 

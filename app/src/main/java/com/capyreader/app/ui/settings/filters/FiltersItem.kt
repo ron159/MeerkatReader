@@ -56,6 +56,9 @@ fun FiltersItem() {
                     onMoveRule = { rule, direction ->
                         keywords.moveRule(rule, direction)
                     },
+                    aiRuleRunStatus = keywords.aiRuleRunStatus,
+                    aiRuleRunAvailability = keywords.aiRuleRunAvailability,
+                    onRunAiRules = keywords.runAiRules,
                 )
             }
         }

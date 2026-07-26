@@ -83,15 +83,21 @@ fun ArticleAiPreviewButton(
 private fun AiPreviewIcon(isLoading: Boolean) {
     Icon(
         imageVector = Icons.Rounded.AutoAwesome,
-        contentDescription = stringResource(R.string.article_ai_preview_summaries),
-        modifier = aiPreviewIconModifier(isLoading),
+        contentDescription = stringResource(
+            if (isLoading) {
+                R.string.article_ai_preview_loading
+            } else {
+                R.string.article_ai_preview_summaries
+            }
+        ),
+        modifier = Modifier.aiPreviewIconModifier(isLoading),
     )
 }
 
 @Composable
-private fun aiPreviewIconModifier(isLoading: Boolean): Modifier {
+private fun Modifier.aiPreviewIconModifier(isLoading: Boolean): Modifier {
     if (!isLoading) {
-        return Modifier
+        return this
     }
 
     val transition = rememberInfiniteTransition(label = "AiPreviewLoading")
@@ -113,10 +119,9 @@ private fun aiPreviewIconModifier(isLoading: Boolean): Modifier {
         label = "AiPreviewRotation",
     )
 
-    return Modifier
-        .graphicsLayer {
-            scaleX = pulse.value
-            scaleY = pulse.value
-            rotationZ = rotation.value
-        }
+    return graphicsLayer {
+        scaleX = pulse.value
+        scaleY = pulse.value
+        rotationZ = rotation.value
+    }
 }

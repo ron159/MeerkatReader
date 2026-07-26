@@ -43,6 +43,16 @@ class AiSettingsViewModel(
     var backgroundPreviewsOnWiFiOnly by mutableStateOf(appPreferences.aiOptions.backgroundPreviewsOnWiFiOnly.get())
         private set
 
+    var backgroundPreviewsRequireCharging by mutableStateOf(
+        appPreferences.aiOptions.backgroundPreviewsRequireCharging.get()
+    )
+        private set
+
+    var backgroundPreviewsDailyLimit by mutableStateOf(
+        appPreferences.aiOptions.backgroundPreviewsDailyLimit.get()
+    )
+        private set
+
     var translationMode by mutableStateOf(appPreferences.aiOptions.translationMode.get())
         private set
 
@@ -88,7 +98,7 @@ class AiSettingsViewModel(
 
     fun updateApiKey(apiKey: String) {
         appPreferences.aiOptions.apiKey.set(apiKey)
-        this.apiKey = apiKey
+        this.apiKey = appPreferences.aiOptions.apiKey.get()
     }
 
     fun updateModel(model: String) {
@@ -119,6 +129,16 @@ class AiSettingsViewModel(
     fun updateBackgroundPreviewsOnWiFiOnly(enabled: Boolean) {
         appPreferences.aiOptions.backgroundPreviewsOnWiFiOnly.set(enabled)
         backgroundPreviewsOnWiFiOnly = enabled
+    }
+
+    fun updateBackgroundPreviewsRequireCharging(enabled: Boolean) {
+        appPreferences.aiOptions.backgroundPreviewsRequireCharging.set(enabled)
+        backgroundPreviewsRequireCharging = enabled
+    }
+
+    fun updateBackgroundPreviewsDailyLimit(limit: Int) {
+        appPreferences.aiOptions.backgroundPreviewsDailyLimit.set(limit)
+        backgroundPreviewsDailyLimit = limit
     }
 
     fun updateTranslationMode(mode: AiTranslationMode) {

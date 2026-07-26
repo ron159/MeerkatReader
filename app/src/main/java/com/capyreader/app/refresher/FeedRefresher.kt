@@ -2,6 +2,8 @@ package com.capyreader.app.refresher
 
 import android.content.Context
 import com.capyreader.app.ai.ArticleAiPreviewWorker
+import com.capyreader.app.ai.ArticleAiRuleWorker
+import com.capyreader.app.ai.canRunBackgroundPreviews
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImagePreloader
 import com.capyreader.app.common.isOnWifi
@@ -32,10 +34,17 @@ class FeedRefresher(
         val since = TimeHelpers.nowUTC()
 
         return withContext(Dispatchers.IO) {
-            account.refresh()
+            val refreshSucceeded = account.refresh().isSuccess
             articleImageCacheCleaner.cleanup()
             articleImagePreloader.enqueue()
             enqueueAiPreviewWorker()
+            if (refreshSucceeded) {
+                ArticleAiRuleWorker.enqueueIfEligible(
+                    context = appContext,
+                    appPreferences = appPreferences,
+                    rules = { account.preferences.automationRules.get() },
+                )
+            }
             notificationHelper.notify(since = since)
             WidgetUpdater.update(appContext)
         }
@@ -43,16 +52,14 @@ class FeedRefresher(
 
     private fun enqueueAiPreviewWorker() {
         val aiOptions = appPreferences.aiOptions
-        if (!aiOptions.enabled.get() ||
-            !aiOptions.backgroundPreviewsEnabled.get() ||
-            aiOptions.apiKey.get().isBlank()
-        ) {
+        if (!aiOptions.canRunBackgroundPreviews()) {
             return
         }
 
         ArticleAiPreviewWorker.enqueue(
             context = appContext,
             wiFiOnly = aiOptions.backgroundPreviewsOnWiFiOnly.get(),
+            requiresCharging = aiOptions.backgroundPreviewsRequireCharging.get(),
         )
     }
 }

@@ -1,5 +1,8 @@
 package com.capyreader.app.ai
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class ArticleAiErrorReason {
     DISABLED,
     DISABLED_FOR_FEED,
@@ -8,6 +11,15 @@ enum class ArticleAiErrorReason {
     CONTENT_EMPTY,
     QUESTION_REQUIRED,
     NO_DIGEST_ARTICLES,
+    INVALID_CONFIGURATION,
+    AUTHENTICATION,
+    RATE_LIMIT,
+    TIMEOUT,
+    CONNECTIVITY,
+    SERVER,
+    PROVIDER_REJECTED,
+    INVALID_RESPONSE,
+    REQUEST_FAILED,
 }
 
 class ArticleAiException(
@@ -23,23 +35,31 @@ data class ArticleAiErrorMessages(
     val contentEmpty: String,
     val questionRequired: String,
     val noDigestArticles: String,
+    val invalidConfiguration: String,
+    val authentication: String,
+    val rateLimit: String,
+    val timeout: String,
+    val connectivity: String,
+    val server: String,
+    val providerRejected: String,
+    val invalidResponse: String,
 ) {
     fun messageFor(error: Throwable): String {
         if (error is ArticleAiException) {
             return messageFor(error.reason)
         }
 
-        return messageFor(error.localizedMessage ?: error.message)
+        return requestFailed
     }
 
     fun messageFor(message: String?): String {
         val detail = message?.takeIf { it.isNotBlank() }
 
-        ArticleAiErrorReason.values().firstOrNull { it.name == detail }?.let {
+        ArticleAiErrorReason.entries.firstOrNull { it.name == detail }?.let {
             return messageFor(it)
         }
 
-        return detail ?: requestFailed
+        return requestFailed
     }
 
     private fun messageFor(reason: ArticleAiErrorReason): String {
@@ -51,6 +71,35 @@ data class ArticleAiErrorMessages(
             ArticleAiErrorReason.CONTENT_EMPTY -> contentEmpty
             ArticleAiErrorReason.QUESTION_REQUIRED -> questionRequired
             ArticleAiErrorReason.NO_DIGEST_ARTICLES -> noDigestArticles
+            ArticleAiErrorReason.INVALID_CONFIGURATION -> invalidConfiguration
+            ArticleAiErrorReason.AUTHENTICATION -> authentication
+            ArticleAiErrorReason.RATE_LIMIT -> rateLimit
+            ArticleAiErrorReason.TIMEOUT -> timeout
+            ArticleAiErrorReason.CONNECTIVITY -> connectivity
+            ArticleAiErrorReason.SERVER -> server
+            ArticleAiErrorReason.PROVIDER_REJECTED -> providerRejected
+            ArticleAiErrorReason.INVALID_RESPONSE -> invalidResponse
+            ArticleAiErrorReason.REQUEST_FAILED -> requestFailed
         }
     }
+}
+
+fun Throwable.toArticleAiException(): ArticleAiException {
+    if (this is ArticleAiException) {
+        return this
+    }
+
+    val reason = when ((this as? AiTransportException)?.reason) {
+        AiTransportErrorReason.INVALID_CONFIGURATION -> ArticleAiErrorReason.INVALID_CONFIGURATION
+        AiTransportErrorReason.AUTHENTICATION -> ArticleAiErrorReason.AUTHENTICATION
+        AiTransportErrorReason.RATE_LIMIT -> ArticleAiErrorReason.RATE_LIMIT
+        AiTransportErrorReason.TIMEOUT -> ArticleAiErrorReason.TIMEOUT
+        AiTransportErrorReason.CONNECTIVITY -> ArticleAiErrorReason.CONNECTIVITY
+        AiTransportErrorReason.SERVER -> ArticleAiErrorReason.SERVER
+        AiTransportErrorReason.PROVIDER_REJECTED -> ArticleAiErrorReason.PROVIDER_REJECTED
+        AiTransportErrorReason.INVALID_RESPONSE -> ArticleAiErrorReason.INVALID_RESPONSE
+        null -> ArticleAiErrorReason.REQUEST_FAILED
+    }
+
+    return ArticleAiException(reason = reason)
 }

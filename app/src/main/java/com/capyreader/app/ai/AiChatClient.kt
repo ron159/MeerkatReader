@@ -9,11 +9,14 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.SerializationException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 interface AiChatClient {
     suspend fun complete(request: AiChatRequest): Result<String>
@@ -38,43 +41,95 @@ class OpenAiCompatibleChatClient(
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun complete(request: AiChatRequest): Result<String> {
-        val httpRequest = Request.Builder()
-            .url("${request.baseUrl.trimEnd('/')}/chat/completions")
-            .header("Authorization", "Bearer ${request.apiKey}")
-            .header("Content-Type", "application/json")
-            .post(buildRequestBody(request))
-            .build()
+        val httpRequest = try {
+            Request.Builder()
+                .url("${request.baseUrl.trimEnd('/')}/chat/completions")
+                .header("Authorization", "Bearer ${request.apiKey}")
+                .header("Content-Type", "application/json")
+                .post(buildRequestBody(request))
+                .build()
+        } catch (_: IllegalArgumentException) {
+            return Result.failure(
+                AiTransportException(
+                    reason = AiTransportErrorReason.INVALID_CONFIGURATION,
+                )
+            )
+        }
 
         return try {
             httpClient.newCall(httpRequest).execute().use { response ->
-                val responseBody = response.body.string()
-
                 if (!response.isSuccessful) {
-                    return Result.failure(IOException("AI API request failed: HTTP ${response.code}"))
+                    return Result.failure(httpFailure(response.code))
                 }
 
-                val result = json.parseToJsonElement(responseBody)
-                    .jsonObject["choices"]
-                    ?.jsonArray
-                    ?.firstOrNull()
-                    ?.jsonObject
-                    ?.get("message")
-                    ?.jsonObject
-                    ?.get("content")
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?.trim()
-                    .orEmpty()
+                val responseBody = response.body.string()
+                val result = parseResponse(responseBody)
 
                 if (result.isBlank()) {
-                    Result.failure(IOException("AI API returned an empty result"))
+                    Result.failure(
+                        AiTransportException(AiTransportErrorReason.INVALID_RESPONSE)
+                    )
                 } else {
                     Result.success(result)
                 }
             }
-        } catch (e: Throwable) {
-            Result.failure(e)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: SocketTimeoutException) {
+            Result.failure(
+                AiTransportException(
+                    reason = AiTransportErrorReason.TIMEOUT,
+                )
+            )
+        } catch (_: SerializationException) {
+            Result.failure(
+                AiTransportException(
+                    reason = AiTransportErrorReason.INVALID_RESPONSE,
+                )
+            )
+        } catch (_: IOException) {
+            Result.failure(
+                AiTransportException(
+                    reason = AiTransportErrorReason.CONNECTIVITY,
+                )
+            )
+        } catch (_: RuntimeException) {
+            Result.failure(
+                AiTransportException(
+                    reason = AiTransportErrorReason.INVALID_RESPONSE,
+                )
+            )
         }
+    }
+
+    private fun parseResponse(responseBody: String): String {
+        return json.parseToJsonElement(responseBody)
+            .jsonObject["choices"]
+            ?.jsonArray
+            ?.firstOrNull()
+            ?.jsonObject
+            ?.get("message")
+            ?.jsonObject
+            ?.get("content")
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.trim()
+            .orEmpty()
+    }
+
+    private fun httpFailure(statusCode: Int): AiTransportException {
+        val reason = when (statusCode) {
+            401, 403 -> AiTransportErrorReason.AUTHENTICATION
+            408 -> AiTransportErrorReason.TIMEOUT
+            429 -> AiTransportErrorReason.RATE_LIMIT
+            in 500..599 -> AiTransportErrorReason.SERVER
+            else -> AiTransportErrorReason.PROVIDER_REJECTED
+        }
+
+        return AiTransportException(
+            reason = reason,
+            statusCode = statusCode,
+        )
     }
 
     private fun buildRequestBody(request: AiChatRequest) = buildJsonObject {
@@ -94,3 +149,19 @@ class OpenAiCompatibleChatClient(
         )
     }.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 }
+
+enum class AiTransportErrorReason {
+    INVALID_CONFIGURATION,
+    AUTHENTICATION,
+    RATE_LIMIT,
+    TIMEOUT,
+    CONNECTIVITY,
+    SERVER,
+    PROVIDER_REJECTED,
+    INVALID_RESPONSE,
+}
+
+class AiTransportException(
+    val reason: AiTransportErrorReason,
+    val statusCode: Int? = null,
+) : IOException(reason.name)

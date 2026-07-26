@@ -10,6 +10,7 @@ import com.jocmp.capy.persistence.ArticleAiDigestInput
 import com.jocmp.capy.persistence.ArticleAiDigestRecords
 import com.jocmp.capy.persistence.ArticleAiResultInput
 import com.jocmp.capy.persistence.ArticleAiResultRecords
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.security.MessageDigest
 
@@ -140,7 +141,7 @@ class ArticleAiRepository(
             }
         }
 
-        chatClient.complete(
+        complete(
             AiChatRequest(
                 baseUrl = settings.baseUrl,
                 apiKey = settings.apiKey,
@@ -219,7 +220,7 @@ class ArticleAiRepository(
         content: String,
         question: String,
     ): Result<String> {
-        return chatClient.complete(
+        return complete(
             AiChatRequest(
                 baseUrl = settings.baseUrl,
                 apiKey = settings.apiKey,
@@ -272,7 +273,7 @@ class ArticleAiRepository(
                 |$chunk
             """.trimMargin()
 
-            chatClient.complete(
+            complete(
                 AiChatRequest(
                     baseUrl = settings.baseUrl,
                     apiKey = settings.apiKey,
@@ -309,7 +310,7 @@ class ArticleAiRepository(
             |$combinedSummaryInput
         """.trimMargin()
 
-        return chatClient.complete(
+        return complete(
             AiChatRequest(
                 baseUrl = settings.baseUrl,
                 apiKey = settings.apiKey,
@@ -322,6 +323,18 @@ class ArticleAiRepository(
                     AiChatMessage(role = "user", content = finalPrompt),
                 ),
             )
+        )
+    }
+
+    private suspend fun complete(request: AiChatRequest): Result<String> {
+        return chatClient.complete(request).fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { error ->
+                if (error is CancellationException) {
+                    throw error
+                }
+                Result.failure(error.toArticleAiException())
+            },
         )
     }
 
