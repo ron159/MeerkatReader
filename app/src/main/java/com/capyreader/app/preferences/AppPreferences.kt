@@ -1,6 +1,7 @@
 package com.capyreader.app.preferences
 
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import androidx.preference.PreferenceManager
 import com.capyreader.app.common.FeedGroup
 import com.capyreader.app.common.ImagePreview
@@ -19,18 +20,41 @@ import com.jocmp.capy.preferences.getEnum
 import kotlinx.serialization.json.Json
 import java.util.Locale
 
-class AppPreferences(context: Context) {
+class AppPreferences internal constructor(
+    context: Context,
+    private val secretStore: SecretStore,
+) {
+    constructor(context: Context) : this(
+        context = context,
+        secretStore = AndroidKeystoreSecretStore(context),
+    )
+
     private val preferenceStore: PreferenceStore = AndroidPreferenceStore(
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+    )
+
+    private val deviceStateStore: PreferenceStore = AndroidPreferenceStore(
+        sharedPreferences = context.getSharedPreferences(
+            DEVICE_STATE_PREFERENCES_NAME,
+            MODE_PRIVATE,
+        )
     )
 
     val readerOptions = ReaderOptions(preferenceStore)
 
     val articleListOptions = ArticleListOptions(preferenceStore)
 
-    val aiOptions = AiOptions(preferenceStore)
+    val aiOptions = AiOptions(
+        preferenceStore = preferenceStore,
+        deviceStateStore = deviceStateStore,
+        secretStore = secretStore,
+    )
 
     val offlineOptions = OfflineOptions(preferenceStore)
+
+    val wallabagOptions = WallabagOptions(preferenceStore, secretStore)
+
+    val webDavBackupOptions = WebDavBackupOptions(preferenceStore, secretStore)
 
     val isLoggedIn
         get() = accountID.get().isNotBlank()
@@ -121,6 +145,8 @@ class AppPreferences(context: Context) {
 
     fun clearAll() {
         preferenceStore.clearAll()
+        deviceStateStore.clearAll()
+        secretStore.clear()
     }
 
     class ReaderOptions(private val preferenceStore: PreferenceStore) {
@@ -168,6 +194,15 @@ class AppPreferences(context: Context) {
 
         val titleFollowsBodyFont: Preference<Boolean>
             get() = preferenceStore.getBoolean("article_title_follows_body_font", false)
+
+        val ttsLanguageTag: Preference<String>
+            get() = preferenceStore.getString("article_tts_language_tag")
+
+        val ttsVoiceID: Preference<String>
+            get() = preferenceStore.getString("article_tts_voice_id")
+
+        val ttsSpeechRate: Preference<Float>
+            get() = preferenceStore.getFloat("article_tts_speech_rate", 1.0f)
     }
 
     class ArticleListOptions(private val preferenceStore: PreferenceStore) {
@@ -286,7 +321,73 @@ class AppPreferences(context: Context) {
             get() = preferenceStore.getBoolean("offline_cleanup_preserve_feed_offline", true)
     }
 
-    class AiOptions(private val preferenceStore: PreferenceStore) {
+    class WallabagOptions internal constructor(
+        private val preferenceStore: PreferenceStore,
+        secretStore: SecretStore,
+    ) {
+        val enabled: Preference<Boolean>
+            get() = preferenceStore.getBoolean("wallabag_enabled", false)
+
+        val serverUrl: Preference<String>
+            get() = preferenceStore.getString("wallabag_server_url")
+
+        val accessToken: Preference<String> = SecretPreference(
+            key = "wallabag_access_token",
+            secretStore = secretStore,
+            legacyPreference = preferenceStore.getString("wallabag_access_token"),
+        )
+
+        val lastError: Preference<String>
+            get() = preferenceStore.getString("wallabag_last_error")
+
+        fun isConfigured(): Boolean {
+            return enabled.get() &&
+                serverUrl.get().isNotBlank() &&
+                accessToken.get().isNotBlank()
+        }
+    }
+
+    class WebDavBackupOptions internal constructor(
+        private val preferenceStore: PreferenceStore,
+        secretStore: SecretStore,
+    ) {
+        val enabled: Preference<Boolean>
+            get() = preferenceStore.getBoolean("webdav_backup_enabled", false)
+
+        val directoryUrl: Preference<String>
+            get() = preferenceStore.getString("webdav_backup_directory_url")
+
+        val username: Preference<String>
+            get() = preferenceStore.getString("webdav_backup_username")
+
+        val password: Preference<String> = SecretPreference(
+            key = "webdav_backup_password",
+            secretStore = secretStore,
+            legacyPreference = preferenceStore.getString("webdav_backup_password"),
+        )
+
+        val lastBackupAt: Preference<Long>
+            get() = preferenceStore.getLong("webdav_backup_last_at", 0L)
+
+        val lastError: Preference<String>
+            get() = preferenceStore.getString("webdav_backup_last_error")
+
+        fun hasConnectionDetails(): Boolean {
+            return directoryUrl.get().isNotBlank() &&
+                username.get().isNotBlank() &&
+                password.get().isNotBlank()
+        }
+
+        fun isConfigured(): Boolean {
+            return enabled.get() && hasConnectionDetails()
+        }
+    }
+
+    class AiOptions internal constructor(
+        private val preferenceStore: PreferenceStore,
+        private val deviceStateStore: PreferenceStore,
+        secretStore: SecretStore,
+    ) {
         val enabled: Preference<Boolean>
             get() = preferenceStore.getBoolean("ai_enabled", false)
 
@@ -296,8 +397,11 @@ class AppPreferences(context: Context) {
         val baseUrl: Preference<String>
             get() = preferenceStore.getString("ai_base_url", AiProvider.default.defaultBaseUrl)
 
-        val apiKey: Preference<String>
-            get() = preferenceStore.getString("ai_api_key")
+        val apiKey: Preference<String> = SecretPreference(
+            key = "ai_api_key",
+            secretStore = secretStore,
+            legacyPreference = preferenceStore.getString("ai_api_key"),
+        )
 
         val model: Preference<String>
             get() = preferenceStore.getString("ai_model", AiProvider.default.defaultModel)
@@ -316,6 +420,35 @@ class AppPreferences(context: Context) {
 
         val backgroundPreviewsOnWiFiOnly: Preference<Boolean>
             get() = preferenceStore.getBoolean("ai_background_preview_summaries_wifi_only", true)
+
+        val backgroundPreviewsRequireCharging: Preference<Boolean>
+            get() = preferenceStore.getBoolean(
+                "ai_background_preview_summaries_require_charging",
+                false,
+            )
+
+        val backgroundPreviewsDailyLimit: Preference<Int>
+            get() = preferenceStore.getInt(
+                "ai_background_preview_summaries_daily_limit",
+                DEFAULT_BACKGROUND_PREVIEW_DAILY_LIMIT,
+            )
+
+        val backgroundPreviewsDailyUsage: Preference<String>
+            get() = deviceStateStore.getString(
+                "ai_background_preview_summaries_daily_usage"
+            )
+
+        val ruleEvaluationsDailyLimit: Preference<Int>
+            get() = preferenceStore.getInt(
+                "ai_rule_evaluations_daily_limit",
+                DEFAULT_AI_RULE_EVALUATIONS_DAILY_LIMIT,
+            )
+
+        val ruleEvaluationsDailyUsage: Preference<String>
+            get() = deviceStateStore.getString("ai_rule_evaluations_daily_usage")
+
+        val ruleEvaluationRunStatus: Preference<String>
+            get() = deviceStateStore.getString("ai_rule_evaluation_run_status")
 
         val translationMode: Preference<AiTranslationMode>
             get() = preferenceStore.getEnum("ai_translation_mode", AiTranslationMode.default)
@@ -345,3 +478,7 @@ class AppPreferences(context: Context) {
             )
     }
 }
+
+internal const val DEFAULT_BACKGROUND_PREVIEW_DAILY_LIMIT = 20
+internal const val DEFAULT_AI_RULE_EVALUATIONS_DAILY_LIMIT = 20
+internal const val DEVICE_STATE_PREFERENCES_NAME = "capy_device_state"

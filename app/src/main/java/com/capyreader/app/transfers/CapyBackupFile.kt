@@ -58,14 +58,11 @@ class CapyBackupFile(
             treeUri,
             DocumentsContract.getTreeDocumentId(treeUri),
         )
-        val timestamp = AUTOMATIC_BACKUP_FILE_FORMAT.format(
-            exportedAt.atZone(ZoneOffset.UTC)
-        )
         val target = DocumentsContract.createDocument(
             context.contentResolver,
             rootDocumentUri,
             BACKUP_MIME_TYPE,
-            "$AUTOMATIC_BACKUP_FILE_PREFIX$timestamp.json",
+            automaticBackupFileName(exportedAt),
         ) ?: throw IOException("Could not create automatic backup")
 
         try {
@@ -170,11 +167,18 @@ class CapyBackupFile(
         target: Uri,
         exportedAt: Instant = Instant.now(),
     ) {
-        val source = json.encodeToString(createBackup(account, exportedAt)).toByteArray()
+        val source = createPayload(account, exportedAt)
         val output = context.contentResolver.openOutputStream(target, "w")
             ?: throw IOException("Could not open backup file")
 
         output.use { it.write(source) }
+    }
+
+    internal suspend fun createPayload(
+        account: Account,
+        exportedAt: Instant = Instant.now(),
+    ): ByteArray = withContext(Dispatchers.IO) {
+        json.encodeToString(createBackup(account, exportedAt)).toByteArray()
     }
 
     private suspend fun createBackup(
@@ -203,7 +207,7 @@ class CapyBackupFile(
             ai = BackupAi(
                 settings = appPreferences().backupValues(
                     includedKeys = { it.startsWith("ai_") },
-                    excludedKeys = SENSITIVE_APP_KEYS,
+                    excludedKeys = EXCLUDED_APP_KEYS,
                 ),
                 includeApiKey = false,
             ),
@@ -378,17 +382,19 @@ class CapyBackupFile(
         private const val MIN_RETENTION = 1
         private const val MAX_RETENTION = 30
         private val SUPPORTED_BACKUP_VERSIONS = setOf(1, BACKUP_VERSION)
-        private val SENSITIVE_APP_KEYS = setOf("ai_api_key")
-        private val SENSITIVE_ACCOUNT_KEYS = setOf("password")
-        private val DEVICE_LOCAL_APP_KEYS = setOf(
-            "automatic_backup_enabled",
-            "automatic_backup_tree_uri",
-            "automatic_backup_last_at",
-            "automatic_backup_last_error",
-        )
+        private val SENSITIVE_APP_KEYS = SENSITIVE_APP_PREFERENCE_KEYS
+        private val SENSITIVE_ACCOUNT_KEYS = SENSITIVE_ACCOUNT_PREFERENCE_KEYS
+        private val DEVICE_LOCAL_APP_KEYS = DEVICE_LOCAL_APP_PREFERENCE_KEYS
         private val EXCLUDED_APP_KEYS = SENSITIVE_APP_KEYS + DEVICE_LOCAL_APP_KEYS
         private val AUTOMATIC_BACKUP_FILE_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+        internal fun automaticBackupFileName(exportedAt: Instant): String {
+            val timestamp = AUTOMATIC_BACKUP_FILE_FORMAT.format(
+                exportedAt.atZone(ZoneOffset.UTC)
+            )
+            return "$AUTOMATIC_BACKUP_FILE_PREFIX$timestamp.json"
+        }
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -396,6 +402,30 @@ class CapyBackupFile(
         }
     }
 }
+
+internal val SENSITIVE_APP_PREFERENCE_KEYS = setOf(
+    "ai_api_key",
+    "wallabag_access_token",
+    "webdav_backup_password",
+)
+
+internal val SENSITIVE_ACCOUNT_PREFERENCE_KEYS = setOf("password")
+
+internal val DEVICE_LOCAL_APP_PREFERENCE_KEYS = setOf(
+    "automatic_backup_enabled",
+    "automatic_backup_tree_uri",
+    "automatic_backup_last_at",
+    "automatic_backup_last_error",
+    "ai_background_preview_summaries_daily_usage",
+    "ai_rule_evaluations_daily_usage",
+    "ai_rule_evaluation_run_status",
+    "webdav_backup_enabled",
+    "webdav_backup_directory_url",
+    "webdav_backup_username",
+    "webdav_backup_password",
+    "webdav_backup_last_at",
+    "webdav_backup_last_error",
+)
 
 internal data class AutomaticBackupDocument(
     val documentID: String,

@@ -6,21 +6,43 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.jocmp.capy.AccountPreferences
 import com.jocmp.capy.PreferenceStoreProvider
+import com.capyreader.app.preferences.ACCOUNT_SECRET_KEY_ALIAS
+import com.capyreader.app.preferences.ACCOUNT_SECRET_PREFERENCES_NAME
+import com.capyreader.app.preferences.AndroidKeystoreSecretStore
 import com.capyreader.app.preferences.AndroidPreferenceStore
+import com.capyreader.app.preferences.SecretPreference
+import com.capyreader.app.preferences.SecretStore
 
-
-class SharedPreferenceStoreProvider(
-    private val context: Context
+class SharedPreferenceStoreProvider internal constructor(
+    private val context: Context,
+    private val secretStore: SecretStore,
 ) : PreferenceStoreProvider {
+    constructor(context: Context) : this(
+        context = context,
+        secretStore = AndroidKeystoreSecretStore(
+            context = context,
+            preferencesName = ACCOUNT_SECRET_PREFERENCES_NAME,
+            keyAlias = ACCOUNT_SECRET_KEY_ALIAS,
+        ),
+    )
+
     override fun build(accountID: String): AccountPreferences {
+        val preferenceStore = AndroidPreferenceStore(
+            buildPreferences(context, accountID)
+        )
+
         return AccountPreferences(
-            AndroidPreferenceStore(
-                buildPreferences(context, accountID)
-            )
+            store = preferenceStore,
+            passwordPreference = SecretPreference(
+                key = accountPasswordSecretKey(accountID),
+                secretStore = secretStore,
+                legacyPreference = preferenceStore.getString(PASSWORD_KEY),
+            ),
         )
     }
 
     override fun delete(accountID: String) {
+        secretStore.delete(accountPasswordSecretKey(accountID))
         val preferences = buildPreferences(context, accountID)
 
         preferences.edit(commit = true) {
@@ -30,6 +52,10 @@ class SharedPreferenceStoreProvider(
 }
 
 private fun buildPreferences(context: Context, accountID: String) =
-    context.getSharedPreferences(accountPrefs(accountID), MODE_PRIVATE)
+    context.getSharedPreferences(accountPreferencesName(accountID), MODE_PRIVATE)
 
-private fun accountPrefs(accountID: String) = "account_$accountID"
+internal fun accountPreferencesName(accountID: String) = "account_$accountID"
+
+internal fun accountPasswordSecretKey(accountID: String) = "account:$accountID:password"
+
+private const val PASSWORD_KEY = "password"
