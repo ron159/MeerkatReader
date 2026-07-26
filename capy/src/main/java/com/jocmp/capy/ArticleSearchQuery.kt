@@ -21,10 +21,7 @@ data class ArticleSearchQuery(
 
     companion object {
         fun parse(input: String?): ArticleSearchQuery {
-            val parts = input.orEmpty()
-                .trim()
-                .split(Regex("\\s+"))
-                .filter { it.isNotBlank() }
+            val parts = tokenize(input.orEmpty())
 
             val text = mutableListOf<String>()
             var status: ArticleSearchStatus? = null
@@ -45,7 +42,11 @@ data class ArticleSearchQuery(
                 }
 
                 val key = part.substring(0, separator).lowercase()
-                val value = part.substring(separator + 1).trim()
+                val value = parseQualifierValue(part.substring(separator + 1))
+                if (value == null) {
+                    text += part
+                    return@forEach
+                }
 
                 when (key) {
                     "is" -> {
@@ -98,6 +99,73 @@ data class ArticleSearchQuery(
                 hasImage = hasImage,
                 hasAudio = hasAudio,
             )
+        }
+
+        private fun tokenize(input: String): List<String> {
+            val parts = mutableListOf<String>()
+            val current = StringBuilder()
+            var insideQuotes = false
+            var escaped = false
+
+            fun flush() {
+                if (current.isNotEmpty()) {
+                    parts += current.toString()
+                    current.clear()
+                }
+            }
+
+            input.trim().forEach { character ->
+                if (character.isWhitespace() && !insideQuotes) {
+                    flush()
+                    return@forEach
+                }
+
+                current.append(character)
+                if (escaped) {
+                    escaped = false
+                } else {
+                    when {
+                        insideQuotes && character == '\\' -> escaped = true
+                        character == '"' -> insideQuotes = !insideQuotes
+                    }
+                }
+            }
+            flush()
+
+            return parts
+        }
+
+        private fun parseQualifierValue(rawValue: String): String? {
+            val value = rawValue.trim()
+            if (value.isEmpty()) return null
+            if (!value.startsWith('"')) {
+                return value.takeIf { '"' !in it }
+            }
+            if (value.length < 2 || !value.endsWith('"')) return null
+
+            val unescaped = StringBuilder()
+            var escaped = false
+            value.substring(1, value.lastIndex).forEach { character ->
+                if (escaped) {
+                    when (character) {
+                        '"', '\\' -> unescaped.append(character)
+                        else -> {
+                            unescaped.append('\\')
+                            unescaped.append(character)
+                        }
+                    }
+                    escaped = false
+                } else {
+                    when (character) {
+                        '\\' -> escaped = true
+                        '"' -> return null
+                        else -> unescaped.append(character)
+                    }
+                }
+            }
+            if (escaped) return null
+
+            return unescaped.toString().takeIf { it.isNotBlank() }
         }
 
         private fun parseStartDate(value: String): Long? {

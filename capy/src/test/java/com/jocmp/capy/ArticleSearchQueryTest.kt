@@ -48,4 +48,46 @@ class ArticleSearchQueryTest {
         assertNull(query.hasAudio)
         assertNull(query.hasImage)
     }
+
+    @Test
+    fun parse_extractsQuotedMultiWordQualifierValues() {
+        val query = ArticleSearchQuery.parse(
+            "patch feed:\"Android Weekly\" folder:\"Mobile News\" " +
+                "author:\"Alice Smith\" title:\"Security Update\""
+        )
+
+        assertEquals("patch", query.text)
+        assertEquals("Android Weekly", query.feed)
+        assertEquals("Mobile News", query.folder)
+        assertEquals("Alice Smith", query.author)
+        assertEquals("Security Update", query.title)
+    }
+
+    @Test
+    fun parse_unescapesQuotesAndBackslashesInsideQuotedValues() {
+        val query = ArticleSearchQuery.parse(
+            "author:\"Alice \\\"Ace\\\" Smith\" feed:\"Android \\\\ Weekly\""
+        )
+
+        assertEquals("Alice \"Ace\" Smith", query.author)
+        assertEquals("Android \\ Weekly", query.feed)
+        assertEquals("", query.text)
+    }
+
+    @Test
+    fun parse_keepsMalformedAndUnknownQuotedQualifiersInPlainText() {
+        val query = ArticleSearchQuery.parse(
+            "feed:\"\" site:\"example dot com\" title:\"Security Update\"suffix " +
+                "author:\"Unclosed Name"
+        )
+
+        assertNull(query.feed)
+        assertNull(query.title)
+        assertNull(query.author)
+        assertEquals(
+            "feed:\"\" site:\"example dot com\" title:\"Security Update\"suffix " +
+                "author:\"Unclosed Name",
+            query.text,
+        )
+    }
 }

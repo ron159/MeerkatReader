@@ -383,6 +383,57 @@ class ArticleRecordsTest {
     }
 
     @Test
+    fun allByStatus_quotedMultiWordSearchQualifiers() {
+        val androidWeekly = FeedFixture(database).create(title = "Android Weekly")
+        val androidDigest = FeedFixture(database).create(title = "Android Digest")
+        val articleResult = articleFixture.create(
+            title = "Security Update",
+            summary = "Monthly patch notes",
+            feed = androidWeekly,
+            author = "Alice Smith",
+        )
+        articleFixture.create(
+            title = "Security Update",
+            summary = "Monthly patch notes",
+            feed = androidDigest,
+            author = "Alice Smith",
+        )
+        articleFixture.create(
+            title = "Security Update",
+            summary = "Monthly patch notes",
+            feed = androidWeekly,
+            author = "Alice Jones",
+        )
+
+        val searchQuery = ArticleSearchQuery.parse(
+            "patch feed:\"Android Weekly\" author:\"Alice Smith\" " +
+                "title:\"Security Update\""
+        )
+        val articleRecords = ArticleRecords(database)
+
+        val results = articleRecords
+            .byStatus
+            .all(
+                status = ArticleStatus.ALL,
+                searchQuery = searchQuery,
+                limit = 10,
+                offset = 0,
+                sortOrder = SortOrder.NEWEST_FIRST,
+            )
+            .executeAsList()
+        val count = articleRecords
+            .byStatus
+            .count(
+                status = ArticleStatus.ALL,
+                searchQuery = searchQuery,
+            )
+            .executeAsOne()
+
+        assertEquals(expected = 1, actual = count)
+        assertEquals(expected = listOf(articleResult.id), actual = results.map { it.id })
+    }
+
+    @Test
     fun markUnread() = runTest {
         val article = articleFixture.create()
         val articleRecords = ArticleRecords(database)
