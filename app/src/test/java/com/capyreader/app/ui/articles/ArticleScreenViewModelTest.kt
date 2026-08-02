@@ -186,6 +186,21 @@ class ArticleScreenViewModelTest {
     }
 
     @Test
+    fun `clampScrollHighWaterMark only lowers the mark to the last item`() = runTest {
+        val viewModel = buildViewModel()
+
+        viewModel.updateScrollHighWaterMark(8)
+        viewModel.clampScrollHighWaterMark(itemCount = 3)
+        assertEquals(2, viewModel.scrollHighWaterMark)
+
+        viewModel.clampScrollHighWaterMark(itemCount = 10)
+        assertEquals(2, viewModel.scrollHighWaterMark)
+
+        viewModel.clampScrollHighWaterMark(itemCount = 0)
+        assertEquals(-1, viewModel.scrollHighWaterMark)
+    }
+
+    @Test
     fun `selecting a visible article does not wait for initial refresh`() = runTest {
         val refreshGate = CompletableDeferred<Unit>()
         coEvery { account.refresh(any()) } coAnswers {
