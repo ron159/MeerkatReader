@@ -12,7 +12,19 @@ platform :android do
 
   desc "Runs all the tests"
   lane :test do
-    gradle(task: "test")
+    gradle(
+      tasks: [
+        ":app:testFreeDebugUnitTest",
+        ":app:testGplayDebugUnitTest",
+        ":bench:test",
+        ":capy:test",
+        ":feedbinclient:test",
+        ":feedfinder:test",
+        ":minifluxclient:test",
+        ":readerclient:test",
+        ":rssparser:test",
+      ]
+    )
   end
 
   desc "Deploy a new version to the Google Play"
