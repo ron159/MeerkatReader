@@ -382,13 +382,7 @@ class ArticleScreenViewModel(
             }
         }
 
-        val skipInitialRefresh = account.preferences.lastRefreshedAt.get() > 0
-
-        if (skipInitialRefresh) {
-            refreshInitialized = true
-        } else {
-            refreshAll()
-        }
+        refreshAll()
     }
 
     fun selectArticleFilter(status: ArticleStatus = currentStatus) {

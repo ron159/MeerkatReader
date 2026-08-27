@@ -16,7 +16,6 @@ import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.ArticleListVerticalSwipe
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.ui.articles.feeds.AngleRefreshState
-import java.time.ZonedDateTime
 import com.jocmp.capy.Account
 import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleFilter
@@ -32,11 +31,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-<<<<<<< HEAD
 import kotlinx.coroutines.CompletableDeferred
-=======
-import java.time.ZonedDateTime
->>>>>>> d76b45b7 (Increase fetch concurrency for Reader API accounts (#2193))
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +53,7 @@ import org.koin.core.context.stopKoin
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.net.URL
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -139,27 +135,26 @@ class ArticleScreenViewModelTest {
     }
 
     @Test
-    fun `skips initial refresh when account has already synced before`() = runTest {
+    fun `entering app refreshes previously synced account once`() = runTest {
         every { account.preferences.lastRefreshedAt.get() } returns
             ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
 
         val viewModel = buildViewModel()
 
+        assertFalse(viewModel.refreshInitialized)
+        assertTrue(viewModel.refreshingAll)
+
+        advanceUntilIdle()
+
         assertTrue(viewModel.refreshInitialized)
-        assertFalse(viewModel.refreshingAll)
+        coVerify(exactly = 1) { account.refresh(ArticleFilter.default()) }
     }
 
     @Test
-    fun `refreshAll transitions from stopped, running, to settling`() = runTest {
-        every { account.preferences.lastRefreshedAt.get() } returns
-            ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
-
+    fun `entering app refresh transitions from running to settling`() = runTest {
         val viewModel = buildViewModel()
 
         viewModel.refreshAllState.test {
-            assertEquals(AngleRefreshState.STOPPED, awaitItem())
-
-            viewModel.refreshAll()
             assertEquals(AngleRefreshState.RUNNING, awaitItem())
 
             advanceUntilIdle()
@@ -170,19 +165,23 @@ class ArticleScreenViewModelTest {
 
     @Test
     fun `refreshAll guards against double calls while running`() = runTest {
-        every { account.preferences.lastRefreshedAt.get() } returns
-            ZonedDateTime.parse("2023-11-14T22:13:20Z").toEpochSecond()
+        val refreshGate = CompletableDeferred<Unit>()
+        coEvery { account.refresh(any()) } coAnswers {
+            refreshGate.await()
+            Result.success(Unit)
+        }
 
         val viewModel = buildViewModel()
 
         viewModel.refreshAllState.test {
-            assertEquals(AngleRefreshState.STOPPED, awaitItem())
-
-            viewModel.refreshAll()
             assertEquals(AngleRefreshState.RUNNING, awaitItem())
+            runCurrent()
 
             viewModel.refreshAll()
+            runCurrent()
+            coVerify(exactly = 1) { account.refresh(ArticleFilter.default()) }
 
+            refreshGate.complete(Unit)
             advanceUntilIdle()
 
             assertEquals(AngleRefreshState.SETTLING, awaitItem())
