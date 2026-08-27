@@ -16,9 +16,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,7 +34,7 @@ import androidx.core.net.toUri
 import com.capyreader.app.BuildConfig.VERSION_NAME
 import com.capyreader.app.R
 import com.capyreader.app.ui.LocalLinkOpener
-import com.capyreader.app.ui.components.FormSection
+import com.capyreader.app.ui.settings.SettingsSection
 import com.capyreader.app.ui.theme.CapyTheme
 import kotlinx.coroutines.launch
 
@@ -53,21 +54,24 @@ fun AboutSettingsPanel() {
     val linkOpener = LocalLinkOpener.current
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
-        Column {
-            Text(
-                text = stringResource(R.string.settings_about_description),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+        Text(
+            text = stringResource(R.string.settings_about_description),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
 
+        SettingsSection {
             Box(
                 modifier = Modifier.clickable {
                     linkOpener.open(Project.ISSUES_URL.toUri())
                 }
             ) {
                 ListItem(
+                    colors = ListItemDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
                     leadingContent = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
                     headlineContent = { Text(stringResource(R.string.settings_bug_report_title)) },
                     supportingContent = {
@@ -82,6 +86,9 @@ fun AboutSettingsPanel() {
                 }
             ) {
                 ListItem(
+                    colors = ListItemDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
                     leadingContent = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
                     headlineContent = { Text(stringResource(R.string.settings_acknowledgements_title)) },
                     supportingContent = {
@@ -91,7 +98,7 @@ fun AboutSettingsPanel() {
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_version)) {
+        SettingsSection(title = stringResource(R.string.settings_section_version)) {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -116,7 +123,6 @@ fun AboutSettingsPanel() {
                 )
             }
         }
-        HorizontalDivider()
         Spacer(Modifier.height(16.dp))
     }
 }

@@ -4,11 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,12 +14,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.R
 import com.capyreader.app.common.RowItem
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
+import com.capyreader.app.ui.settings.SettingsSection
+import com.capyreader.app.ui.settings.SettingsTextField
 import org.koin.androidx.compose.koinViewModel
 import java.text.DateFormat
 import java.util.Date
@@ -90,7 +88,7 @@ internal fun IntegrationSettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
-        FormSection(title = stringResource(R.string.integration_wallabag_title)) {
+        SettingsSection(title = stringResource(R.string.integration_wallabag_title)) {
             RowItem {
                 TextSwitch(
                     checked = wallabagEnabled,
@@ -101,38 +99,22 @@ internal fun IntegrationSettingsPanelView(
             }
 
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = wallabagServerUrl,
                     onValueChange = updateWallabagServerUrl,
-                    label = {
-                        Text(
-                            stringResource(R.string.integration_wallabag_server_url)
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.integration_wallabag_server_url),
+                    keyboardType = KeyboardType.Uri,
                 )
             }
 
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = wallabagAccessToken,
                     onValueChange = updateWallabagAccessToken,
-                    label = {
-                        Text(
-                            stringResource(R.string.integration_wallabag_access_token)
-                        )
-                    },
-                    supportingText = {
-                        Text(
-                            stringResource(R.string.integration_wallabag_token_privacy)
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.integration_wallabag_access_token),
+                    supportingText = stringResource(R.string.integration_wallabag_token_privacy),
+                    keyboardType = KeyboardType.Password,
+                    isPassword = true,
                 )
             }
 
@@ -149,7 +131,7 @@ internal fun IntegrationSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.integration_webdav_backup_title)) {
+        SettingsSection(title = stringResource(R.string.integration_webdav_backup_title)) {
             RowItem {
                 TextSwitch(
                     checked = webDavBackupEnabled,
@@ -162,53 +144,31 @@ internal fun IntegrationSettingsPanelView(
             }
 
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = webDavDirectoryUrl,
                     onValueChange = updateWebDavDirectoryUrl,
-                    label = {
-                        Text(
-                            stringResource(R.string.integration_webdav_directory_url)
-                        )
-                    },
-                    supportingText = {
-                        Text(
-                            stringResource(R.string.integration_webdav_nextcloud_hint)
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.integration_webdav_directory_url),
+                    supportingText = stringResource(R.string.integration_webdav_nextcloud_hint),
+                    keyboardType = KeyboardType.Uri,
                 )
             }
 
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = webDavUsername,
                     onValueChange = updateWebDavUsername,
-                    label = {
-                        Text(stringResource(R.string.integration_webdav_username))
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.integration_webdav_username),
                 )
             }
 
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = webDavPassword,
                     onValueChange = updateWebDavPassword,
-                    label = {
-                        Text(stringResource(R.string.integration_webdav_app_password))
-                    },
-                    supportingText = {
-                        Text(
-                            stringResource(R.string.integration_webdav_password_privacy)
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.integration_webdav_app_password),
+                    supportingText = stringResource(R.string.integration_webdav_password_privacy),
+                    keyboardType = KeyboardType.Password,
+                    isPassword = true,
                 )
             }
 

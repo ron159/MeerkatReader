@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +14,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
@@ -55,13 +59,22 @@ fun <T> PreferenceSelect(
     val defaults = ListItemDefaults.colors()
     val colors = ListItemDefaults.colors(
         headlineColor = if (enabled) defaults.contentColor else defaults.disabledContentColor,
-        supportingColor = if (enabled) defaults.supportingContentColor else defaults.disabledSupportingTextColor,
-        containerColor = MaterialTheme.colorScheme.background,
+        supportingColor = if (enabled) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            defaults.disabledSupportingTextColor
+        },
+        containerColor = Color.Transparent,
     )
 
     Box(
         Modifier
-            .clickable {
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp)
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+            ) {
                 setOpen(true)
             }
     ) {
@@ -71,7 +84,15 @@ fun <T> PreferenceSelect(
             supportingContent = {
                 Text(optionText(selected))
             },
-            trailingContent = trailingContent
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    trailingContent?.invoke()
+                    Icon(
+                        imageVector = Icons.Rounded.ArrowDropDown,
+                        contentDescription = null,
+                    )
+                }
+            },
         )
     }
 

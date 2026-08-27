@@ -83,17 +83,30 @@ sealed class SettingsPanel(@StringRes val title: Int) {
     fun isNested() = !items.contains(this)
 
     companion object {
-        val items: List<SettingsPanel>
-            get() = listOf(
-                General,
-                Display,
-                ArticleList,
-                AI,
-                Integrations,
-                Gestures,
-                DataStorage,
-                Account,
-                About,
-            )
+        val groups = listOf(
+            SettingsPanelGroup(
+                title = R.string.settings_group_app,
+                panels = listOf(General, DataStorage),
+            ),
+            SettingsPanelGroup(
+                title = R.string.settings_group_reading,
+                panels = listOf(Display, ArticleList, Gestures),
+            ),
+            SettingsPanelGroup(
+                title = R.string.settings_group_services,
+                panels = listOf(AI, Integrations),
+            ),
+            SettingsPanelGroup(
+                title = R.string.settings_group_account,
+                panels = listOf(Account, About),
+            ),
+        )
+
+        val items: List<SettingsPanel> = groups.flatMap(SettingsPanelGroup::panels)
     }
 }
+
+data class SettingsPanelGroup(
+    @StringRes val title: Int,
+    val panels: List<SettingsPanel>,
+)

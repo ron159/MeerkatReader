@@ -41,7 +41,6 @@ import com.capyreader.app.common.RowItem
 import com.capyreader.app.notifications.Notifications
 import com.capyreader.app.refresher.RefreshInterval
 import com.capyreader.app.ui.CrashReporting
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.fixtures.PreviewKoinApplication
 import com.capyreader.app.ui.settings.CrashReportingCheckbox
@@ -49,6 +48,7 @@ import com.capyreader.app.ui.components.LocalSnackbarHost
 import com.capyreader.app.ui.settings.filters.FilterKeywords
 import com.capyreader.app.ui.settings.filters.FiltersItem
 import com.capyreader.app.ui.settings.filters.LocalFilterKeywords
+import com.capyreader.app.ui.settings.SettingsSection
 import com.capyreader.app.ui.theme.CapyTheme
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.common.launchUI
@@ -116,7 +116,7 @@ fun GeneralSettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        FormSection(title = stringResource(R.string.settings_section_refresh)) {
+        SettingsSection(title = stringResource(R.string.settings_section_refresh)) {
             Column {
                 RefreshIntervalMenu(
                     refreshInterval = refreshInterval,
@@ -136,19 +136,19 @@ fun GeneralSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_automation)) {
+        SettingsSection(title = stringResource(R.string.settings_section_automation)) {
             FiltersItem()
         }
 
         if (CrashReporting.isAvailable) {
-            FormSection(title = stringResource(R.string.settings_section_privacy)) {
+            SettingsSection(title = stringResource(R.string.settings_section_privacy)) {
                 RowItem {
                     CrashReportingCheckbox()
                 }
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_browser)) {
+        SettingsSection(title = stringResource(R.string.settings_section_browser)) {
             RowItem {
                 TextSwitch(
                     checked = canOpenLinksInternally,
@@ -158,7 +158,7 @@ fun GeneralSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_reader_title)) {
+        SettingsSection(title = stringResource(R.string.settings_reader_title)) {
             RowItem {
                 TextSwitch(
                     checked = enableStickyFullContent,
@@ -169,7 +169,7 @@ fun GeneralSettingsPanelView(
             }
         }
 
-        FormSection(
+        SettingsSection(
             title = stringResource(R.string.settings_section_advanced)
         ) {
             CrashLogExportItem(source = source)
@@ -210,6 +210,7 @@ fun NotificationsListItem(
     val colors = ListItemDefaults.colors(
         headlineColor = if (enabled) defaultColors.contentColor else defaultColors.disabledContentColor,
         supportingColor = if (enabled) defaultColors.supportingContentColor else defaultColors.disabledContentColor,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
     )
 
     val permissions = rememberLauncherForActivityResult(RequestPermission()) { allowed ->

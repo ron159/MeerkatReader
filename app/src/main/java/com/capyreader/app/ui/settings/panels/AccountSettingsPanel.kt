@@ -8,17 +8,13 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme.colorScheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,9 +44,10 @@ import com.capyreader.app.transfers.BackupRestoreMode
 import com.capyreader.app.transfers.CapyBackupFile
 import com.capyreader.app.transfers.OPMLExporter
 import com.capyreader.app.transfers.StarredExporter
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.AccountSettingsStrings
+import com.capyreader.app.ui.settings.SettingsSection
+import com.capyreader.app.ui.settings.SettingsTextField
 import com.capyreader.app.ui.theme.CapyTheme
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.opml.ImportProgress
@@ -199,7 +196,7 @@ fun AccountSettingsPanelView(
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
         if (showAccountName(accountSource)) {
-            FormSection(
+            SettingsSection(
                 title = stringResource(accountSource.titleKey),
             ) {
                 RowItem {
@@ -207,7 +204,7 @@ fun AccountSettingsPanelView(
                 }
             }
             if (accountURL.isNotBlank()) {
-                FormSection(
+                SettingsSection(
                     title = stringResource(R.string.settings_section_account_server),
                 ) {
                     RowItem {
@@ -221,7 +218,7 @@ fun AccountSettingsPanelView(
             }
         }
 
-        FormSection(
+        SettingsSection(
             title = stringResource(R.string.settings_section_refresh),
         ) {
             RowItem {
@@ -231,7 +228,7 @@ fun AccountSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_import)) {
+        SettingsSection(title = stringResource(R.string.settings_section_import)) {
             if (showImportButton(accountSource)) {
                 RowItem {
                     OPMLImportButton(
@@ -250,7 +247,7 @@ fun AccountSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_export)) {
+        SettingsSection(title = stringResource(R.string.settings_section_export)) {
             RowItem {
                 OPMLExportButton(
                     onClick = onRequestExport,
@@ -268,7 +265,7 @@ fun AccountSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_automatic_backup)) {
+        SettingsSection(title = stringResource(R.string.settings_section_automatic_backup)) {
             RowItem {
                 FilledTonalButton(
                     onClick = onRequestAutomaticBackupTree,
@@ -295,13 +292,12 @@ fun AccountSettingsPanelView(
                 )
             }
             RowItem {
-                OutlinedTextField(
+                SettingsTextField(
                     value = automaticBackupRetention,
                     onValueChange = updateAutomaticBackupRetention,
                     enabled = automaticBackupTreeUri.isNotBlank(),
-                    label = { Text(stringResource(R.string.automatic_backup_retention)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.automatic_backup_retention),
+                    keyboardType = KeyboardType.Number,
                 )
             }
             RowItem {
@@ -340,9 +336,8 @@ fun AccountSettingsPanelView(
             }
         }
 
-        FormSection {
+        SettingsSection {
             RowItem {
-                HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
                 RemoveAccountButton(
                     source = accountSource,
                     modifier = Modifier.fillMaxWidth(),

@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,17 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.R
 import com.capyreader.app.ai.ArticleAiDailyBudget
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.preferences.AiProvider
 import com.capyreader.app.preferences.AiTranslationMode
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
+import com.capyreader.app.ui.settings.SettingsTextField
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -122,7 +119,7 @@ fun AiSettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        FormSection(title = stringResource(R.string.settings_panel_ai_title)) {
+        SettingsSection(title = stringResource(R.string.settings_section_ai_provider)) {
             RowItem {
                 TextSwitch(
                     checked = enabled,
@@ -168,7 +165,9 @@ fun AiSettingsPanelView(
                     label = stringResource(R.string.ai_settings_model),
                 )
             }
+        }
 
+        SettingsSection(title = stringResource(R.string.settings_section_ai_output)) {
             RowItem {
                 SettingsTextField(
                     value = language,
@@ -186,6 +185,18 @@ fun AiSettingsPanelView(
                 )
             }
 
+            PreferenceSelect(
+                selected = translationMode,
+                update = updateTranslationMode,
+                options = AiTranslationMode.entries,
+                label = R.string.ai_settings_translation_mode,
+                optionText = {
+                    stringResource(it.translationKey)
+                }
+            )
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_section_ai_background)) {
             RowItem {
                 TextSwitch(
                     checked = backgroundPreviewsEnabled,
@@ -225,19 +236,9 @@ fun AiSettingsPanelView(
                     )
                 },
             )
-
-            PreferenceSelect(
-                selected = translationMode,
-                update = updateTranslationMode,
-                options = AiTranslationMode.entries,
-                label = R.string.ai_settings_translation_mode,
-                optionText = {
-                    stringResource(it.translationKey)
-                }
-            )
         }
 
-        FormSection(title = stringResource(R.string.ai_settings_prompts)) {
+        SettingsSection(title = stringResource(R.string.ai_settings_prompts)) {
             RowItem {
                 SettingsTextField(
                     value = summarizePrompt,
@@ -283,7 +284,7 @@ fun AiSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_privacy)) {
+        SettingsSection(title = stringResource(R.string.settings_section_privacy)) {
             RowItem {
                 Text(
                     text = stringResource(R.string.ai_settings_privacy_detail),
@@ -312,25 +313,4 @@ fun AiSettingsPanelView(
 
         Spacer(Modifier.height(16.dp))
     }
-}
-
-@Composable
-private fun SettingsTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    isPassword: Boolean = false,
-    singleLine: Boolean = true,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = singleLine,
-        minLines = if (singleLine) 1 else 3,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-    )
 }

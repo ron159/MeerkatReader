@@ -17,9 +17,9 @@ import com.capyreader.app.preferences.ArticleListVerticalSwipe
 import com.capyreader.app.preferences.ArticleVerticalSwipe
 import com.capyreader.app.preferences.BackAction
 import com.capyreader.app.preferences.RowSwipeOption
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
 import com.capyreader.app.ui.theme.CapyTheme
 import org.koin.androidx.compose.koinViewModel
 
@@ -74,7 +74,7 @@ private fun GesturesSettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
-        FormSection(title = stringResource(R.string.settings_reader_title)) {
+        SettingsSection(title = stringResource(R.string.settings_reader_title)) {
             Column {
                 PreferenceSelect(
                     selected = topSwipe,
@@ -127,7 +127,7 @@ private fun GesturesSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_article_list_title)) {
+        SettingsSection(title = stringResource(R.string.settings_article_list_title)) {
             Column {
                 PreferenceSelect(
                     selected = rowSwipeStart,

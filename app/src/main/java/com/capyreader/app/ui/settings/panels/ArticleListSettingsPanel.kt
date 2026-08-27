@@ -16,9 +16,9 @@ import com.capyreader.app.preferences.ArticleStatusListDisplay
 import com.capyreader.app.preferences.DefaultHomeTab
 import com.capyreader.app.ui.articles.MarkReadPosition
 import com.capyreader.app.ui.collectChangesWithCurrent
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
 import com.jocmp.capy.articles.SortOrder
 import org.koin.androidx.compose.koinViewModel
 
@@ -93,7 +93,7 @@ private fun ArticleListBehaviorSettings(
     updateAfterReadAll: (behavior: AfterReadAllBehavior) -> Unit,
     onNavigateToUnreadBadges: () -> Unit,
 ) {
-    FormSection(title = stringResource(R.string.settings_section_article_list_behavior)) {
+    SettingsSection(title = stringResource(R.string.settings_section_article_list_behavior)) {
         SettingsDisclosureRow(
             title = stringResource(R.string.settings_panel_unread_counts_title),
             onClick = onNavigateToUnreadBadges,
@@ -140,7 +140,7 @@ private fun ArticleListBehaviorSettings(
         )
     }
 
-    FormSection(title = stringResource(R.string.settings_section_mark_all_as_read)) {
+    SettingsSection(title = stringResource(R.string.settings_section_mark_all_as_read)) {
         Column {
             RowItem {
                 TextSwitch(

@@ -279,6 +279,10 @@
     <string name="settings_account_title">Account</string>
     <string name="settings_about_title">About</string>
     <string name="settings_list_top_bar_title">Settings</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_group_reading">Reading</string>
+    <string name="settings_group_services">Services &amp; automation</string>
+    <string name="settings_group_account">Account &amp; support</string>
     <string name="settings_auto_delete_articles_title">Keep read articles</string>
     <string name="settings_auto_delete_option_keep_forever">Forever</string>
     <string name="settings_auto_delete_option_keep_for_one_week">1 week</string>
@@ -288,6 +292,13 @@
     <string name="settings_section_advanced">Advanced</string>
     <string name="settings_section_automation">Automation</string>
     <string name="settings_section_article_list_behavior">Behavior</string>
+    <string name="settings_section_article_list_appearance">Article preview</string>
+    <string name="settings_section_ai_provider">Provider</string>
+    <string name="settings_section_ai_output">Output</string>
+    <string name="settings_section_ai_background">Background previews</string>
+    <string name="settings_section_text_to_speech">Text-to-speech</string>
+    <string name="settings_section_offline_content">Downloaded content</string>
+    <string name="settings_section_offline_keep">Keep offline</string>
     <string name="settings_section_image_cache">Image cache</string>
     <string name="settings_section_retention_cleanup">Retention and cleanup</string>
     <string name="settings_section_experimental">Experimental</string>

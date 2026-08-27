@@ -2,7 +2,10 @@ package com.capyreader.app.ui.settings.filters
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -20,11 +23,14 @@ fun FiltersItem() {
     val dismiss = { setOpen(false) }
 
     Box(
-        Modifier.clickable {
-            setOpen(true)
-        }
+        Modifier
+            .fillMaxWidth()
+            .clickable { setOpen(true) }
     ) {
         ListItem(
+            colors = ListItemDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
             headlineContent = { Text(stringResource(R.string.filters_title)) },
             supportingContent = { Text(stringResource(R.string.filters_supporting_text)) }
         )

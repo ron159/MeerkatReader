@@ -36,11 +36,10 @@ import com.capyreader.app.ui.articles.ArticleRowOptions
 import com.capyreader.app.ui.articles.FaviconBadge
 import com.capyreader.app.ui.articles.StyleProviders
 import com.capyreader.app.ui.articles.list.ArticleListItem
-import com.capyreader.app.ui.components.FormSection
-import com.capyreader.app.ui.components.LabelStyle
 import com.capyreader.app.ui.components.MeerkatSilhouetteIcon
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
 import com.capyreader.app.ui.theme.LocalAppTheme
 import kotlin.math.roundToInt
 
@@ -66,14 +65,16 @@ fun ArticleListSettings(
 ) {
     val fontScales = ArticleListFontScale.entries
 
-    Column {
+    SettingsSection(title = stringResource(R.string.settings_section_article_list_appearance)) {
         PreviewArticleRow(options = options)
 
-        FormSection(
-            title = stringResource(R.string.article_font_scale_label),
-            labelStyle = LabelStyle.COMPACT,
-        ) {
-            RowItem {
+        RowItem {
+            Column {
+                Text(
+                    text = stringResource(R.string.article_font_scale_label),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
                 Slider(
                     steps = fontScales.size - 2,
                     valueRange = 0f..(fontScales.size - 1).toFloat(),

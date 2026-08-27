@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,9 +26,10 @@ import com.capyreader.app.common.RowItem
 import com.capyreader.app.preferences.ArticleImageCacheCleanupInterval
 import com.capyreader.app.preferences.ArticleImageCacheSize
 import com.capyreader.app.preferences.ArticleImageDownloadMode
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
+import com.capyreader.app.ui.settings.SettingsTextField
 import com.jocmp.capy.accounts.AutoDelete
 import org.koin.androidx.compose.koinViewModel
 
@@ -129,7 +128,7 @@ private fun DataStorageSettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        FormSection(title = stringResource(R.string.settings_section_offline_reading)) {
+        SettingsSection(title = stringResource(R.string.settings_section_offline_reading)) {
             Column {
                 RowItem {
                     TextSwitch(
@@ -152,6 +151,11 @@ private fun DataStorageSettingsPanelView(
                         title = stringResource(R.string.settings_offline_require_charging),
                     )
                 }
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_section_offline_content)) {
+            Column {
                 RowItem {
                     TextSwitch(
                         checked = offlineIncludeFullContent,
@@ -174,13 +178,18 @@ private fun DataStorageSettingsPanelView(
                     )
                 }
                 RowItem {
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = offlineStorageLimitMegabytes,
                         onValueChange = updateOfflineStorageLimitMegabytes,
-                        label = { Text(stringResource(R.string.settings_offline_storage_limit_mb)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = stringResource(R.string.settings_offline_storage_limit_mb),
+                        keyboardType = KeyboardType.Number,
                     )
                 }
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_section_offline_keep)) {
+            Column {
                 RowItem {
                     TextSwitch(
                         checked = offlinePreserveStarred,
@@ -212,7 +221,7 @@ private fun DataStorageSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_image_cache)) {
+        SettingsSection(title = stringResource(R.string.settings_section_image_cache)) {
             PreferenceSelect(
                 selected = articleImageDownloadMode,
                 update = updateArticleImageDownloadMode,
@@ -250,7 +259,7 @@ private fun DataStorageSettingsPanelView(
             }
         }
 
-        FormSection(title = stringResource(R.string.settings_section_retention_cleanup)) {
+        SettingsSection(title = stringResource(R.string.settings_section_retention_cleanup)) {
             AutoDeleteMenu(
                 updateAutoDelete = updateAutoDelete,
                 autoDelete = autoDelete,

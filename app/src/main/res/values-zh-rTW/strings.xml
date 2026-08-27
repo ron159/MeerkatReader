@@ -110,6 +110,17 @@
     <string name="settings_about_title">關於</string>
     <string name="settings_auto_delete_option_keep_for_one_week">1 個星期</string>
     <string name="settings_list_top_bar_title">設定</string>
+    <string name="settings_group_app">應用程式</string>
+    <string name="settings_group_reading">閱讀體驗</string>
+    <string name="settings_group_services">服務與自動化</string>
+    <string name="settings_group_account">帳戶與支援</string>
+    <string name="settings_section_ai_provider">服務提供者</string>
+    <string name="settings_section_article_list_appearance">文章預覽</string>
+    <string name="settings_section_ai_output">輸出設定</string>
+    <string name="settings_section_ai_background">背景預覽</string>
+    <string name="settings_section_text_to_speech">文字轉語音</string>
+    <string name="settings_section_offline_content">下載內容</string>
+    <string name="settings_section_offline_keep">離線保留</string>
     <string name="settings_auto_delete_articles_title">文章保留時長</string>
     <string name="settings_auto_delete_option_keep_forever">永遠</string>
     <string name="settings_clear_all_articles_button">清空所有文章</string>

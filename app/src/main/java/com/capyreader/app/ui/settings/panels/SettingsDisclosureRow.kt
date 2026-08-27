@@ -2,10 +2,13 @@ package com.capyreader.app.ui.settings.panels
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,8 +19,15 @@ fun SettingsDisclosureRow(
     title: String,
     onClick: () -> Unit,
 ) {
-    Box(Modifier.clickable { onClick() }) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
         ListItem(
+            colors = ListItemDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
             headlineContent = { Text(title) },
             trailingContent = {
                 Icon(

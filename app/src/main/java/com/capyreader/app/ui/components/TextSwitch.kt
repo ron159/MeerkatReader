@@ -3,6 +3,7 @@ package com.capyreader.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
@@ -26,14 +27,16 @@ fun TextSwitch(
     onCheckedChange: (Boolean) -> Unit,
     checked: Boolean,
     title: String,
+    modifier: Modifier = Modifier,
     subtitle: String? = null,
     enabled: Boolean = true,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp)
             .toggleable(
                 value = checked,
                 enabled = enabled,
@@ -44,13 +47,14 @@ fun TextSwitch(
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier
-                .weight(0.1f)
-                .padding(vertical = 8.dp)
+                .weight(1f)
+                .padding(vertical = 12.dp)
         ) {
             val color = LocalContentColor.current
             Text(
                 title,
-                color = if (enabled) color else color.copy(alpha = ListItemDisabledLabelTextOpacity)
+                color = if (enabled) color else color.copy(alpha = ListItemDisabledLabelTextOpacity),
+                style = typography.bodyLarge,
             )
             if (subtitle != null) {
                 Text(
@@ -67,7 +71,7 @@ fun TextSwitch(
             checked = checked,
             onCheckedChange = null,
             enabled = enabled,
-            modifier = Modifier.padding(start = 8.dp)
+            modifier = Modifier.padding(start = 16.dp)
         )
     }
 }

@@ -33,10 +33,10 @@ import com.capyreader.app.preferences.ThemeMode
 import com.capyreader.app.tts.ArticleTtsConfiguration
 import com.capyreader.app.tts.ArticleTtsVoice
 import com.capyreader.app.ui.collectChangesWithCurrent
-import com.capyreader.app.ui.components.FormSection
 import com.capyreader.app.ui.components.TextSwitch
 import com.capyreader.app.ui.components.ThemePicker
 import com.capyreader.app.ui.settings.PreferenceSelect
+import com.capyreader.app.ui.settings.SettingsSection
 import com.capyreader.app.ui.theme.CapyTheme
 import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
@@ -102,7 +102,7 @@ fun DisplaySettingsPanelView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        FormSection(
+        SettingsSection(
             title = stringResource(R.string.theme_menu_label)
         ) {
             RowItem {
@@ -139,7 +139,7 @@ fun DisplaySettingsPanelView(
 
         }
 
-        FormSection(
+        SettingsSection(
             title = stringResource(R.string.settings_reader_title)
         ) {
             PreferenceSelect(
@@ -151,6 +151,19 @@ fun DisplaySettingsPanelView(
                     stringResource(it.translationKey)
                 }
             )
+            RowItem {
+                TextSwitch(
+                    enabled = enablePinArticleBars,
+                    checked = pinArticleBars,
+                    onCheckedChange = updatePinArticleBars,
+                    title = stringResource(R.string.settings_options_reader_pin_top_toolbar),
+                )
+            }
+        }
+
+        SettingsSection(
+            title = stringResource(R.string.settings_section_text_to_speech)
+        ) {
             ArticleTtsPreferences(
                 languageTag = ttsLanguageTag,
                 languageTags = ttsLanguageTags,
@@ -161,14 +174,6 @@ fun DisplaySettingsPanelView(
                 speechRate = ttsSpeechRate,
                 onSelectSpeechRate = updateTtsSpeechRate,
             )
-            RowItem {
-                TextSwitch(
-                    enabled = enablePinArticleBars,
-                    checked = pinArticleBars,
-                    onCheckedChange = updatePinArticleBars,
-                    title = stringResource(R.string.settings_options_reader_pin_top_toolbar),
-                )
-            }
         }
 
         Spacer(Modifier.height(16.dp))
