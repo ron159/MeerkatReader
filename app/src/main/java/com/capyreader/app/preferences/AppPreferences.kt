@@ -233,6 +233,9 @@ class AppPreferences internal constructor(
         val imagePreview: Preference<ImagePreview>
             get() = preferenceStore.getEnum("article_display_image_preview", ImagePreview.default)
 
+        val imagePreviewOnLeft: Preference<Boolean>
+            get() = preferenceStore.getBoolean("article_display_image_preview_on_left", false)
+
         val shortenTitles: Preference<Boolean>
             get() = preferenceStore.getBoolean("article_display_shorten_titles", true)
 

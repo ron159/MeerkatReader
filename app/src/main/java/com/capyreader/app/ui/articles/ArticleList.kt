@@ -74,7 +74,10 @@ fun ArticleList(
 
                         Box(Modifier.animateItem()) {
                             if (item == null) {
-                                PlaceholderArticleRow(articleOptions.imagePreview)
+                                PlaceholderArticleRow(
+                                    imagePreview = articleOptions.imagePreview,
+                                    imagePreviewOnLeft = articleOptions.imagePreviewOnLeft,
+                                )
                             } else {
                                 ArticleRow(
                                     article = item,
@@ -147,6 +150,7 @@ fun rememberArticleOptions(appPreferences: AppPreferences = koinInject()): Artic
     val showIcon by appPreferences.articleListOptions.showFeedIcons.asState()
     val showFeedName by appPreferences.articleListOptions.showFeedName.asState()
     val imagePreview by appPreferences.articleListOptions.imagePreview.asState()
+    val imagePreviewOnLeft by appPreferences.articleListOptions.imagePreviewOnLeft.asState()
     val fontScale by appPreferences.articleListOptions.fontScale.asState()
     val shortenTitles by appPreferences.articleListOptions.shortenTitles.asState()
     val accentColors by appPreferences.accentColors.asState()
@@ -156,6 +160,7 @@ fun rememberArticleOptions(appPreferences: AppPreferences = koinInject()): Artic
         showIcon = showIcon,
         showFeedName = showFeedName,
         imagePreview = imagePreview,
+        imagePreviewOnLeft = imagePreviewOnLeft,
         fontScale = fontScale,
         shortenTitles = shortenTitles,
         accentColors = accentColors,

@@ -46,6 +46,11 @@ class DisplaySettingsViewModel(
 
     private val _imagePreview = mutableStateOf(appPreferences.articleListOptions.imagePreview.get())
 
+    var imagePreviewOnLeft by mutableStateOf(
+        appPreferences.articleListOptions.imagePreviewOnLeft.get()
+    )
+        private set
+
     private val _showSummary = mutableStateOf(appPreferences.articleListOptions.showSummary.get())
 
     private val _showFeedName = mutableStateOf(appPreferences.articleListOptions.showFeedName.get())
@@ -173,6 +178,11 @@ class DisplaySettingsViewModel(
         appPreferences.articleListOptions.imagePreview.set(imagePreview)
 
         _imagePreview.value = imagePreview
+    }
+
+    fun updateImagePreviewOnLeft(showOnLeft: Boolean) {
+        appPreferences.articleListOptions.imagePreviewOnLeft.set(showOnLeft)
+        imagePreviewOnLeft = showOnLeft
     }
 
     fun updateSummary(show: Boolean) {

@@ -564,6 +564,10 @@ fun ArticleScreen(
 
         val showFeedNavigation = selectedHomeDestination == ArticleHomeDestination.FEEDS && isHomeFilter ||
             showGroupedStatusHome
+        val showAddFeedButton = shouldShowAddFeedButton(
+            destination = selectedHomeDestination,
+            isHomeFilter = isHomeFilter,
+        )
 
         LaunchedEffect(pendingArticleID) {
             val id = pendingArticleID ?: return@LaunchedEffect
@@ -653,7 +657,7 @@ fun ArticleScreen(
                                     isSaveSearchDialogOpen = true
                                 },
                                 onFeedAdded = onFeedAdded,
-                                showAddFeedButton = showFeedNavigation,
+                                showAddFeedButton = showAddFeedButton,
                                 showAiSummaryPreviewButton = showAiSummaryPreviewButton,
                                 canSummarizeArticlePreviews = canSummarizeArticlePreviews,
                                 isAiSummaryPreviewLoading = viewModel.isAiSummaryPreviewLoading,
@@ -1267,6 +1271,13 @@ fun isFeedActive(
     return media == null &&
             article == null &&
             !search.isActive
+}
+
+internal fun shouldShowAddFeedButton(
+    destination: ArticleHomeDestination,
+    isHomeFilter: Boolean,
+): Boolean {
+    return destination == ArticleHomeDestination.FEEDS && isHomeFilter
 }
 
 private fun ArticleFilter.homeDestination(): ArticleHomeDestination {

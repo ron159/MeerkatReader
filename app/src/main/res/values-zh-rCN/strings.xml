@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="meerkat_call">吱吱吱</string>
     <string name="article_actions_mark_after_as_read">将以上内容标记为已读</string>
     <string name="add_feed_name_title">名称</string>
     <string name="add_feed_new_folder_title">新文件夹</string>
@@ -137,6 +138,8 @@
     <string name="theme_menu_option_system_default">系统默认</string>
     <string name="image_preview_menu_option_large">大</string>
     <string name="image_preview_label">图片预览</string>
+    <string name="settings_article_list_images_on_left">图片置于左侧</string>
+    <string name="settings_article_list_images_on_left_summary">适用于小图和中图预览</string>
     <string name="font_option_vollkorn">Vollkorn</string>
     <string name="font_option_atkinson_hyperlegible">Atkinson Hyperlegible</string>
     <string name="settings_option_full_content_subtitle">记住加载完整文章内容的选择</string>

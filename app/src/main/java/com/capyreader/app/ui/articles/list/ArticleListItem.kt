@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.capyreader.app.ui.articles.FaviconBadge
 import com.capyreader.app.ui.components.ProvideContentColorTextStyle
@@ -27,16 +28,15 @@ fun ArticleListItem(
     overlineContent: @Composable() (() -> Unit)? = null,
     supportingContent: @Composable() (() -> Unit)? = null,
     leadingContent: @Composable() (() -> Unit)? = null,
+    leadingContentSize: Dp = 16.dp,
     trailingContent: @Composable() (() -> Unit)? = null,
     colors: ListItemColors = ListItemDefaults.colors()
 ) {
     Surface(
         color = colors.containerColor,
     ) {
-        val leadingSize = 16.dp
-
         val overlineStartPadding = if (leadingContent != null) {
-            leadingSize + VerticalPadding
+            leadingContentSize + VerticalPadding
         } else {
             0.dp
         }
@@ -64,7 +64,7 @@ fun ArticleListItem(
                 horizontalArrangement = Arrangement.spacedBy(VerticalSpacing)
             ) {
                 leadingContent?.let {
-                    Column(Modifier.size(leadingSize)) { it() }
+                    Column(Modifier.size(leadingContentSize)) { it() }
                 }
                 Column(Modifier.weight(1f)) {
                     ProvideTextStyleFromToken(

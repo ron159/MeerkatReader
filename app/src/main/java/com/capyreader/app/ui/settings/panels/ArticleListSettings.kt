@@ -46,6 +46,7 @@ import kotlin.math.roundToInt
 @Immutable
 data class ArticleListOptions(
     val imagePreview: ImagePreview,
+    val imagePreviewOnLeft: Boolean,
     val showFeedIcons: Boolean,
     val showFeedName: Boolean,
     val showSummary: Boolean,
@@ -54,6 +55,7 @@ data class ArticleListOptions(
     val updateFeedIcons: (show: Boolean) -> Unit,
     val updateFeedName: (show: Boolean) -> Unit,
     val updateImagePreview: (preview: ImagePreview) -> Unit,
+    val updateImagePreviewOnLeft: (showOnLeft: Boolean) -> Unit,
     val updateSummary: (show: Boolean) -> Unit,
     val updateFontScale: (scale: ArticleListFontScale) -> Unit,
     val updateShortenTitles: (show: Boolean) -> Unit,
@@ -119,16 +121,28 @@ fun ArticleListSettings(
                 stringResource(id = it.translationKey)
             }
         )
+
+        RowItem {
+            TextSwitch(
+                onCheckedChange = options.updateImagePreviewOnLeft,
+                checked = options.imagePreviewOnLeft,
+                title = stringResource(R.string.settings_article_list_images_on_left),
+                subtitle = stringResource(R.string.settings_article_list_images_on_left_summary),
+                enabled = options.imagePreview.showInline(),
+            )
+        }
     }
 }
 
 @Composable
 private fun PreviewArticleRow(options: ArticleListOptions) {
+    val inlineImageOnLeft = options.imagePreviewOnLeft && options.imagePreview.showInline()
     val rowOptions = ArticleRowOptions(
         showIcon = options.showFeedIcons,
         showSummary = options.showSummary,
         showFeedName = options.showFeedName,
         imagePreview = options.imagePreview,
+        imagePreviewOnLeft = options.imagePreviewOnLeft,
         fontScale = options.fontScale,
         shortenTitles = options.shortenTitles,
         dim = false,
@@ -163,6 +177,10 @@ private fun PreviewArticleRow(options: ArticleListOptions) {
                         .fillMaxWidth()
                         .padding(bottom = 2.dp)
                 ) {
+                    if (inlineImageOnLeft && options.showFeedIcons) {
+                        FaviconBadge(url = null)
+                        Spacer(Modifier.width(8.dp))
+                    }
                     if (options.showFeedName) {
                         Text(
                             text = PREVIEW_FEED_NAME,
@@ -172,6 +190,8 @@ private fun PreviewArticleRow(options: ArticleListOptions) {
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(16.dp))
+                    } else if (inlineImageOnLeft && options.showFeedIcons) {
+                        Spacer(Modifier.weight(1f))
                     }
                     Text(
                         text = PREVIEW_TIME,
@@ -201,12 +221,24 @@ private fun PreviewArticleRow(options: ArticleListOptions) {
             } else {
                 null
             },
-            leadingContent = if (options.showFeedIcons) {
-                { FaviconBadge(url = null) }
-            } else {
-                null
+            leadingContent = when {
+                inlineImageOnLeft -> {
+                    { PreviewImage(imagePreview = options.imagePreview) }
+                }
+                options.showFeedIcons -> {
+                    { FaviconBadge(url = null) }
+                }
+                else -> null
             },
-            trailingContent = if (options.imagePreview.showInline()) {
+            leadingContentSize = if (inlineImageOnLeft) {
+                when (options.imagePreview) {
+                    ImagePreview.MEDIUM -> 84.dp
+                    else -> 56.dp
+                }
+            } else {
+                16.dp
+            },
+            trailingContent = if (options.imagePreview.showInline() && !inlineImageOnLeft) {
                 { PreviewImage(imagePreview = options.imagePreview) }
             } else {
                 null
@@ -272,12 +304,14 @@ private fun ArticleListSettingsPreview() {
     ArticleListSettings(
         options = ArticleListOptions(
             imagePreview = ImagePreview.default,
+            imagePreviewOnLeft = false,
             showSummary = true,
             showFeedIcons = true,
             fontScale = ArticleListFontScale.LARGE,
             showFeedName = false,
             shortenTitles = true,
             updateImagePreview = {},
+            updateImagePreviewOnLeft = {},
             updateSummary = {},
             updateFeedName = {},
             updateFeedIcons = {},

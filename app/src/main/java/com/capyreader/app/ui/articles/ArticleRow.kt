@@ -54,6 +54,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +95,7 @@ data class ArticleRowOptions(
     val showSummary: Boolean = true,
     val showFeedName: Boolean = true,
     val imagePreview: ImagePreview = ImagePreview.default,
+    val imagePreviewOnLeft: Boolean = false,
     val fontScale: ArticleListFontScale = ArticleListFontScale.MEDIUM,
     val shortenTitles: Boolean = true,
     val accentColors: Boolean = false,
@@ -114,6 +116,9 @@ fun ArticleRow(
     wallabagExportRecord: ArticleIntegrationExportRecord? = null,
 ) {
     val imageURL = article.imageURL
+    val inlineImageOnLeft = imageURL != null &&
+        options.imagePreview.showInline() &&
+        options.imagePreviewOnLeft
     val isMonochrome = LocalAppTheme.current.value == AppTheme.MONOCHROME
     val dim = article.read && options.dim
     val deEmphasizeFontWeight = dim && isMonochrome
@@ -167,6 +172,11 @@ fun ArticleRow(
                             .padding(bottom = 2.dp)
                     ) {
 
+                        if (inlineImageOnLeft && options.showIcon) {
+                            FaviconBadge(article.faviconURL)
+                            Spacer(Modifier.width(8.dp))
+                        }
+
                         if (options.showFeedName) {
                             Text(
                                 text = article.displayFeedName(LocalContext.current),
@@ -177,6 +187,8 @@ fun ArticleRow(
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(Modifier.width(16.dp))
+                        } else if (inlineImageOnLeft && options.showIcon) {
+                            Spacer(Modifier.weight(1f))
                         }
                         ArticleRowStatusMetadata(
                             starred = article.starred,
@@ -215,15 +227,31 @@ fun ArticleRow(
                         }
                     }
                 },
-                leadingContent = if (options.showIcon) {
-                    {
-                        FaviconBadge(article.faviconURL)
+                leadingContent = when {
+                    inlineImageOnLeft -> {
+                        {
+                            ArticleImage(
+                                imageURL = imageURL,
+                                imagePreview = options.imagePreview,
+                            )
+                        }
                     }
+                    options.showIcon -> {
+                        { FaviconBadge(article.faviconURL) }
+                    }
+                    else -> null
+                },
+                leadingContentSize = if (inlineImageOnLeft) {
+                    options.imagePreview.inlineImageSize()
                 } else {
-                    null
+                    16.dp
                 },
 
-                trailingContent = if (imageURL != null && options.imagePreview.showInline()) {
+                trailingContent = if (
+                    imageURL != null &&
+                    options.imagePreview.showInline() &&
+                    !inlineImageOnLeft
+                ) {
                     {
                         ArticleImage(
                             imageURL = imageURL,
@@ -515,18 +543,26 @@ private fun ArticleImage(
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = sizeModifier
+            .testTag(ARTICLE_ROW_IMAGE_TAG)
             .clip(MaterialTheme.shapes.small)
             .background(colorScheme.surfaceContainer)
     )
 }
 
 @Composable
-fun PlaceholderArticleRow(imagePreview: ImagePreview = ImagePreview.NONE) {
+fun PlaceholderArticleRow(
+    imagePreview: ImagePreview = ImagePreview.NONE,
+    imagePreviewOnLeft: Boolean = false,
+) {
+    val inlineImageOnLeft = imagePreviewOnLeft && imagePreview.showInline()
+
     ListItem(
         leadingContent = {
             Box(
                 Modifier
-                    .size(16.dp)
+                    .size(
+                        if (inlineImageOnLeft) imagePreview.inlineImageSize() else 16.dp
+                    )
                     .clip(RoundedCornerShape(2.dp))
                     .background(colorScheme.surfaceContainer)
             )
@@ -562,15 +598,10 @@ fun PlaceholderArticleRow(imagePreview: ImagePreview = ImagePreview.NONE) {
             }
         },
         trailingContent = {
-            if (imagePreview.showInline()) {
+            if (imagePreview.showInline() && !inlineImageOnLeft) {
                 Box(
                     Modifier
-                        .size(
-                            when (imagePreview) {
-                                ImagePreview.MEDIUM -> MEDIUM_IMAGE_SIZE
-                                else -> SMALL_IMAGE_SIZE
-                            }
-                        )
+                        .size(imagePreview.inlineImageSize())
                         .clip(MaterialTheme.shapes.small)
                         .background(colorScheme.surfaceContainer)
                 )
@@ -660,6 +691,12 @@ private fun ArticleBox(
 
 private val SMALL_IMAGE_SIZE = 56.dp
 private val MEDIUM_IMAGE_SIZE = 84.dp
+internal const val ARTICLE_ROW_IMAGE_TAG = "article-row-image"
+
+private fun ImagePreview.inlineImageSize(): Dp = when (this) {
+    ImagePreview.MEDIUM -> MEDIUM_IMAGE_SIZE
+    else -> SMALL_IMAGE_SIZE
+}
 
 @Preview(
     uiMode = Configuration.UI_MODE_NIGHT_YES

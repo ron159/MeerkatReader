@@ -1,5 +1,8 @@
 package com.capyreader.app.ui.articles.list
 
+import android.os.SystemClock
+import android.view.ViewConfiguration
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -143,12 +147,7 @@ fun ArticleListTopBar(
                     )
                 }
             } else {
-                IconButton(onClick = onRequestJumpToTop) {
-                    MeerkatSilhouetteIcon(
-                        contentDescription = stringResource(R.string.app_name),
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+                ArticleListLogoButton(onRequestJumpToTop = onRequestJumpToTop)
             }
         },
         actions = {
@@ -192,6 +191,63 @@ fun ArticleListTopBar(
             }
         }
     )
+}
+
+@Composable
+internal fun ArticleListLogoButton(
+    onRequestJumpToTop: () -> Unit,
+) {
+    val context = LocalContext.current
+    val callText = stringResource(R.string.meerkat_call)
+    val tapDetector = remember { RapidTapDetector() }
+
+    IconButton(
+        onClick = {
+            onRequestJumpToTop()
+
+            if (tapDetector.registerTap(SystemClock.elapsedRealtime())) {
+                Toast.makeText(context, callText, Toast.LENGTH_SHORT).show()
+            }
+        }
+    ) {
+        MeerkatSilhouetteIcon(
+            contentDescription = stringResource(R.string.app_name),
+            modifier = Modifier.size(32.dp),
+        )
+    }
+}
+
+internal class RapidTapDetector(
+    private val maxIntervalMillis: Long = ViewConfiguration.getDoubleTapTimeout().toLong(),
+) {
+    private var tapCount = 0
+    private var lastTapAtMillis: Long? = null
+
+    fun registerTap(tapAtMillis: Long): Boolean {
+        val lastTap = lastTapAtMillis
+        tapCount = if (
+            lastTap != null &&
+            tapAtMillis >= lastTap &&
+            tapAtMillis - lastTap <= maxIntervalMillis
+        ) {
+            tapCount + 1
+        } else {
+            1
+        }
+        lastTapAtMillis = tapAtMillis
+
+        if (tapCount < REQUIRED_TAP_COUNT) {
+            return false
+        }
+
+        tapCount = 0
+        lastTapAtMillis = null
+        return true
+    }
+
+    private companion object {
+        const val REQUIRED_TAP_COUNT = 3
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

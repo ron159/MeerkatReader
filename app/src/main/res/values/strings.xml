@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">Meerkat Reader</string>
+    <string name="meerkat_call">吱吱吱</string>
     <string name="add_feed_url_title">Feed or Website URL</string>
     <string name="add_feed_name_title">Name</string>
     <string name="add_feed_new_folder_title">New Folder</string>
@@ -225,6 +226,8 @@
     <string name="image_preview_menu_option_medium">Medium</string>
     <string name="image_preview_menu_option_large">Large</string>
     <string name="image_preview_label">Image Preview</string>
+    <string name="settings_article_list_images_on_left">Place images on the left</string>
+    <string name="settings_article_list_images_on_left_summary">For small and medium previews</string>
     <string name="settings_article_list_feed_name">Feed Name</string>
     <string name="settings_article_list_feed_icons">Feed Icons</string>
     <string name="settings_article_list_summary">Summary</string>

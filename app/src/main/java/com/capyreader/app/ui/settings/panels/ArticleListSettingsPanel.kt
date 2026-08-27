@@ -37,12 +37,14 @@ fun ArticleListSettingsPanel(
         ArticleListSettings(
             options = ArticleListOptions(
                 imagePreview = viewModel.imagePreview,
+                imagePreviewOnLeft = viewModel.imagePreviewOnLeft,
                 showSummary = viewModel.showSummary,
                 fontScale = viewModel.fontScale,
                 showFeedIcons = viewModel.showFeedIcons,
                 showFeedName = viewModel.showFeedName,
                 shortenTitles = viewModel.shortenTitles,
                 updateImagePreview = viewModel::updateImagePreview,
+                updateImagePreviewOnLeft = viewModel::updateImagePreviewOnLeft,
                 updateSummary = viewModel::updateSummary,
                 updateFeedName = viewModel::updateFeedName,
                 updateFeedIcons = viewModel::updateFeedIcons,
