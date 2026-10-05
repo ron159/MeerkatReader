@@ -111,6 +111,12 @@ function addImageLoadFailureListeners() {
  * @param {Event=} event
  */
 function showImageLoadFailure(img, event) {
+  if (!img.dataset.capyImageId && navigator.onLine !== false) {
+    removeImageLoadFailure(img);
+    img.remove();
+    return;
+  }
+
   let label = img.nextElementSibling;
 
   if (!label?.classList.contains("image-load-error")) {

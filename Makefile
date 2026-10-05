@@ -8,9 +8,12 @@ FASTLANE ?= bundle exec fastlane
 assets:
 	$(MAKE) -C article_forge clean build
 
-.PHONY: check
-check: ## Type-check JavaScript files
+.PHONY: check test-js
+check: test-js ## Test and type-check JavaScript files
 	npx -p typescript tsc --noEmit
+
+test-js:
+	node --test app/src/test/javascript/media.test.js
 
 .PHONY: bump-release-dev
 bump-release-dev: ## Bump GitHub version
