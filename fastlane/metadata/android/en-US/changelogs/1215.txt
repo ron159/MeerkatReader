@@ -1,0 +1,4 @@
+Organized settings by control type for easier navigation.
+Improved article list layout, image placement, and controls.
+Added optional feed refresh when opening the app.
+Removed failed online images while preserving offline and cached-image diagnostics.
