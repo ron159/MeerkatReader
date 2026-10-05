@@ -1,4 +1,5 @@
-Organized settings by control type for easier navigation.
-Improved article list layout, image placement, and controls.
-Added optional feed refresh when opening the app.
-Removed failed online images while preserving offline and cached-image diagnostics.
+Backported fixes for Feedbin/Miniflux failures, Reader labels and incomplete sync responses.
+Fixed CDATA titles and summaries.
+Prevented expired read articles from reappearing during refresh while preserving automation.
+Improved settings and article list layout; optional refresh on launch.
+Removed failed online images while retaining offline and cache diagnostics.
