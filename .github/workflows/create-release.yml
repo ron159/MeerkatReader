@@ -14,7 +14,8 @@ jobs:
   build:
     name: Create Release
     runs-on: ubuntu-latest
-    environment: production
+    # Both release variants use the signing credentials stored in this environment.
+    environment: nightly
     permissions:
       contents: write
     steps:
