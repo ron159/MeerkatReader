@@ -21,15 +21,16 @@ private val OPEN_TAG_REGEX = Regex("<([a-zA-Z][a-zA-Z0-9]*)(?:\\s[^>]*)?(?<!/)>"
  * whole title as plain text and only decode entities, instead of risking that data loss.
  */
 fun String.stripTitleMarkup(): String {
-    val hasUnclosedTag = OPEN_TAG_REGEX.findAll(this).any { match ->
+    val title = unwrapCDATA()
+    val hasUnclosedTag = OPEN_TAG_REGEX.findAll(title).any { match ->
         val tagName = match.groupValues[1].lowercase()
 
-        tagName !in VOID_ELEMENTS && !this.contains("</$tagName>", ignoreCase = true)
+        tagName !in VOID_ELEMENTS && !title.contains("</$tagName>", ignoreCase = true)
     }
 
     return if (hasUnclosedTag) {
-        Parser.unescapeEntities(this, false)
+        Parser.unescapeEntities(title, false)
     } else {
-        Cleaner(Safelist.none()).clean(Jsoup.parse(this)).text()
+        Cleaner(Safelist.none()).clean(Jsoup.parse(title)).text()
     }
 }

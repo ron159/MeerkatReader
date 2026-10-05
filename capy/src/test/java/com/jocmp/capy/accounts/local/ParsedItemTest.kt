@@ -236,6 +236,30 @@ class ParsedItemTest {
     }
 
     @Test
+    fun summary_withCDATA() {
+        val item = RssItem.Builder().description("<![CDATA[Hello <b>world</b>]]>").build()
+        val parsedItem = ParsedItem(item, siteURL = "https://example.com")
+
+        assertEquals(expected = "Hello world", actual = parsedItem.summary)
+    }
+
+    @Test
+    fun title_withCDATA() {
+        val item = RssItem.Builder().title("<![CDATA[Hello <b>world</b>]]>").build()
+        val parsedItem = ParsedItem(item, siteURL = "https://example.com")
+
+        assertEquals(expected = "Hello world", actual = parsedItem.title)
+    }
+
+    @Test
+    fun title_withCDATAPreservesLiteralTagNames() {
+        val item = RssItem.Builder().title("<![CDATA[The <dl> element]]>").build()
+        val parsedItem = ParsedItem(item, siteURL = "https://example.com")
+
+        assertEquals(expected = "The <dl> element", actual = parsedItem.title)
+    }
+
+    @Test
     fun enclosures_audioWithItunesData_secondsFormat() {
         val enclosureUrl = "https://example.com/episode.mp3"
         val imageUrl = "http://example.com/artwork.png"

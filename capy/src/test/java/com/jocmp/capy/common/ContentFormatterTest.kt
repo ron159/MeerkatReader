@@ -113,6 +113,20 @@ class ContentFormatterTest {
     }
 
     @Test
+    fun `unwraps CDATA before stripping HTML`() {
+        val html = "<![CDATA[ <p>Hello <strong>world</strong></p> ]]>"
+
+        assertEquals("Hello world", ContentFormatter.summary(html))
+    }
+
+    @Test
+    fun `unwraps multiple multiline CDATA sections`() {
+        val html = "<![CDATA[<p>Hello\nworld</p>]]> <![CDATA[<b>again</b>]]>"
+
+        assertEquals("Hello world again", ContentFormatter.summary(html))
+    }
+
+    @Test
     fun `handles content with only whitespace after stripping HTML`() {
         val html = "<div>   <span>  </span>  </div>"
 
