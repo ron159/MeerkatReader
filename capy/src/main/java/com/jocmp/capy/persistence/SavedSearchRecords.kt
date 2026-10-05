@@ -85,7 +85,16 @@ internal class SavedSearchRecords(private val database: Database) {
     }
 
     internal fun deleteOrphanedEntries(savedSearchID: String, excludedIDs: List<String>) {
-        savedSearchQueries.deleteOrphanedEntries(savedSearchID, excludedIDs = excludedIDs)
+        val keptIDs = excludedIDs.toSet()
+
+        database.transaction {
+            articleIDs(savedSearchID)
+                .filterNot { it in keptIDs }
+                .chunked(MAX_IDS_PER_QUERY)
+                .forEach { articleIDs ->
+                    savedSearchQueries.deleteArticles(savedSearchID, articleIDs)
+                }
+        }
     }
 
     internal suspend fun updateShowUnreadBadge(id: String, enabled: Boolean) = withIOContext {
@@ -116,6 +125,7 @@ internal class SavedSearchRecords(private val database: Database) {
         get() = database.saved_searchesQueries
 
     companion object {
+        private const val MAX_IDS_PER_QUERY = 500
         private const val AUTOMATION_PREFIX = "automation:"
         private const val LOCAL_QUERY_PREFIX = "query:"
 

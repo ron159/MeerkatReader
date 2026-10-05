@@ -11,6 +11,7 @@ import org.junit.Before
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SavedSearchRecordsTest {
@@ -69,6 +70,37 @@ class SavedSearchRecordsTest {
     }
 
     @Test
+    fun deleteOrphaned_keepsLocalSearchesAndTheirArticles() = runTest {
+        val remoteSearch = savedSearchFixture.create()
+        val automationID = SavedSearchRecords.automationID("Local category")
+        val queryID = SavedSearchRecords.localQueryID("local-query")
+        val articleID = ArticleFixture(database).create().id
+        savedSearchRecords.upsert(automationID, "Local category")
+        savedSearchRecords.upsert(queryID, "Local query", query = "title:Rocket")
+        listOf(remoteSearch.id, automationID, queryID).forEach {
+            savedSearchRecords.upsertArticle(articleID, it)
+        }
+
+        savedSearchRecords.deleteOrphaned(excludedIDs = emptyList())
+
+        assertNull(savedSearchRecords.find(remoteSearch.id))
+        assertEquals(emptyList(), savedSearchRecords.articleIDs(remoteSearch.id))
+        assertNotNull(savedSearchRecords.find(automationID))
+        assertEquals("title:Rocket", savedSearchRecords.find(queryID)?.query)
+        assertEquals(listOf(articleID), savedSearchRecords.articleIDs(automationID))
+        assertEquals(listOf(articleID), savedSearchRecords.articleIDs(queryID))
+    }
+
+    @Test
+    fun remoteIDs_excludesLocalSearches() = runTest {
+        val remoteSearch = savedSearchFixture.create()
+        savedSearchFixture.create(id = SavedSearchRecords.automationID("Local category"))
+        savedSearchFixture.create(id = SavedSearchRecords.localQueryID("local-query"))
+
+        assertEquals(listOf(remoteSearch.id), savedSearchRecords.remoteIDs())
+    }
+
+    @Test
     fun removeArticleBySavedSearchIDs() = runTest {
         val oldSearch = savedSearchFixture.create()
         val latestSearch = savedSearchFixture.create()
@@ -122,5 +154,29 @@ class SavedSearchRecordsTest {
             database.saved_searchesQueries.articlesBySavedSearchID(search.id).executeAsList()
 
         assertEquals(actual = remainingArticleIDs.sorted(), expected = listOf(keepArticleID))
+    }
+
+    @Test
+    fun deleteOrphanedEntries_acrossBatches() = runTest {
+        val search = savedSearchFixture.create()
+        val otherSearch = savedSearchFixture.create()
+        val articleIDs = (1..2_400).map { it.toString() }
+        val keptArticleIDs = articleIDs.take(1_200)
+        val otherSearchArticleIDs = articleIDs.takeLast(10)
+
+        articleIDs.forEach { articleID ->
+            savedSearchRecords.upsertArticle(articleID = articleID, savedSearchID = search.id)
+        }
+        otherSearchArticleIDs.forEach { articleID ->
+            savedSearchRecords.upsertArticle(articleID = articleID, savedSearchID = otherSearch.id)
+        }
+
+        savedSearchRecords.deleteOrphanedEntries(
+            savedSearchID = search.id,
+            excludedIDs = keptArticleIDs,
+        )
+
+        assertEquals(keptArticleIDs.sorted(), savedSearchRecords.articleIDs(search.id).sorted())
+        assertEquals(otherSearchArticleIDs.sorted(), savedSearchRecords.articleIDs(otherSearch.id).sorted())
     }
 }

@@ -15,8 +15,11 @@ import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
+import com.jocmp.capy.persistence.FeedRecords
+import com.jocmp.capy.persistence.SavedSearchRecords
 import com.jocmp.capy.randomID
 import com.jocmp.feedbinclient.CreateSubscriptionRequest
+import com.jocmp.feedbinclient.DeleteTagRequest
 import com.jocmp.feedbinclient.Enclosure
 import com.jocmp.feedbinclient.Entry
 import com.jocmp.feedbinclient.Feedbin
@@ -26,6 +29,7 @@ import com.jocmp.feedbinclient.Subscription
 import com.jocmp.feedbinclient.Tagging
 import com.jocmp.feedbinclient.UnreadEntriesRequest
 import com.jocmp.feedbinclient.UpdateSubscriptionRequest
+import com.jocmp.feedbinclient.UpdateTagRequest
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -37,11 +41,16 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Test
+import retrofit2.HttpException
 import retrofit2.Response
 import java.net.SocketTimeoutException
+import java.time.ZonedDateTime
 import kotlin.test.BeforeTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FeedbinAccountDelegateTest {
@@ -238,6 +247,96 @@ class FeedbinAccountDelegateTest {
     }
 
     @Test
+    fun refresh_skipsOnlyOldReadUnstarredArticles() = runTest {
+        val cutoff = ZonedDateTime.parse("2025-03-01T00:00:00Z")
+        val starredArticle = vergeArticle.copy(id = vergeArticle.id + 1)
+        val recentArticle = vergeArticle.copy(
+            id = vergeArticle.id + 2,
+            published = cutoff.plusDays(1).toString(),
+        )
+        val articleAtCutoff = vergeArticle.copy(
+            id = vergeArticle.id + 3,
+            published = cutoff.toString(),
+        )
+        stubRefresh(
+            entries = listOf(
+                arsTechnicaArticle,
+                vergeArticle,
+                starredArticle,
+                recentArticle,
+                articleAtCutoff,
+            ),
+            unreadIDs = listOf(arsTechnicaArticle.id),
+            starredIDs = listOf(starredArticle.id),
+        )
+
+        delegate.refresh(ArticleFilter.default(), cutoffDate = cutoff).getOrThrow()
+
+        val articles = ArticleRecords(database)
+        assertNull(articles.find(vergeArticle.id.toString()))
+        assertFalse(assertNotNull(articles.find(arsTechnicaArticle.id.toString())).read)
+        assertTrue(assertNotNull(articles.find(starredArticle.id.toString())).starred)
+        assertNotNull(articles.find(recentArticle.id.toString()))
+        assertNotNull(articles.find(articleAtCutoff.id.toString()))
+        assertTrue(EnclosureRecords(database).findByArticle(vergeArticle.id.toString()).isEmpty())
+    }
+
+    @Test
+    fun refresh_keepsOldReadArticlesWhenAutoDeleteDisabled() = runTest {
+        stubRefresh(entries = listOf(vergeArticle))
+
+        delegate.refresh(ArticleFilter.default(), cutoffDate = null).getOrThrow()
+
+        val article = assertNotNull(ArticleRecords(database).find(vergeArticle.id.toString()))
+        assertTrue(article.read)
+        assertFalse(article.starred)
+    }
+
+    @Test
+    fun refresh_keepsOldReadArticlesStarredByAutomation() = runTest {
+        preferences.automationRules.set(
+            listOf(automationTestRule(titleText = "Reddit admits"))
+        )
+        stubRefresh(entries = listOf(arsTechnicaArticle))
+        coEvery {
+            feedbin.deleteUnreadEntries(UnreadEntriesRequest(listOf(arsTechnicaArticle.id)))
+        } returns Response.success(null)
+        coEvery {
+            feedbin.createStarredEntries(StarredEntriesRequest(listOf(arsTechnicaArticle.id)))
+        } returns Response.success(listOf(arsTechnicaArticle.id))
+
+        delegate.refresh(
+            ArticleFilter.default(),
+            cutoffDate = ZonedDateTime.parse("2025-03-01T00:00:00Z"),
+        ).getOrThrow()
+
+        assertAutomationApplied(database, arsTechnicaArticle.id.toString())
+    }
+
+    @Test
+    fun refresh_keepsOldStarredArticlesInSavedSearches() = runTest {
+        val articleID = arsTechnicaArticle.id.toString()
+        stubRefresh(entries = emptyList(), starredIDs = listOf(arsTechnicaArticle.id))
+        coEvery { feedbin.savedSearches() } returns Response.success(listOf(savedSearch))
+        coEvery { feedbin.savedSearchEntries(savedSearch.id.toString()) } returns
+            Response.success(listOf(arsTechnicaArticle.id))
+        coEvery {
+            feedbin.entries(since = any(), perPage = any(), page = any(), ids = articleID)
+        } returns Response.success(listOf(arsTechnicaArticle))
+
+        delegate.refresh(
+            ArticleFilter.default(),
+            cutoffDate = ZonedDateTime.parse("2025-03-01T00:00:00Z"),
+        ).getOrThrow()
+
+        assertTrue(assertNotNull(ArticleRecords(database).find(articleID)).starred)
+        assertEquals(
+            listOf(articleID),
+            SavedSearchRecords(database).articleIDs(savedSearch.id.toString()),
+        )
+    }
+
+    @Test
     fun refresh_IOException() = runTest {
         val networkError = SocketTimeoutException("Sorry networked charlie")
         coEvery { feedbin.subscriptions() }.throws(networkError)
@@ -380,6 +479,85 @@ class FeedbinAccountDelegateTest {
         delegate.removeStar(listOf(id.toString()))
 
         coVerify { feedbin.deleteStarredEntries(body = StarredEntriesRequest(listOf(id))) }
+    }
+
+    @Test
+    fun markRead_httpError() = runTest {
+        coEvery {
+            feedbin.deleteUnreadEntries(UnreadEntriesRequest(listOf(777L)))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.markRead(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun markUnread_httpError() = runTest {
+        coEvery {
+            feedbin.createUnreadEntries(UnreadEntriesRequest(listOf(777L)))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.markUnread(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun addStar_httpError() = runTest {
+        coEvery {
+            feedbin.createStarredEntries(StarredEntriesRequest(listOf(777L)))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.addStar(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeStar_httpError() = runTest {
+        coEvery {
+            feedbin.deleteStarredEntries(StarredEntriesRequest(listOf(777L)))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeStar(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeFeed_httpError() = runTest {
+        val feed = feedFixture.create()
+        coEvery {
+            feedbin.deleteSubscription(subscriptionID = feed.subscriptionID)
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeFeed(feed)
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(feed, FeedRecords(database).find(feed.id))
+    }
+
+    @Test
+    fun updateFolder_httpError() = runTest {
+        coEvery {
+            feedbin.updateTag(UpdateTagRequest(old_name = "Tech", new_name = "News"))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.updateFolder(oldTitle = "Tech", newTitle = "News")
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeFolder_httpError() = runTest {
+        coEvery {
+            feedbin.deleteTag(DeleteTagRequest(name = "Tech"))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeFolder(folderTitle = "Tech")
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
     }
 
     @Test
@@ -554,5 +732,40 @@ class FeedbinAccountDelegateTest {
         ).getOrThrow()
 
         assertEquals(expected = feedTitle, actual = updated.title)
+    }
+
+    @Test
+    fun updateFeed_httpErrorPreservesLocalTitle() = runTest {
+        val feed = feedFixture.create()
+        coEvery {
+            feedbin.updateSubscription(
+                subscriptionID = feed.subscriptionID,
+                body = UpdateSubscriptionRequest(title = "New title"),
+            )
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.updateFeed(
+            feed = feed,
+            title = "New title",
+            folderTitles = emptyList(),
+        )
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(feed, FeedRecords(database).find(feed.id))
+    }
+
+    private fun stubRefresh(
+        entries: List<Entry>,
+        unreadIDs: List<Long> = emptyList(),
+        starredIDs: List<Long> = emptyList(),
+    ) {
+        coEvery { feedbin.subscriptions() } returns Response.success(subscriptions)
+        coEvery { feedbin.unreadEntries() } returns Response.success(unreadIDs)
+        coEvery { feedbin.starredEntries() } returns Response.success(starredIDs)
+        coEvery { feedbin.taggings() } returns Response.success(taggings)
+        coEvery { feedbin.savedSearches() } returns Response.success(emptyList())
+        coEvery {
+            feedbin.entries(since = any(), perPage = any(), page = any(), ids = null)
+        } returns Response.success(entries)
     }
 }

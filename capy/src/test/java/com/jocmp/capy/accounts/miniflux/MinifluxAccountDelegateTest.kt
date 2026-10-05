@@ -10,7 +10,9 @@ import com.jocmp.capy.accounts.assertAutomationApplied
 import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.FeedFixture
+import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
+import com.jocmp.capy.persistence.FeedRecords
 import com.jocmp.minifluxclient.Category
 import com.jocmp.minifluxclient.CreateCategoryRequest
 import com.jocmp.minifluxclient.CreateFeedRequest
@@ -23,6 +25,7 @@ import com.jocmp.minifluxclient.Feed
 import com.jocmp.minifluxclient.Icon
 import com.jocmp.minifluxclient.IconData
 import com.jocmp.minifluxclient.Miniflux
+import com.jocmp.minifluxclient.UpdateCategoryRequest
 import com.jocmp.minifluxclient.UpdateEntriesRequest
 import com.jocmp.minifluxclient.UpdateFeedRequest
 import com.jocmp.capy.logging.CapyLog
@@ -32,11 +35,18 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Test
+import retrofit2.HttpException
 import retrofit2.Response
 import java.net.SocketTimeoutException
+import java.time.ZonedDateTime
 import kotlin.test.BeforeTest
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MinifluxAccountDelegateTest {
@@ -298,6 +308,67 @@ class MinifluxAccountDelegateTest {
     }
 
     @Test
+    fun refresh_skipsOnlyOldReadUnstarredArticles() = runTest {
+        val cutoff = ZonedDateTime.parse("2025-03-01T00:00:00Z")
+        val starredArticle = vergeArticle.copy(id = vergeArticle.id + 1, starred = true)
+        val recentArticle = vergeArticle.copy(
+            id = vergeArticle.id + 2,
+            published_at = cutoff.plusDays(1).toString(),
+        )
+        val articleAtCutoff = vergeArticle.copy(
+            id = vergeArticle.id + 3,
+            published_at = cutoff.toString(),
+        )
+        stubRefresh(
+            entries = listOf(
+                arsTechnicaArticle,
+                vergeArticle,
+                starredArticle,
+                recentArticle,
+                articleAtCutoff,
+            ),
+        )
+
+        delegate.refresh(ArticleFilter.default(), cutoffDate = cutoff).getOrThrow()
+
+        val articles = ArticleRecords(database)
+        assertNull(articles.find(vergeArticle.id.toString()))
+        assertFalse(assertNotNull(articles.find(arsTechnicaArticle.id.toString())).read)
+        assertTrue(assertNotNull(articles.find(starredArticle.id.toString())).starred)
+        assertNotNull(articles.find(recentArticle.id.toString()))
+        assertNotNull(articles.find(articleAtCutoff.id.toString()))
+        assertTrue(EnclosureRecords(database).findByArticle(vergeArticle.id.toString()).isEmpty())
+    }
+
+    @Test
+    fun refresh_keepsOldReadArticlesWhenAutoDeleteDisabled() = runTest {
+        stubRefresh(entries = listOf(vergeArticle))
+
+        delegate.refresh(ArticleFilter.default(), cutoffDate = null).getOrThrow()
+
+        val article = assertNotNull(ArticleRecords(database).find(vergeArticle.id.toString()))
+        assertTrue(article.read)
+        assertFalse(article.starred)
+    }
+
+    @Test
+    fun refresh_keepsOldReadArticlesStarredByAutomation() = runTest {
+        val article = arsTechnicaArticle.copy(status = EntryStatus.READ)
+        preferences.automationRules.set(
+            listOf(automationTestRule(titleText = "Reddit admits"))
+        )
+        stubRefresh(entries = listOf(article))
+        coEvery { miniflux.toggleBookmark(article.id) } returns Response.success(Unit)
+
+        delegate.refresh(
+            ArticleFilter.default(),
+            cutoffDate = ZonedDateTime.parse("2025-03-01T00:00:00Z"),
+        ).getOrThrow()
+
+        assertAutomationApplied(database, article.id.toString())
+    }
+
+    @Test
     fun refresh_IOException() = runTest {
         val networkError = SocketTimeoutException("Network timeout")
         coEvery { miniflux.feeds() }.throws(networkError)
@@ -366,6 +437,117 @@ class MinifluxAccountDelegateTest {
     }
 
     @Test
+    fun markRead_httpError() = runTest {
+        coEvery {
+            miniflux.updateEntries(
+                UpdateEntriesRequest(entry_ids = listOf(777L), status = EntryStatus.READ)
+            )
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.markRead(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun markUnread_httpError() = runTest {
+        coEvery {
+            miniflux.updateEntries(
+                UpdateEntriesRequest(entry_ids = listOf(777L), status = EntryStatus.UNREAD)
+            )
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.markUnread(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun addStar_httpError() = runTest {
+        coEvery { miniflux.toggleBookmark(777L) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.addStar(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeStar_httpError() = runTest {
+        coEvery { miniflux.toggleBookmark(777L) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeStar(listOf("777"))
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeFeed_httpError() = runTest {
+        val feed = feedFixture.create()
+        coEvery { miniflux.deleteFeed(feedID = feed.id.toLong()) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeFeed(feed)
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(feed, FeedRecords(database).find(feed.id))
+    }
+
+    @Test
+    fun updateFolder_httpErrorPreservesLocalFolder() = runTest {
+        feedFixture.create(folderNames = listOf(category.title))
+        coEvery { miniflux.categories() } returns Response.success(categories)
+        coEvery {
+            miniflux.updateCategory(category.id, UpdateCategoryRequest(title = "News"))
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.updateFolder(oldTitle = category.title, newTitle = "News")
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(
+            listOf(category.title),
+            database.feedsQueries.tagged().executeAsList().map { it.name },
+        )
+    }
+
+    @Test
+    fun removeFolder_httpErrorPreservesLocalFolder() = runTest {
+        feedFixture.create(folderNames = listOf(category.title))
+        coEvery { miniflux.categories() } returns Response.success(categories)
+        coEvery { miniflux.deleteCategory(category.id) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeFolder(folderTitle = category.title)
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(
+            listOf(category.title),
+            database.feedsQueries.tagged().executeAsList().map { it.name },
+        )
+    }
+
+    @Test
+    fun updateFolder_categoriesHttpError() = runTest {
+        coEvery { miniflux.categories() } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.updateFolder(oldTitle = category.title, newTitle = "News")
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
+    fun removeFolder_categoriesHttpError() = runTest {
+        coEvery { miniflux.categories() } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.removeFolder(folderTitle = category.title)
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+    }
+
+    @Test
     fun addFeed() = runTest {
         val url = "https://wheresyoured.at/feed"
         val feedID = 2819820L
@@ -408,6 +590,24 @@ class MinifluxAccountDelegateTest {
     }
 
     @Test
+    fun addFeed_categoriesHttpError() = runTest {
+        coEvery { miniflux.categories() } returns
+            Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.addFeed(
+            url = "https://example.com/feed",
+            title = "News",
+            folderTitles = listOf("Tech"),
+        )
+
+        assertIs<AddFeedResult.Error.NetworkError>(assertIs<AddFeedResult.Failure>(result).error)
+        coVerify(exactly = 0) {
+            miniflux.createCategory(any())
+            miniflux.createFeed(any())
+        }
+    }
+
+    @Test
     fun addFeed_Failure() = runTest {
         val url = "https://example.com/invalid"
 
@@ -439,6 +639,33 @@ class MinifluxAccountDelegateTest {
         ).getOrThrow()
 
         assertEquals(expected = feedTitle, actual = updated.title)
+    }
+
+    @Test
+    fun updateFeed_httpErrorPreservesLocalTitleAndFolder() = runTest {
+        val feed = feedFixture.create(folderNames = listOf(category.title))
+        val newCategory = Category(id = 2, title = "News", user_id = 100)
+        coEvery { miniflux.categories() } returns
+            Response.success(listOf(category, newCategory))
+        coEvery {
+            miniflux.updateFeed(
+                feedID = feed.id.toLong(),
+                request = UpdateFeedRequest(title = "New title", category_id = newCategory.id),
+            )
+        } returns Response.error(503, "Unavailable".toResponseBody())
+
+        val result = delegate.updateFeed(
+            feed = feed,
+            title = "New title",
+            folderTitles = listOf(newCategory.title),
+        )
+
+        assertEquals(503, assertIs<HttpException>(result.exceptionOrNull()).code())
+        assertEquals(feed, FeedRecords(database).find(feed.id))
+        assertEquals(
+            listOf(category.title),
+            database.feedsQueries.tagged().executeAsList().map { it.name },
+        )
     }
 
     @Test
@@ -511,5 +738,27 @@ class MinifluxAccountDelegateTest {
 
         assertEquals(expected = 1, actual = allTaggings.size)
         assertEquals(expected = 0, actual = nonScienceTaggings.size)
+    }
+
+    private fun stubRefresh(entries: List<Entry>) {
+        coEvery { miniflux.feeds() } returns Response.success(feeds)
+        coEvery { miniflux.icon(1) } returns
+            Response.success(IconData(id = 1, data = "image/png;base64,abc", mime_type = "image/png"))
+        val starred = entries.filter { it.starred }
+        coEvery { miniflux.entries(starred = true, limit = 250, offset = 0) } returns
+            Response.success(EntryResultSet(total = starred.size, entries = starred))
+        val unread = entries.filter { it.status == EntryStatus.UNREAD }
+        coEvery {
+            miniflux.entries(status = EntryStatus.UNREAD.value, limit = 250, offset = 0)
+        } returns Response.success(EntryResultSet(total = unread.size, entries = unread))
+        coEvery {
+            miniflux.entries(
+                limit = 250,
+                offset = 0,
+                order = "published_at",
+                direction = "desc",
+                changedAfter = null,
+            )
+        } returns Response.success(EntryResultSet(total = entries.size, entries = entries))
     }
 }

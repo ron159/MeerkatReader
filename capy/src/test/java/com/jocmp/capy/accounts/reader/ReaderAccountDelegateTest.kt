@@ -12,11 +12,14 @@ import com.jocmp.capy.accounts.assertAutomationApplied
 import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.articles.SortOrder
 import com.jocmp.capy.db.Database
+import com.jocmp.capy.fixtures.ArticleFixture
 import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.fixtures.FolderFixture
 import com.jocmp.capy.logging.CapyLog
+import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
+import com.jocmp.capy.persistence.SavedSearchRecords
 import com.jocmp.readerclient.Category
 import com.jocmp.readerclient.GoogleReader
 import com.jocmp.readerclient.Item
@@ -46,10 +49,13 @@ import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Response
 import java.net.SocketTimeoutException
+import java.time.ZonedDateTime
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ReaderAccountDelegateTest {
@@ -269,6 +275,223 @@ class ReaderAccountDelegateTest {
     }
 
     @Test
+    fun refresh_removesSavedSearchArticlesMissingFromServerAndKeepsLocalSearches() = runTest {
+        val savedSearchRecords = SavedSearchRecords(database)
+        val keptItemRef = ItemRef("16")
+        val removedArticleID = unreadStarredItem.hexID
+        val automationID = SavedSearchRecords.automationID("Local category")
+        val queryID = SavedSearchRecords.localQueryID("local-query")
+
+        savedSearchRecords.upsertArticle(keptItemRef.hexID, chicagoTag.id)
+        savedSearchRecords.upsertArticle(removedArticleID, chicagoTag.id)
+        savedSearchRecords.upsert(automationID, "Local category")
+        savedSearchRecords.upsert(queryID, "Local query", query = "title:Rocket")
+        savedSearchRecords.upsertArticle(removedArticleID, automationID)
+        savedSearchRecords.upsertArticle(removedArticleID, queryID)
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        stubUnread()
+        stubSavedSearchItemIDs(chicagoTag.id, listOf(keptItemRef))
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertEquals(listOf(keptItemRef.hexID), savedSearchRecords.articleIDs(chicagoTag.id))
+        assertEquals(listOf(removedArticleID), savedSearchRecords.articleIDs(automationID))
+        assertEquals(listOf(removedArticleID), savedSearchRecords.articleIDs(queryID))
+        assertNotNull(savedSearchRecords.find(automationID))
+        assertEquals("title:Rocket", savedSearchRecords.find(queryID)?.query)
+        coVerify(exactly = 1) {
+            googleReader.streamItemsIDs(streamID = chicagoTag.id, count = 10_000)
+        }
+        coVerify(exactly = 0) {
+            googleReader.streamItemsIDs(streamID = automationID, count = any())
+            googleReader.streamItemsIDs(streamID = queryID, count = any())
+        }
+    }
+
+    @Test
+    fun refresh_removesAllSavedSearchArticlesWhenServerLabelIsEmpty() = runTest {
+        val savedSearchRecords = SavedSearchRecords(database)
+        savedSearchRecords.upsertArticle(unreadItem.hexID, chicagoTag.id)
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        stubUnread()
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertEquals(emptyList(), savedSearchRecords.articleIDs(chicagoTag.id))
+        assertNotNull(savedSearchRecords.find(chicagoTag.id))
+    }
+
+    @Test
+    fun refresh_keepsSavedSearchArticlesWhenLabelRequestFails() = runTest {
+        val savedSearchRecords = SavedSearchRecords(database)
+        savedSearchRecords.upsertArticle(unreadItem.hexID, chicagoTag.id)
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        stubUnread()
+        coEvery {
+            googleReader.streamItemsIDs(streamID = chicagoTag.id, count = 10_000)
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertEquals(listOf(unreadItem.hexID), savedSearchRecords.articleIDs(chicagoTag.id))
+        coVerify(exactly = 1) {
+            googleReader.streamItemsIDs(streamID = chicagoTag.id, count = 10_000)
+        }
+    }
+
+    @Test
+    fun refresh_keepsSavedSearchArticlesWhenLaterLabelPageFails() = runTest {
+        val savedSearchRecords = SavedSearchRecords(database)
+        val firstPageItemRef = ItemRef("1")
+        val existingArticleIDs = listOf(firstPageItemRef.hexID, unreadItem.hexID)
+        existingArticleIDs.forEach { savedSearchRecords.upsertArticle(it, chicagoTag.id) }
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        stubUnread()
+        coEvery {
+            googleReader.streamItemsIDs(streamID = chicagoTag.id, count = 10_000)
+        } returns Response.success(
+            StreamItemIDsResult(itemRefs = listOf(firstPageItemRef), continuation = "next-page")
+        )
+        coEvery {
+            googleReader.streamItemsIDs(
+                streamID = chicagoTag.id,
+                count = 10_000,
+                continuation = "next-page",
+            )
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertEquals(existingArticleIDs.sorted(), savedSearchRecords.articleIDs(chicagoTag.id).sorted())
+        coVerify(exactly = 1) {
+            googleReader.streamItemsIDs(
+                streamID = chicagoTag.id,
+                count = 10_000,
+                continuation = "next-page",
+            )
+        }
+    }
+
+    @Test
+    fun refresh_keepsUnreadArticlesWhenUnreadRequestFails() = runTest {
+        val article = ArticleFixture(database).create(
+            feed = feedFixture.create(feedID = arsTechnica.id),
+            read = false,
+        )
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        coEvery {
+            googleReader.streamItemsIDs(
+                streamID = Stream.ReadingList().id,
+                count = 10_000,
+                excludedStreamID = Stream.Read().id,
+            )
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertFalse(assertNotNull(ArticleRecords(database).find(article.id)).read)
+    }
+
+    @Test
+    fun refresh_keepsUnreadStatusWhenLaterUnreadPageFails() = runTest {
+        val feed = feedFixture.create(feedID = arsTechnica.id)
+        val articleFixture = ArticleFixture(database)
+        val unreadArticle = articleFixture.create(id = unreadStarredItem.hexID, feed = feed, read = false)
+        val readArticle = articleFixture.create(id = readItem.hexID, feed = feed, read = true)
+
+        stubSubscriptions()
+        stubTags()
+        stubStarred()
+        coEvery {
+            googleReader.streamItemsIDs(
+                streamID = Stream.ReadingList().id,
+                count = 10_000,
+                excludedStreamID = Stream.Read().id,
+            )
+        } returns Response.success(
+            StreamItemIDsResult(itemRefs = listOf(ItemRef("2")), continuation = "next-page")
+        )
+        coEvery {
+            googleReader.streamItemsIDs(
+                streamID = Stream.ReadingList().id,
+                count = 10_000,
+                excludedStreamID = Stream.Read().id,
+                continuation = "next-page",
+            )
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        val articleRecords = ArticleRecords(database)
+        assertFalse(assertNotNull(articleRecords.find(unreadArticle.id)).read)
+        assertTrue(assertNotNull(articleRecords.find(readArticle.id)).read)
+    }
+
+    @Test
+    fun refresh_keepsStarredArticlesWhenStarredRequestFails() = runTest {
+        val article = ArticleFixture(database).create(
+            feed = feedFixture.create(feedID = arsTechnica.id),
+            starred = true,
+        )
+
+        stubSubscriptions()
+        stubTags()
+        stubUnread()
+        coEvery {
+            googleReader.streamItemsIDs(streamID = Stream.Starred().id, count = 10_000)
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        assertTrue(assertNotNull(ArticleRecords(database).find(article.id)).starred)
+    }
+
+    @Test
+    fun refresh_keepsStarredStatusWhenLaterStarredPageFails() = runTest {
+        val feed = feedFixture.create(feedID = arsTechnica.id)
+        val articleFixture = ArticleFixture(database)
+        val starredArticle = articleFixture.create(id = unreadStarredItem.hexID, feed = feed, starred = true)
+        val unstarredArticle = articleFixture.create(id = readItem.hexID, feed = feed, starred = false)
+
+        stubSubscriptions()
+        stubTags()
+        stubUnread()
+        coEvery {
+            googleReader.streamItemsIDs(streamID = Stream.Starred().id, count = 10_000)
+        } returns Response.success(
+            StreamItemIDsResult(itemRefs = listOf(ItemRef("2")), continuation = "next-page")
+        )
+        coEvery {
+            googleReader.streamItemsIDs(
+                streamID = Stream.Starred().id,
+                count = 10_000,
+                continuation = "next-page",
+            )
+        } returns Response.error(500, "Server Error".toResponseBody())
+
+        delegate.refresh(ArticleFilter.default()).getOrThrow()
+
+        val articleRecords = ArticleRecords(database)
+        assertTrue(assertNotNull(articleRecords.find(starredArticle.id)).starred)
+        assertFalse(assertNotNull(articleRecords.find(unstarredArticle.id)).starred)
+    }
+
+    @Test
     fun refresh_feedOnly() = runTest {
         delegate = ReaderAccountDelegate(source = Source.READER, database, googleReader, preferences)
 
@@ -293,6 +516,128 @@ class ReaderAccountDelegateTest {
             .executeAsList()
 
         assertEquals(expected = 1, actual = articles.size)
+    }
+
+    @Test
+    fun refresh_skipsOnlyExpiredReadUnstarredArticles() = runTest {
+        val cutoffDate = ZonedDateTime.parse("2025-01-01T00:00:00Z")
+        val imageURL = "https://example.com/article.jpg"
+        val content = Item.Content("<p>Article content</p><img src=\"$imageURL\">")
+        val oldReadItem = readItem.copy(
+            id = "tag:google.com,2005:reader/item/0000000000000003",
+            categories = listOf(Stream.Read().id),
+            content = content,
+        )
+        val recentReadItem = oldReadItem.copy(
+            id = "tag:google.com,2005:reader/item/0000000000000004",
+            published = cutoffDate.plusDays(1).toEpochSecond(),
+        )
+        val oldUnreadItem = unreadItem.copy(content = content)
+        val responseItems = listOf(unreadStarredItem, readItem, oldReadItem, recentReadItem, oldUnreadItem)
+
+        feedFixture.create(feedID = arsTechnica.id)
+        feedFixture.create(feedID = readItem.origin.streamId)
+        stubStarred()
+        stubUnread()
+        stubStreamItemsIDs(
+            itemRefs = listOf("1", "2", "3", "4", "16").map(::ItemRef),
+            responseItems = responseItems,
+            stream = Stream.Feed(arsTechnica.id),
+        )
+
+        delegate.refresh(
+            ArticleFilter.Feeds(
+                feedID = arsTechnica.id,
+                feedStatus = ArticleStatus.ALL,
+                folderTitle = "",
+            ),
+            cutoffDate = cutoffDate,
+        ).getOrThrow()
+
+        val articleRecords = ArticleRecords(database)
+        assertFalse(assertNotNull(articleRecords.find(oldUnreadItem.hexID)).read)
+        assertNotNull(articleRecords.find(unreadStarredItem.hexID))
+        assertTrue(assertNotNull(articleRecords.find(readItem.hexID)).starred)
+        assertNotNull(articleRecords.find(recentReadItem.hexID))
+        assertNull(articleRecords.find(oldReadItem.hexID))
+
+        val imageRecords = ArticleImageRecords(database)
+        assertEquals(listOf(imageURL), imageRecords.findRefs(oldUnreadItem.hexID).map { it.resolvedURL })
+        assertEquals(emptyList(), imageRecords.findRefs(oldReadItem.hexID))
+        assertEquals(1, EnclosureRecords(database).findByArticle(oldUnreadItem.hexID).size)
+    }
+
+    @Test
+    fun refresh_keepsExpiredArticlesThatAutomationStars() = runTest {
+        val oldReadItem = readItem.copy(
+            categories = listOf(Stream.Read().id),
+            content = Item.Content("<img src=\"https://example.com/automation.jpg\">"),
+        )
+        preferences.automationRules.set(listOf(automationTestRule(titleText = "Apple")))
+        feedFixture.create(feedID = oldReadItem.origin.streamId)
+        stubStarred()
+        stubUnread()
+        stubStreamItemsIDs(
+            itemRefs = listOf(ItemRef("2")),
+            responseItems = listOf(oldReadItem),
+            stream = Stream.Feed(oldReadItem.origin.streamId),
+        )
+        coEvery {
+            googleReader.editTag(
+                ids = listOf(oldReadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Starred().id,
+            )
+        } returns Response.success("OK")
+
+        delegate.refresh(
+            ArticleFilter.Feeds(
+                feedID = oldReadItem.origin.streamId,
+                feedStatus = ArticleStatus.ALL,
+                folderTitle = "",
+            ),
+            cutoffDate = ZonedDateTime.parse("2025-01-01T00:00:00Z"),
+        ).getOrThrow()
+
+        assertAutomationApplied(database, oldReadItem.hexID)
+        assertEquals(
+            listOf("https://example.com/automation.jpg"),
+            ArticleImageRecords(database).findRefs(oldReadItem.hexID).map { it.resolvedURL },
+        )
+        coVerify(exactly = 1) {
+            googleReader.editTag(
+                ids = listOf(oldReadItem.hexID.taggedItemID),
+                postToken = postToken,
+                addTag = Stream.Starred().id,
+            )
+        }
+    }
+
+    @Test
+    fun refresh_unwrapsCDATASummary() = runTest {
+        val cdataItem = readItem.copy(
+            summary = Summary("<![CDATA[ Apple’s tagline: <b>'It’s Glowtime.'</b> ]]>"),
+        )
+
+        feedFixture.create(feedID = cdataItem.origin.streamId)
+        stubStarred()
+        stubUnread()
+        stubStreamItemsIDs(
+            itemRefs = listOf(ItemRef("2")),
+            responseItems = listOf(cdataItem),
+            stream = Stream.Feed(cdataItem.origin.streamId),
+        )
+
+        delegate.refresh(
+            ArticleFilter.Feeds(
+                feedID = cdataItem.origin.streamId,
+                feedStatus = ArticleStatus.ALL,
+                folderTitle = "",
+            ),
+        ).getOrThrow()
+
+        val article = assertNotNull(ArticleRecords(database).find(cdataItem.hexID))
+        assertEquals("Apple’s tagline: 'It’s Glowtime.'", article.summary)
     }
 
     @Test
@@ -853,6 +1198,19 @@ class ReaderAccountDelegateTest {
         coEvery { googleReader.tagList() }.returns(
             Response.success(TagListResult(tags))
         )
+
+        tags.filter { it.type == Tag.Type.TAG }.forEach {
+            stubSavedSearchItemIDs(savedSearchID = it.id)
+        }
+    }
+
+    private fun stubSavedSearchItemIDs(
+        savedSearchID: String,
+        itemRefs: List<ItemRef> = emptyList(),
+    ) {
+        coEvery {
+            googleReader.streamItemsIDs(streamID = savedSearchID, count = 10_000)
+        } returns Response.success(StreamItemIDsResult(itemRefs = itemRefs, continuation = null))
     }
 
     private fun stubStarred(itemRefs: List<ItemRef> = emptyList()) {

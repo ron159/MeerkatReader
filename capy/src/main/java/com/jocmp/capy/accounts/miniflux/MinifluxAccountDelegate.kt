@@ -7,6 +7,8 @@ import com.jocmp.capy.ArticleAutomationArticle
 import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.Feed
 import com.jocmp.capy.accounts.AddFeedResult
+import com.jocmp.capy.accounts.orThrow
+import com.jocmp.capy.accounts.willAutoDelete
 import com.jocmp.capy.accounts.withErrorHandling
 import com.jocmp.capy.common.ContentFormatter
 import com.jocmp.capy.common.TimeHelpers
@@ -37,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okio.IOException
+import retrofit2.HttpException
 import retrofit2.Response
 import java.time.ZonedDateTime
 import com.jocmp.minifluxclient.Feed as MinifluxFeed
@@ -57,7 +60,7 @@ internal class MinifluxAccountDelegate(
         return try {
             refreshIntegrationStatus()
             refreshFeeds()
-            refreshArticles()
+            refreshArticles(cutoffDate = cutoffDate)
             preferences.touchLastRefreshedAt()
 
             Result.success(Unit)
@@ -77,7 +80,7 @@ internal class MinifluxAccountDelegate(
                     entry_ids = entryIDs,
                     status = EntryStatus.READ
                 )
-            )
+            ).orThrow()
             Unit
         }
     }
@@ -91,7 +94,7 @@ internal class MinifluxAccountDelegate(
                     entry_ids = entryIDs,
                     status = EntryStatus.UNREAD
                 )
-            )
+            ).orThrow()
             Unit
         }
     }
@@ -101,7 +104,7 @@ internal class MinifluxAccountDelegate(
 
         return withErrorHandling {
             entryIDs.forEach { entryID ->
-                miniflux.toggleBookmark(entryID)
+                miniflux.toggleBookmark(entryID).orThrow()
             }
             Unit
         }
@@ -112,7 +115,7 @@ internal class MinifluxAccountDelegate(
 
         return withErrorHandling {
             entryIDs.forEach { entryID ->
-                miniflux.toggleBookmark(entryID)
+                miniflux.toggleBookmark(entryID).orThrow()
             }
             Unit
         }
@@ -188,6 +191,8 @@ internal class MinifluxAccountDelegate(
             }
         } catch (e: IOException) {
             AddFeedResult.networkError()
+        } catch (e: HttpException) {
+            AddFeedResult.networkError()
         }
     }
 
@@ -203,7 +208,7 @@ internal class MinifluxAccountDelegate(
         miniflux.updateFeed(
             feedID = feed.id.toLong(),
             request = UpdateFeedRequest(title = title, category_id = categoryId)
-        )
+        ).orThrow()
 
         database.transactionWithErrorHandling {
             feedRecords.update(
@@ -238,14 +243,14 @@ internal class MinifluxAccountDelegate(
         oldTitle: String,
         newTitle: String
     ): Result<Unit> = withErrorHandling {
-        val categories = miniflux.categories().body() ?: emptyList()
+        val categories = miniflux.categories().orThrow().body() ?: emptyList()
         val category = categories.find { it.title == oldTitle }
 
         if (category != null) {
             miniflux.updateCategory(
                 categoryID = category.id,
                 request = UpdateCategoryRequest(title = newTitle)
-            )
+            ).orThrow()
 
             taggingRecords.updateTitle(previousTitle = oldTitle, title = newTitle)
         }
@@ -254,17 +259,17 @@ internal class MinifluxAccountDelegate(
     }
 
     override suspend fun removeFeed(feed: Feed): Result<Unit> = withErrorHandling {
-        miniflux.deleteFeed(feedID = feed.id.toLong())
+        miniflux.deleteFeed(feedID = feed.id.toLong()).orThrow()
 
         Unit
     }
 
     override suspend fun removeFolder(folderTitle: String): Result<Unit> = withErrorHandling {
-        val categories = miniflux.categories().body() ?: emptyList()
+        val categories = miniflux.categories().orThrow().body() ?: emptyList()
         val category = categories.find { it.title == folderTitle }
 
         if (category != null) {
-            miniflux.deleteCategory(categoryID = category.id)
+            miniflux.deleteCategory(categoryID = category.id).orThrow()
             taggingRecords.deleteByFolderName(folderTitle)
         }
 
@@ -309,12 +314,12 @@ internal class MinifluxAccountDelegate(
         database.feedsQueries.deleteAllExcept(feedsToKeep)
     }
 
-    private suspend fun refreshArticles() = coroutineScope {
+    private suspend fun refreshArticles(cutoffDate: ZonedDateTime? = null) = coroutineScope {
         val starred = async { refreshStarredEntries() }
         val unread = async { refreshUnreadEntries() }
         starred.await()
         unread.await()
-        fetchAllEntries()
+        fetchAllEntries(cutoffDate = cutoffDate)
     }
 
     private suspend fun refreshStarredEntries() {
@@ -354,7 +359,7 @@ internal class MinifluxAccountDelegate(
         return ids
     }
 
-    private suspend fun fetchAllEntries() = coroutineScope {
+    private suspend fun fetchAllEntries(cutoffDate: ZonedDateTime?) = coroutineScope {
         val changedAfter = preferences.lastRefreshedAt.get().takeIf { it > 0 }
 
         val firstResult = miniflux.entries(
@@ -367,7 +372,7 @@ internal class MinifluxAccountDelegate(
 
         val total = firstResult.total
 
-        saveEntries(firstResult.entries)
+        saveEntries(firstResult.entries, cutoffDate = cutoffDate)
 
         val semaphore = Semaphore(MAX_CONCURRENT_FETCHES)
 
@@ -382,14 +387,14 @@ internal class MinifluxAccountDelegate(
                             direction = "desc",
                             changedAfter = changedAfter,
                         ).body()?.entries ?: return@withPermit
-                        saveEntries(entries)
+                        saveEntries(entries, cutoffDate = cutoffDate)
                     }
                 }
             }
             .awaitAll()
     }
 
-    private suspend fun saveEntries(entries: List<Entry>) {
+    private suspend fun saveEntries(entries: List<Entry>, cutoffDate: ZonedDateTime?) {
         val articleIDsToMarkRead = mutableSetOf<String>()
         val articleIDsToStar = mutableSetOf<String>()
 
@@ -431,6 +436,19 @@ internal class MinifluxAccountDelegate(
                     return@forEach
                 }
 
+                val publishedAt = entry.published_at.toDateTime?.toEpochSecond() ?: updated.toEpochSecond()
+                val willAutoStar = articleID !in existingArticleIDs && automation.star
+
+                if (willAutoDelete(
+                        publishedAt = publishedAt,
+                        read = entry.status == EntryStatus.READ,
+                        starred = entry.starred || willAutoStar,
+                        cutoffDate = cutoffDate,
+                    )
+                ) {
+                    return@forEach
+                }
+
                 val isNewArticle = existingArticleIDs.add(articleID)
 
                 database.articlesQueries.create(
@@ -443,7 +461,7 @@ internal class MinifluxAccountDelegate(
                     url = entry.url,
                     summary = summary,
                     image_url = imageURL,
-                    published_at = entry.published_at.toDateTime?.toEpochSecond() ?: updated.toEpochSecond(),
+                    published_at = publishedAt,
                     enclosure_type = enclosures.firstOrNull()?.mime_type,
                 )
                 articleImageRecords.replaceArticleRefs(
@@ -521,7 +539,7 @@ internal class MinifluxAccountDelegate(
     }
 
     private suspend fun findOrCreateCategory(title: String): Long {
-        val categories = miniflux.categories().body() ?: emptyList()
+        val categories = miniflux.categories().orThrow().body() ?: emptyList()
         val existing = categories.find { it.title == title }
 
         return if (existing != null) {
