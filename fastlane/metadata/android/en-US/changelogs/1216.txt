@@ -1,0 +1,5 @@
+Fixed backup restoration stopping when leaving settings.
+Restores now continue in the background with a notification and a stop action.
+Skipped existing subscriptions when restoring remote accounts to reduce repeated server requests.
+Kept local subscription and folder restoration behavior unchanged.
+Stopped reporting cancelled restores as failures and retained access to the selected backup file.
