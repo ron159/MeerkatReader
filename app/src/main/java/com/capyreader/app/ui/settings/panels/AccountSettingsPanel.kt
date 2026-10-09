@@ -1,5 +1,6 @@
 package com.capyreader.app.ui.settings.panels
 
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import com.capyreader.app.R
 import com.capyreader.app.common.GetOPMLContent
 import com.capyreader.app.common.RowItem
 import com.capyreader.app.common.titleKey
+import com.capyreader.app.common.toast
 import com.capyreader.app.preferences.AppTheme
 import com.capyreader.app.transfers.BackupRestorePreview
 import com.capyreader.app.transfers.BackupRestoreMode
@@ -74,9 +76,20 @@ fun AccountSettingsPanel(
     }
 
     val backupImporter = rememberLauncherForActivityResult(
-        GetOPMLContent()
+        ActivityResultContracts.OpenDocument()
     ) { uri ->
-        viewModel.prepareBackupImport(uri = uri)
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }.onSuccess {
+                viewModel.prepareBackupImport(uri = uri)
+            }.onFailure {
+                context.toast(R.string.backup_importer_failure)
+            }
+        }
     }
 
     val automaticBackupTreePicker = rememberLauncherForActivityResult(
@@ -118,7 +131,7 @@ fun AccountSettingsPanel(
             importer.launch(listOf("text/xml", "text/x-opml", "application/*"))
         },
         onRequestBackupImport = {
-            backupImporter.launch(listOf("application/json", "text/*", "application/octet-stream"))
+            backupImporter.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
         },
         onRequestExport = {
             opmlExporter.launch(OPMLExporter.DEFAULT_FILE_NAME)

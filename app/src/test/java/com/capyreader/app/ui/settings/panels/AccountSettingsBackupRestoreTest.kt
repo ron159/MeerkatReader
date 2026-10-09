@@ -2,12 +2,18 @@ package com.capyreader.app.ui.settings.panels
 
 import android.app.Application
 import android.net.Uri
+import androidx.lifecycle.ViewModelStore
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.capyreader.app.integrations.webdav.WebDavBackupScheduler
 import com.capyreader.app.preferences.AppPreferences
 import com.capyreader.app.preferences.InMemorySecretStore
 import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.transfers.BackupRestoreMode
 import com.capyreader.app.transfers.BackupRestorePreview
+import com.capyreader.app.transfers.BackupRestoreWorker
 import com.capyreader.app.transfers.CapyBackupFile
 import com.jocmp.capy.Account
 import com.jocmp.capy.AccountManager
@@ -18,10 +24,15 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.slot
+import io.mockk.unmockkObject
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -32,6 +43,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,12 +60,17 @@ class AccountSettingsBackupRestoreTest {
     private val automaticBackupScheduler = mockk<AutomaticBackupScheduler>(relaxed = true)
     private val backupFile = mockk<CapyBackupFile>(relaxed = true)
     private val webDavBackupScheduler = mockk<WebDavBackupScheduler>(relaxed = true)
+    private val workManager = mockk<WorkManager>(relaxed = true)
+    private val restoreWork = MutableStateFlow<List<WorkInfo>>(emptyList())
     private lateinit var account: Account
     private lateinit var appPreferences: AppPreferences
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        mockkObject(WorkManager.Companion)
+        every { WorkManager.getInstance(any()) } returns workManager
+        every { workManager.getWorkInfosForUniqueWorkFlow(BackupRestoreWorker.WORK_NAME) } returns restoreWork
         appPreferences = AppPreferences(
             RuntimeEnvironment.getApplication(),
             InMemorySecretStore(),
@@ -67,6 +84,7 @@ class AccountSettingsBackupRestoreTest {
         every { accountPreferences.username } returns username
         every { accountPreferences.lastRefreshedAt } returns lastRefreshedAt
         account = mockk {
+            every { id } returns "backup-account"
             every { source } returns Source.LOCAL
             every { preferences } returns accountPreferences
         }
@@ -74,6 +92,7 @@ class AccountSettingsBackupRestoreTest {
 
     @After
     fun tearDown() {
+        unmockkObject(WorkManager.Companion)
         Dispatchers.resetMain()
     }
 
@@ -96,9 +115,38 @@ class AccountSettingsBackupRestoreTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.backupImportInProgress)
-        coVerify(exactly = 1) {
-            backupFile.restore(account, uri, BackupRestoreMode.MERGE)
+        val request = slot<OneTimeWorkRequest>()
+        verify(exactly = 1) {
+            workManager.enqueueUniqueWork(BackupRestoreWorker.WORK_NAME, ExistingWorkPolicy.KEEP, capture(request))
         }
+        assertEquals(uri.toString(), request.captured.workSpec.input.getString(BackupRestoreWorker.URI_KEY))
+        assertEquals(account.id, request.captured.workSpec.input.getString(BackupRestoreWorker.ACCOUNT_ID_KEY))
+        assertEquals(BackupRestoreMode.MERGE.name, request.captured.workSpec.input.getString(BackupRestoreWorker.MODE_KEY))
+        coVerify(exactly = 0) { backupFile.restore(any(), any(), any()) }
+    }
+
+    @Test
+    fun `leaving settings keeps the restore running and reopening observes it`() = runTest {
+        val uri = Uri.parse("content://backup/selected.json")
+        coEvery { backupFile.restorePreview(account, uri) } returns preview()
+        val viewModel = buildViewModel()
+        val store = ViewModelStore().also { it.put("settings", viewModel) }
+        viewModel.prepareBackupImport(uri)
+        advanceUntilIdle()
+        viewModel.confirmBackupImport(BackupRestoreMode.REPLACE)
+        restoreWork.value = listOf(mockk { every { state } returns WorkInfo.State.RUNNING })
+        advanceUntilIdle()
+        assertTrue(viewModel.backupImportInProgress)
+
+        store.clear()
+        val reopened = buildViewModel()
+        advanceUntilIdle()
+
+        assertTrue(reopened.backupImportInProgress)
+        verify(exactly = 0) { workManager.cancelUniqueWork(any()) }
+        restoreWork.value = listOf(mockk { every { state } returns WorkInfo.State.SUCCEEDED })
+        advanceUntilIdle()
+        assertFalse(reopened.backupImportInProgress)
     }
 
     @Test

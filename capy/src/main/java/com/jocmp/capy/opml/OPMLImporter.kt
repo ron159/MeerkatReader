@@ -2,6 +2,9 @@ package com.jocmp.capy.opml
 
 import com.jocmp.capy.Account
 import com.jocmp.capy.common.optionalURL
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import java.io.InputStream
 import java.net.URL
 
@@ -9,6 +12,7 @@ internal class OPMLImporter(private val account: Account) {
     internal suspend fun import(
         onProgress: (progress: ImportProgress) -> Unit = {},
         inputStream: InputStream,
+        skipExistingFeeds: Boolean = false,
     ) {
         var counter = 0
         val outlines = OPMLHandler.parse(inputStream)
@@ -17,14 +21,22 @@ internal class OPMLImporter(private val account: Account) {
 
         val groupedForms = entries.groupBy { it.url.toString() }.toMap()
         val size = groupedForms.size
+        val existingFeedURLs = if (skipExistingFeeds) {
+            account.allFeeds.first().map { it.feedURL }.toSet()
+        } else {
+            emptySet()
+        }
 
         onProgress(ImportProgress(currentCount = 0, total = size))
 
         groupedForms.forEach { (feedURL, forms) ->
+            currentCoroutineContext().ensureActive()
             val folderTitles = forms.flatMap { it.folderTitles }.distinct()
             val title = forms.first().title
 
-            account.addFeed(url = feedURL, title = title, folderTitles = folderTitles)
+            if (feedURL !in existingFeedURLs) {
+                account.addFeed(url = feedURL, title = title, folderTitles = folderTitles)
+            }
             counter += 1
 
             onProgress(

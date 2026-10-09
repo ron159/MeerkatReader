@@ -521,9 +521,10 @@ data class Account(
 
     suspend fun import(
         inputStream: InputStream,
+        skipExistingFeeds: Boolean = false,
         onProgress: (ImportProgress) -> Unit
     ) {
-        OPMLImporter(this).import(onProgress, inputStream)
+        OPMLImporter(this).import(onProgress, inputStream, skipExistingFeeds)
     }
 
     suspend fun isFullContentEnabled(feedID: String): Boolean {

@@ -2,6 +2,7 @@ package com.capyreader.app.ui.settings
 
 import com.capyreader.app.integrations.webdav.WebDavBackupWorker
 import com.capyreader.app.transfers.AutomaticBackupWorker
+import com.capyreader.app.transfers.BackupRestoreWorker
 import com.capyreader.app.transfers.OPMLImportWorker
 import com.capyreader.app.ui.settings.panels.AccountSettingsViewModel
 import com.capyreader.app.ui.settings.panels.AiSettingsViewModel
@@ -74,5 +75,6 @@ val settingsModule = module {
     }
     worker { OPMLImportWorker(get(), get()) }
     worker { AutomaticBackupWorker(get(), get()) }
+    worker { BackupRestoreWorker(get(), get()) }
     worker { WebDavBackupWorker(get(), get()) }
 }

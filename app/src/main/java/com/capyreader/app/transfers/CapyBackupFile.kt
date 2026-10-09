@@ -12,6 +12,7 @@ import com.jocmp.capy.ArticleBackupReference
 import com.jocmp.capy.SavedSearchBackupEntry
 import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.logging.CapyLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -101,7 +102,10 @@ class CapyBackupFile(
             }
         }
 
-        result.exceptionOrNull()?.let { context.toast(showRestoreFailure(it)) }
+        result.exceptionOrNull()?.let {
+            if (it is CancellationException) throw it
+            context.toast(showRestoreFailure(it))
+        }
 
         return result.getOrNull()
     }
@@ -110,8 +114,8 @@ class CapyBackupFile(
         account: Account,
         source: Uri?,
         mode: BackupRestoreMode = BackupRestoreMode.REPLACE,
-    ) {
-        source ?: return
+    ): Boolean {
+        source ?: return false
 
         val result = runCatching {
             withContext(Dispatchers.IO) {
@@ -139,7 +143,9 @@ class CapyBackupFile(
                 )
 
                 if (subscriptionsOpml.isNotBlank()) {
-                    account.import(subscriptionsOpml.byteInputStream()) {}
+                    subscriptionsOpml.byteInputStream().use {
+                        account.import(it, skipExistingFeeds = account.source != Source.LOCAL) {}
+                    }
                 }
 
                 account.restoreSavedSearchBackupEntries(
@@ -154,12 +160,18 @@ class CapyBackupFile(
             }
         }
 
+        result.exceptionOrNull()?.let {
+            if (it is CancellationException) throw it
+        }
+
         context.toast(
             result.fold(
                 onSuccess = { R.string.backup_importer_success },
                 onFailure = ::showRestoreFailure,
             )
         )
+
+        return result.isSuccess
     }
 
     private suspend fun writeBackup(

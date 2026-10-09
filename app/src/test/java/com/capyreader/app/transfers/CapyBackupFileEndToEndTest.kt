@@ -22,6 +22,7 @@ import com.jocmp.capy.accounts.Source
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -71,6 +72,68 @@ class CapyBackupFileEndToEndTest {
         backupFile = CapyBackupFile(context)
         databaseProvider = AndroidDatabaseProvider(context)
         secretStore = InMemorySecretStore()
+    }
+
+    @Test
+    fun `restore does not resubscribe to feeds already in the account`() = runTest {
+        val fixture = createExportFixture()
+        val target = createTargetFixture(Source.FEEDBIN)
+        seedArticle(
+            account = target.account,
+            articleID = SOURCE_ARTICLE_ID,
+            articleURL = SOURCE_ARTICLE_URL,
+            feedID = SOURCE_FEED_ID,
+            feedURL = SOURCE_FEED_URL,
+            feedTitle = SOURCE_FEED_TITLE,
+            readLater = false,
+            starred = false,
+        )
+
+        backupFile.restore(target.account, fixture.uri)
+
+        assertEquals(context.getString(R.string.backup_importer_success), ShadowToast.getTextOfLatestToast())
+        coVerify(exactly = 0) { target.delegate.addFeed(any(), any(), any()) }
+        assertTrue(SOURCE_ARTICLE_ID in target.account.starredArticleBackupIDs())
+    }
+
+    @Test
+    fun `local restore still imports existing subscriptions to update their folders`() = runTest {
+        val fixture = createExportFixture()
+        val document = fixture.document()
+        val localAccount = JsonObject(
+            document.required("account").jsonObject + ("source" to JsonPrimitive(Source.LOCAL.name))
+        )
+        fixture.file.writeText(JsonObject(document + ("account" to localAccount)).toString())
+        val target = createTargetFixture(Source.LOCAL)
+        seedArticle(
+            account = target.account,
+            articleID = SOURCE_ARTICLE_ID,
+            articleURL = SOURCE_ARTICLE_URL,
+            feedID = SOURCE_FEED_ID,
+            feedURL = SOURCE_FEED_URL,
+            feedTitle = SOURCE_FEED_TITLE,
+            readLater = false,
+            starred = false,
+        )
+
+        assertTrue(backupFile.restore(target.account, fixture.uri))
+
+        coVerify(exactly = 1) {
+            target.delegate.addFeed(SOURCE_FEED_URL, SOURCE_FEED_TITLE, emptyList())
+        }
+    }
+
+    @Test
+    fun `cancelled restore does not report a backup failure`() = runTest {
+        val fixture = createExportFixture()
+        val target = createTargetFixture(Source.FEEDBIN)
+        coEvery { target.delegate.addFeed(any(), any(), any()) } throws CancellationException()
+        ShadowToast.reset()
+
+        val error = runCatching { backupFile.restore(target.account, fixture.uri) }.exceptionOrNull()
+
+        assertTrue(error is CancellationException)
+        assertNull(ShadowToast.getTextOfLatestToast())
     }
 
     @Test

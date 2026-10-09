@@ -8,6 +8,7 @@ import com.jocmp.capy.MockFeedFinder
 import com.jocmp.capy.accounts.local.LocalAccountDelegate
 import com.jocmp.capy.db.Database
 import com.jocmp.capy.fixtures.AccountFixture
+import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.fixtures.GenericFeed
 import com.jocmp.capy.testFile
 import com.jocmp.feedfinder.parser.Feed
@@ -98,6 +99,88 @@ class OPMLImporterTest {
             expected = setOf("BBC News - World", "NetNewsWire", "Block Club Chicago"),
             actual = newsFeeds
         )
+    }
+
+    @Test
+    fun `it skips existing feeds while importing missing feeds and folders`() = runTest {
+        val existingFeed = FeedFixture(database).create(
+            feedID = "existing-subscription",
+            feedURL = "https://jvns.ca/atom.xml",
+            title = "My Julia Evans subscription",
+            folderNames = listOf("Saved"),
+        )
+
+        account.import(
+            inputStream = testFile("multiple_matching_feeds.xml").inputStream(),
+            skipExistingFeeds = true,
+        ) {}
+
+        val feeds = account.allFeeds.first()
+        val restoredFeed = feeds.single { it.feedURL == existingFeed.feedURL }
+        val folders = account.folders.first().associate { folder ->
+            folder.title to folder.feeds.map { it.title }.toSet()
+        }
+
+        assertEquals(expected = 5, actual = feeds.size)
+        assertEquals(expected = existingFeed.id, actual = restoredFeed.id)
+        assertEquals(expected = existingFeed.title, actual = restoredFeed.title)
+        assertEquals(
+            expected = mapOf(
+                "Saved" to setOf(existingFeed.title),
+                "Apple" to setOf("Daring Fireball"),
+                "Blogs" to setOf("Daring Fireball"),
+                "News" to setOf("BBC News - World", "NetNewsWire", "Block Club Chicago"),
+            ),
+            actual = folders,
+        )
+    }
+
+    @Test
+    fun `it reports completed progress when all feeds are skipped`() = runTest {
+        val fixture = FeedFixture(database)
+        sites.values.forEach { site ->
+            fixture.create(
+                feedURL = site.feedURL.toString(),
+                title = site.name,
+                folderNames = listOf("Saved"),
+            )
+        }
+        val progress = mutableListOf<ImportProgress>()
+        val existingAccount = account.copy(delegate = mockk())
+
+        OPMLImporter(existingAccount).import(
+            inputStream = testFile("multiple_matching_feeds.xml").inputStream(),
+            skipExistingFeeds = true,
+            onProgress = { progress.add(it) },
+        )
+
+        assertEquals(
+            expected = (0..sites.size).map { ImportProgress(currentCount = it, total = sites.size) },
+            actual = progress,
+        )
+        assertEquals(expected = 1f, actual = progress.last().percent)
+    }
+
+    @Test
+    fun `it updates existing feeds and folders by default`() = runTest {
+        val feedURL = "https://daringfireball.net/feeds/main"
+        val existingFeed = FeedFixture(database).create(
+            feedID = feedURL,
+            feedURL = feedURL,
+            title = "Previous title",
+        )
+
+        account.import(testFile("multiple_matching_feeds.xml").inputStream()) {}
+
+        val feeds = account.allFeeds.first()
+        val importedFeed = feeds.single { it.id == existingFeed.id }
+        val importedFolders = account.folders.first().filter { folder ->
+            folder.feeds.any { it.id == existingFeed.id }
+        }.map { it.title }.toSet()
+
+        assertEquals(expected = 5, actual = feeds.size)
+        assertEquals(expected = "Daring Fireball", actual = importedFeed.title)
+        assertEquals(expected = setOf("Apple", "Blogs"), actual = importedFolders)
     }
 
     @Test

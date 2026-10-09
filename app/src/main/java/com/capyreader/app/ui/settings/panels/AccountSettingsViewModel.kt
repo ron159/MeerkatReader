@@ -17,6 +17,7 @@ import com.capyreader.app.common.toast
 import com.capyreader.app.transfers.CapyBackupFile
 import com.capyreader.app.transfers.BackupRestorePreview
 import com.capyreader.app.transfers.BackupRestoreMode
+import com.capyreader.app.transfers.BackupRestoreWorker
 import com.capyreader.app.transfers.AutomaticBackupScheduler
 import com.capyreader.app.transfers.OPMLImportWorker
 import com.capyreader.app.transfers.OPMLImportWorker.Companion.PROGRESS_CURRENT_COUNT
@@ -53,6 +54,16 @@ class AccountSettingsViewModel(
 
     private var backupRestoreUri: Uri? = null
     private var backupPreviewJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            WorkManager.getInstance(application)
+                .getWorkInfosForUniqueWorkFlow(BackupRestoreWorker.WORK_NAME)
+                .collect { work ->
+                    backupImportInProgress = work.any { !it.state.isFinished }
+                }
+        }
+    }
 
     var automaticBackupEnabled by mutableStateOf(appPreferences.automaticBackupEnabled.get())
         private set
@@ -91,6 +102,7 @@ class AccountSettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LastRefreshed.Never)
 
     fun removeAccount() {
+        WorkManager.getInstance(applicationContext).cancelUniqueWork(BackupRestoreWorker.WORK_NAME)
         automaticBackupScheduler.clear()
         webDavBackupScheduler.clear()
         appPreferences.clearAll()
@@ -190,15 +202,7 @@ class AccountSettingsViewModel(
     ) {
         uri ?: return
 
-        viewModelScope.launch {
-            backupImportInProgress = true
-
-            try {
-                backupFile.restore(account, uri, mode)
-            } finally {
-                backupImportInProgress = false
-            }
-        }
+        BackupRestoreWorker.enqueue(applicationContext, account.id, uri, mode)
     }
 
     private val applicationContext: Context
