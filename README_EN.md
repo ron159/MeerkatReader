@@ -9,6 +9,7 @@
 <p align="center"><a href="README.md">简体中文</a> · English</p>
 
 <p align="center">
+  <a href="https://github.com/ron159/MeerkatReader/releases/latest"><img src="https://img.shields.io/github/v/release/ron159/MeerkatReader?display_name=tag&amp;sort=date" alt="Latest stable release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-3b82f6.svg" alt="GPL-3.0" /></a>
   <img src="https://img.shields.io/badge/platform-Android%2011%2B-3ddc84.svg" alt="Android 11 and later" />
   <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7f52ff.svg" alt="Kotlin and Jetpack Compose" />
@@ -33,7 +34,7 @@ Keep feeds on your device or connect an existing RSS service. Organize articles 
 
 ## Downloads and requirements
 
-Requires **Android 11 (API 30) or later**. See [GitHub Releases](https://github.com/ron159/MeerkatReader/releases) for packages and release notes. Nightly builds are development previews; check the notes for the build you download.
+Requires **Android 11 (API 30) or later**. See [GitHub Releases](https://github.com/ron159/MeerkatReader/releases/latest) for packages and release notes. Nightly builds are development previews; check the notes for the build you download.
 
 ## Building the app
 

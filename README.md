@@ -9,6 +9,7 @@
 <p align="center">简体中文 · <a href="README_EN.md">English</a></p>
 
 <p align="center">
+  <a href="https://github.com/ron159/MeerkatReader/releases/latest"><img src="https://img.shields.io/github/v/release/ron159/MeerkatReader?display_name=tag&amp;sort=date" alt="最新正式版" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-3b82f6.svg" alt="GPL-3.0" /></a>
   <img src="https://img.shields.io/badge/platform-Android%2011%2B-3ddc84.svg" alt="Android 11 and later" />
   <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7f52ff.svg" alt="Kotlin and Jetpack Compose" />
@@ -33,7 +34,7 @@ Meerkat Reader 是一款基于 [Capy Reader](https://github.com/jocmp/capyreader
 
 ## 下载与运行环境
 
-支持 **Android 11（API 30）及以上版本**。安装包与版本说明见 [GitHub Releases](https://github.com/ron159/MeerkatReader/releases)；Nightly 为开发预览版本，下载时请留意对应版本说明。
+支持 **Android 11（API 30）及以上版本**。安装包与版本说明见 [GitHub Releases](https://github.com/ron159/MeerkatReader/releases/latest)；Nightly 为开发预览版本，下载时请留意对应版本说明。
 
 ## 本地开发
 
