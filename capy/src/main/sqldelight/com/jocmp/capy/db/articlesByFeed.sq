@@ -19,13 +19,20 @@ FROM articles
 JOIN feeds ON articles.feed_id = feeds.id
 JOIN article_statuses ON articles.id = article_statuses.article_id
 WHERE articles.feed_id IN :feedIDs
-AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
+AND ((article_statuses.read = :read AND (:read = 1 OR article_statuses.last_read_at IS NULL))
+    OR (:read = 0 AND article_statuses.last_read_at >= :lastReadAt)
+    OR :read IS NULL)
 AND ((article_statuses.starred = :starred AND article_statuses.last_unstarred_at IS NULL OR article_statuses.last_unstarred_at >= :lastUnstarredAt) OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
 AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
 AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
 AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:folder IS NULL OR EXISTS (
+    SELECT 1 FROM taggings
+    WHERE taggings.feed_id = articles.feed_id
+    AND taggings.name LIKE '%' || :folder || '%'
+))
 AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
 AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
 AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
@@ -56,13 +63,20 @@ FROM articles
 JOIN feeds ON articles.feed_id = feeds.id
 JOIN article_statuses ON articles.id = article_statuses.article_id
 WHERE articles.feed_id IN :feedIDs
-AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
+AND ((article_statuses.read = :read AND (:read = 1 OR article_statuses.last_read_at IS NULL))
+    OR (:read = 0 AND article_statuses.last_read_at >= :lastReadAt)
+    OR :read IS NULL)
 AND ((article_statuses.starred = :starred AND article_statuses.last_unstarred_at IS NULL OR article_statuses.last_unstarred_at >= :lastUnstarredAt) OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
 AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
 AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
 AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:folder IS NULL OR EXISTS (
+    SELECT 1 FROM taggings
+    WHERE taggings.feed_id = articles.feed_id
+    AND taggings.name LIKE '%' || :folder || '%'
+))
 AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
 AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
 AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
@@ -78,12 +92,19 @@ FROM articles
 JOIN article_statuses ON articles.id = article_statuses.article_id
 JOIN feeds ON articles.feed_id = feeds.id
 WHERE articles.feed_id IN :feedIDs
-AND ((article_statuses.read = :read AND article_statuses.last_read_at IS NULL OR article_statuses.last_read_at >= :lastReadAt) OR :read IS NULL)
+AND ((article_statuses.read = :read AND (:read = 1 OR article_statuses.last_read_at IS NULL))
+    OR (:read = 0 AND article_statuses.last_read_at >= :lastReadAt)
+    OR :read IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
 AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
 AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
 AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:folder IS NULL OR EXISTS (
+    SELECT 1 FROM taggings
+    WHERE taggings.feed_id = articles.feed_id
+    AND taggings.name LIKE '%' || :folder || '%'
+))
 AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
 AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
 AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))
@@ -100,12 +121,18 @@ JOIN article_statuses ON articles.id = article_statuses.article_id
 LEFT JOIN articles AS after_articles ON after_articles.id = :afterArticleID
 LEFT JOIN articles AS before_articles ON before_articles.id = :beforeArticleID
 WHERE article_statuses.read = 0
+AND (article_statuses.read = :read OR :read IS NULL)
 AND (article_statuses.starred = :starred OR :starred IS NULL)
 AND (articles.published_at >= :publishedSince OR :publishedSince IS NULL)
 AND (articles.published_at >= :afterEpochSeconds OR :afterEpochSeconds IS NULL)
 AND (articles.published_at <= :beforeEpochSeconds OR :beforeEpochSeconds IS NULL)
 AND (:query IS NULL OR articles.title LIKE '%' || :query || '%' OR articles.summary LIKE '%' || :query || '%')
 AND (:feed IS NULL OR feeds.title LIKE '%' || :feed || '%')
+AND (:folder IS NULL OR EXISTS (
+    SELECT 1 FROM taggings
+    WHERE taggings.feed_id = articles.feed_id
+    AND taggings.name LIKE '%' || :folder || '%'
+))
 AND (:author IS NULL OR articles.author LIKE '%' || :author || '%')
 AND (:title IS NULL OR articles.title LIKE '%' || :title || '%')
 AND (:hasImage IS NULL OR (:hasImage = 1 AND articles.image_url IS NOT NULL AND articles.image_url != '') OR (:hasImage = 0 AND (articles.image_url IS NULL OR articles.image_url = '')))

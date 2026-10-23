@@ -99,27 +99,27 @@ internal class MinifluxAccountDelegate(
         }
     }
 
-    override suspend fun addStar(articleIDs: List<String>): Result<Unit> {
-        val entryIDs = articleIDs.map { it.toLong() }
+    override suspend fun addStar(articleIDs: List<String>): Result<Unit> =
+        setStarred(articleIDs, starred = true)
 
-        return withErrorHandling {
-            entryIDs.forEach { entryID ->
-                miniflux.toggleBookmark(entryID).orThrow()
+    override suspend fun removeStar(articleIDs: List<String>): Result<Unit> =
+        setStarred(articleIDs, starred = false)
+
+    private suspend fun setStarred(articleIDs: List<String>, starred: Boolean): Result<Unit> =
+        withErrorHandling {
+            articleIDs.distinct().forEach { articleID ->
+                val entryID = articleID.toLong()
+                val entry = miniflux.entry(entryID).orThrow().body()
+                    ?: throw IOException("Missing entry when synchronizing bookmark")
+
+                // Older Miniflux versions only expose a toggle endpoint. Re-read the
+                // server state so retries never toggle an already synchronized entry.
+                if (entry.starred != starred) {
+                    miniflux.toggleBookmark(entryID).orThrow()
+                }
             }
             Unit
         }
-    }
-
-    override suspend fun removeStar(articleIDs: List<String>): Result<Unit> {
-        val entryIDs = articleIDs.map { it.toLong() }
-
-        return withErrorHandling {
-            entryIDs.forEach { entryID ->
-                miniflux.toggleBookmark(entryID).orThrow()
-            }
-            Unit
-        }
-    }
 
     override suspend fun addSavedSearch(articleID: String, savedSearchID: String): Result<Unit> {
         return Result.failure(UnsupportedOperationException("Labels not supported"))

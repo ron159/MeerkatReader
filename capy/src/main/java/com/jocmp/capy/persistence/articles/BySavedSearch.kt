@@ -33,6 +33,7 @@ class BySavedSearch(private val database: Database) {
                 savedSearchID = savedSearchID,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -54,6 +55,7 @@ class BySavedSearch(private val database: Database) {
                 savedSearchID = savedSearchID,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -80,11 +82,12 @@ class BySavedSearch(private val database: Database) {
         sortOrder: SortOrder,
         searchQuery: ArticleSearchQuery,
     ): Query<String> {
-        val (_, starred) = searchQuery.statusParams(status)
+        val (read, starred) = searchQuery.statusParams(status)
 
         val (afterArticleID, beforeArticleID) = range.toPair
 
         return database.articlesBySavedSearchQueries.findArticleIDs(
+            read = read,
             savedSearchID = savedSearchID,
             starred = starred,
             afterArticleID = afterArticleID,
@@ -95,6 +98,7 @@ class BySavedSearch(private val database: Database) {
             newestFirst = isNewestFirst(sortOrder),
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,
@@ -115,6 +119,7 @@ class BySavedSearch(private val database: Database) {
             savedSearchID = savedSearchID,
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,

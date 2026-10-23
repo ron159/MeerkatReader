@@ -35,6 +35,7 @@ class ByFeed(private val database: Database) {
                 feedIDs = feedIDs,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -57,6 +58,7 @@ class ByFeed(private val database: Database) {
                 feedIDs = feedIDs,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -85,10 +87,11 @@ class ByFeed(private val database: Database) {
         priority: FeedPriority,
         searchQuery: ArticleSearchQuery,
     ): Query<String> {
-        val (_, starred) = searchQuery.statusParams(status)
+        val (read, starred) = searchQuery.statusParams(status)
         val (afterArticleID, beforeArticleID) = range.toPair
 
         return database.articlesByFeedQueries.findArticleIDs(
+            read = read,
             feedIDs = feedIDs,
             starred = starred,
             afterArticleID = afterArticleID,
@@ -99,6 +102,7 @@ class ByFeed(private val database: Database) {
             newestFirst = isNewestFirst(sortOrder),
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,
@@ -121,6 +125,7 @@ class ByFeed(private val database: Database) {
             feedIDs = feedIDs,
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,

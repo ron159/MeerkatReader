@@ -39,6 +39,7 @@ class ByToday(private val database: Database) {
                 beforeEpochSeconds = searchQuery.beforeEpochSeconds,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -59,6 +60,7 @@ class ByToday(private val database: Database) {
                 beforeEpochSeconds = searchQuery.beforeEpochSeconds,
                 query = searchQuery.textOrNull,
                 feed = searchQuery.feed,
+                folder = searchQuery.folder,
                 author = searchQuery.author,
                 title = searchQuery.title,
                 hasImage = searchQuery.hasImageParam,
@@ -75,10 +77,11 @@ class ByToday(private val database: Database) {
         sortOrder: SortOrder,
         searchQuery: ArticleSearchQuery,
     ): Query<String> {
-        val (_, starred) = searchQuery.statusParams(status)
+        val (read, starred) = searchQuery.statusParams(status)
         val (afterArticleID, beforeArticleID) = range.toPair
 
         return database.articlesByStatusQueries.findArticleIDs(
+            read = read,
             starred = starred,
             afterArticleID = afterArticleID,
             beforeArticleID = beforeArticleID,
@@ -88,6 +91,7 @@ class ByToday(private val database: Database) {
             newestFirst = isNewestFirst(sortOrder),
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,
@@ -108,6 +112,7 @@ class ByToday(private val database: Database) {
             starred = starred,
             query = searchQuery.textOrNull,
             feed = searchQuery.feed,
+            folder = searchQuery.folder,
             author = searchQuery.author,
             title = searchQuery.title,
             hasImage = searchQuery.hasImageParam,

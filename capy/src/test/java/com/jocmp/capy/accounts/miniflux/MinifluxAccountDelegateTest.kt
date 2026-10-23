@@ -6,9 +6,12 @@ import com.jocmp.capy.ArticleFilter
 import com.jocmp.capy.InMemoryDataStore
 import com.jocmp.capy.InMemoryDatabaseProvider
 import com.jocmp.capy.accounts.AddFeedResult
+import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.accounts.assertAutomationApplied
 import com.jocmp.capy.accounts.automationTestRule
 import com.jocmp.capy.db.Database
+import com.jocmp.capy.fixtures.AccountFixture
+import com.jocmp.capy.fixtures.ArticleFixture
 import com.jocmp.capy.fixtures.FeedFixture
 import com.jocmp.capy.persistence.ArticleRecords
 import com.jocmp.capy.persistence.EnclosureRecords
@@ -36,7 +39,9 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import retrofit2.HttpException
 import retrofit2.Response
 import java.net.SocketTimeoutException
@@ -50,6 +55,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MinifluxAccountDelegateTest {
+    @JvmField
+    @Rule
+    val temporaryFolder = TemporaryFolder()
+
     private val accountID = "777"
     private lateinit var database: Database
     private lateinit var miniflux: Miniflux
@@ -289,6 +298,7 @@ class MinifluxAccountDelegateTest {
                 )
             )
         } returns Response.success(Unit)
+        stubBookmarkState(arsTechnicaArticle.id, starred = false)
         coEvery { miniflux.toggleBookmark(arsTechnicaArticle.id) } returns
             Response.success(Unit)
 
@@ -358,6 +368,7 @@ class MinifluxAccountDelegateTest {
             listOf(automationTestRule(titleText = "Reddit admits"))
         )
         stubRefresh(entries = listOf(article))
+        stubBookmarkState(article.id, starred = false)
         coEvery { miniflux.toggleBookmark(article.id) } returns Response.success(Unit)
 
         delegate.refresh(
@@ -416,6 +427,7 @@ class MinifluxAccountDelegateTest {
 
     @Test
     fun addStar() = runTest {
+        stubBookmarkState(777L, starred = false)
         val id = 777L
 
         coEvery { miniflux.toggleBookmark(any()) } returns Response.success(Unit)
@@ -427,6 +439,7 @@ class MinifluxAccountDelegateTest {
 
     @Test
     fun removeStar() = runTest {
+        stubBookmarkState(777L, starred = true)
         val id = 777L
 
         coEvery { miniflux.toggleBookmark(any()) } returns Response.success(Unit)
@@ -464,6 +477,7 @@ class MinifluxAccountDelegateTest {
 
     @Test
     fun addStar_httpError() = runTest {
+        stubBookmarkState(777L, starred = false)
         coEvery { miniflux.toggleBookmark(777L) } returns
             Response.error(503, "Unavailable".toResponseBody())
 
@@ -474,6 +488,7 @@ class MinifluxAccountDelegateTest {
 
     @Test
     fun removeStar_httpError() = runTest {
+        stubBookmarkState(777L, starred = true)
         coEvery { miniflux.toggleBookmark(777L) } returns
             Response.error(503, "Unavailable".toResponseBody())
 
@@ -738,6 +753,103 @@ class MinifluxAccountDelegateTest {
 
         assertEquals(expected = 1, actual = allTaggings.size)
         assertEquals(expected = 0, actual = nonScienceTaggings.size)
+    }
+
+    @Test
+    fun bookmarkUpdatesSkipEntriesAlreadyInTheRequestedState() = runTest {
+        stubBookmarkState(777L, starred = true)
+        delegate.addStar(listOf("777")).getOrThrow()
+
+        stubBookmarkState(777L, starred = false)
+        delegate.removeStar(listOf("777")).getOrThrow()
+
+        coVerify(exactly = 0) { miniflux.toggleBookmark(any()) }
+    }
+
+    @Test
+    fun offlineStarThenUnstarPreservesTheRemoteBookmarkState() = runTest {
+        val account = AccountFixture.create(
+            parentFolder = temporaryFolder,
+            database = database,
+            source = Source.MINIFLUX,
+            accountDelegate = delegate,
+        )
+        ArticleFixture(database).create(id = "777", starred = false)
+        var remoteStarred = false
+        coEvery { miniflux.entry(777L) } answers {
+            Response.success(arsTechnicaArticle.copy(id = 777L, starred = remoteStarred))
+        }
+        coEvery { miniflux.toggleBookmark(777L) } answers {
+            remoteStarred = !remoteStarred
+            Response.success(Unit)
+        }
+
+        account.addStar("777")
+        account.removeStar("777")
+        account.sendArticleStatus().getOrThrow()
+
+        assertFalse(remoteStarred)
+        assertFalse(assertNotNull(ArticleRecords(database).find("777")).starred)
+    }
+
+    @Test
+    fun bookmarkBatchRetryDoesNotUndoEntriesThatAlreadySucceeded() = runTest {
+        val starred = mutableMapOf(777L to false, 778L to false)
+        var failSecondEntry = true
+        coEvery { miniflux.entry(any()) } answers {
+            val id = firstArg<Long>()
+            Response.success(arsTechnicaArticle.copy(id = id, starred = starred.getValue(id)))
+        }
+        coEvery { miniflux.toggleBookmark(any()) } answers {
+            val id = firstArg<Long>()
+            if (id == 778L && failSecondEntry) {
+                failSecondEntry = false
+                Response.error(503, "Unavailable".toResponseBody())
+            } else {
+                starred[id] = !starred.getValue(id)
+                Response.success(Unit)
+            }
+        }
+
+        assertTrue(delegate.addStar(listOf("777", "778")).isFailure)
+        assertEquals(mapOf(777L to true, 778L to false), starred)
+        delegate.addStar(listOf("777", "778")).getOrThrow()
+
+        assertEquals(mapOf(777L to true, 778L to true), starred)
+    }
+
+    @Test
+    fun bookmarkRetryChecksStateAfterAnUncertainToggleResponse() = runTest {
+        var remoteStarred = false
+        coEvery { miniflux.entry(777L) } answers {
+            Response.success(arsTechnicaArticle.copy(id = 777L, starred = remoteStarred))
+        }
+        coEvery { miniflux.toggleBookmark(777L) } answers {
+            remoteStarred = !remoteStarred
+            throw SocketTimeoutException("Response lost after server applied bookmark")
+        }
+
+        assertTrue(delegate.addStar(listOf("777")).isFailure)
+        delegate.addStar(listOf("777")).getOrThrow()
+
+        assertTrue(remoteStarred)
+    }
+
+    @Test
+    fun bookmarkUpdatesDoNotToggleWhenTheServerStateIsUnknown() = runTest {
+        coEvery { miniflux.entry(777L) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+        assertTrue(delegate.addStar(listOf("777")).isFailure)
+
+        coEvery { miniflux.entry(777L) } returns Response.success<Entry>(null)
+        assertTrue(delegate.removeStar(listOf("777")).isFailure)
+
+        coVerify(exactly = 0) { miniflux.toggleBookmark(any()) }
+    }
+
+    private fun stubBookmarkState(articleID: Long, starred: Boolean) {
+        coEvery { miniflux.entry(articleID) } returns
+            Response.success(arsTechnicaArticle.copy(id = articleID, starred = starred))
     }
 
     private fun stubRefresh(entries: List<Entry>) {
