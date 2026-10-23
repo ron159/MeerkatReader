@@ -1,6 +1,7 @@
 package com.capyreader.app.ui.articles
 
 import android.app.Application
+import androidx.lifecycle.ViewModelStore
 import app.cash.turbine.test
 import com.capyreader.app.articleimages.ArticleImageCacheCleaner
 import com.capyreader.app.articleimages.ArticleImageDownloader
@@ -34,6 +35,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -480,6 +486,54 @@ class ArticleScreenViewModelTest {
         assertTrue(viewModel.wallabagExportRecords.isEmpty())
 
         viewModel.observeWallabagExportStates(emptyList())
+    }
+
+    @Test
+    fun `finishing full content download does not reopen a previous article`() = fullContentRaceTest {
+        it.selectArticle(previewArticle("B"))
+        assertEquals("B", it.article?.id)
+    }
+
+    @Test
+    fun `finishing full content download does not reopen a closed article`() = fullContentRaceTest {
+        it.clearArticle()
+        assertEquals(null, it.article)
+    }
+
+    @Test
+    fun `finishing full content download does not undo a reset`() = fullContentRaceTest {
+        it.resetFullContent()
+        assertEquals(Article.FullContentState.NONE, it.article?.fullContent)
+    }
+
+    private fun fullContentRaceTest(onPendingDownload: (ArticleScreenViewModel) -> Unit) = runTest {
+        coEvery { account.findArticle(any()) } returns null
+        coEvery { account.fetchFullContent(any()) } returns Result.success("<p>Full article A</p>")
+        val downloadGate = CompletableDeferred<Unit>()
+        val downloadEntered = CompletableDeferred<Job>()
+        coEvery { articleImageDownloader.downloadPendingForArticle("A") } coAnswers {
+            downloadEntered.complete(currentCoroutineContext().job)
+            // A completed blocking request may still return after cancellation.
+            withContext(NonCancellable) { downloadGate.await() }
+        }
+        val viewModel = buildViewModel()
+        val viewModelStore = ViewModelStore().apply { put("full-content-race", viewModel) }
+        try {
+            advanceUntilIdle()
+            viewModel.selectArticle(previewArticle("A"))
+            viewModel.fetchFullContentAsync()
+            val fetchJob = downloadEntered.await()
+
+            onPendingDownload(viewModel)
+            val expectedArticle = viewModel.article
+            downloadGate.complete(Unit)
+            fetchJob.join()
+
+            assertEquals(expectedArticle, viewModel.article)
+        } finally {
+            downloadGate.complete(Unit)
+            viewModelStore.clear()
+        }
     }
 
     private fun previewArticle(id: String): Article {

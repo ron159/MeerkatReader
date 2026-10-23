@@ -77,6 +77,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -127,6 +128,7 @@ class ArticleScreenViewModel(
     private var refreshJob: Job? = null
 
     private var fullContentJob: Job? = null
+    private val fullContentGeneration = AtomicLong()
 
     private var aiSummaryPreviewJob: Job? = null
 
@@ -977,22 +979,24 @@ class ArticleScreenViewModel(
             return
         }
 
+        val generation = cancelFullContent()
         viewModelScope.launchIO {
             val article = preloadedArticles.remove(articleID) ?: buildArticle(articleID) ?: return@launchIO
-            _article = article
+            val selected = withUIContext {
+                if (generation != fullContentGeneration.get()) {
+                    return@withUIContext false
+                }
+                _article = article
+                onComplete(article)
+                if (article.fullContent == Article.FullContentState.LOADING) {
+                    fullContentJob = viewModelScope.launchIO { fetchFullContent(article, generation) }
+                }
+                true
+            }
+            if (!selected) return@launchIO
 
             launchIO {
                 markRead(articleID)
-            }
-
-            launchUI {
-                onComplete(article)
-            }
-
-            if (article.fullContent == Article.FullContentState.LOADING) {
-                fullContentJob?.cancel()
-
-                fullContentJob = viewModelScope.launchIO { fetchFullContent(article) }
             }
 
             articleImagePreloader.enqueue()
@@ -1004,6 +1008,7 @@ class ArticleScreenViewModel(
             return
         }
 
+        val generation = cancelFullContent()
         val preloadedArticle = preloadedArticles.remove(article.id)
         val selectedArticle = (preloadedArticle ?: article).copy(read = true)
 
@@ -1016,13 +1021,14 @@ class ArticleScreenViewModel(
             }
 
             val hydratedArticle = preloadedArticle ?: buildArticle(article.id)
-            if (hydratedArticle != null && _article?.id == article.id) {
-                _article = hydratedArticle
+            withUIContext {
+                if (hydratedArticle != null && isCurrentFullContent(article.id, generation)) {
+                    _article = hydratedArticle
 
-                if (hydratedArticle.fullContent == Article.FullContentState.LOADING) {
-                    fullContentJob?.cancel()
-                    fullContentJob = viewModelScope.launchIO {
-                        fetchFullContent(hydratedArticle)
+                    if (hydratedArticle.fullContent == Article.FullContentState.LOADING) {
+                        fullContentJob = viewModelScope.launchIO {
+                            fetchFullContent(hydratedArticle, generation)
+                        }
                     }
                 }
             }
@@ -1091,6 +1097,7 @@ class ArticleScreenViewModel(
     }
 
     fun clearArticle() {
+        cancelFullContent()
         _article = null
     }
 
@@ -1374,31 +1381,34 @@ class ArticleScreenViewModel(
 
     fun fetchFullContentAsync(article: Article? = _article) {
         article ?: return
+        if (_article?.id != article.id) return
 
-        viewModelScope.launchIO {
-            val stickyFullContentEnabled = enableStickyFullContent
+        val generation = cancelFullContent()
+        val stickyFullContentEnabled = enableStickyFullContent
+        val loadingArticle = article.copy(
+            enableStickyFullContent = article.enableStickyFullContent || stickyFullContentEnabled,
+            fullContent = Article.FullContentState.LOADING,
+        )
+        _article = loadingArticle
 
+        fullContentJob = viewModelScope.launchIO {
             if (stickyFullContentEnabled) {
                 if (!account.isFullContentEnabled(feedID = article.feedID)) {
                     account.enableStickyContent(article.feedID)
                 }
 
-                clearPreloadedArticlesForFeed(article.feedID)
+                withUIContext {
+                    clearPreloadedArticlesForFeed(article.feedID)
+                }
             }
 
-            val loadingArticle = article.copy(
-                enableStickyFullContent = article.enableStickyFullContent || stickyFullContentEnabled,
-                fullContent = Article.FullContentState.LOADING,
-            )
-
-            _article = loadingArticle
-
-            fetchFullContent(loadingArticle)
+            fetchFullContent(loadingArticle, generation)
         }
     }
 
     fun resetFullContent() {
         val article = _article ?: return
+        cancelFullContent()
         viewModelScope.launchIO {
             articleImageRecords.replaceArticleRefs(
                 articleID = article.id,
@@ -1432,11 +1442,22 @@ class ArticleScreenViewModel(
         }
     }
 
-    private suspend fun fetchFullContent(article: Article) {
+    private fun cancelFullContent(): Long {
+        val generation = fullContentGeneration.incrementAndGet()
+        fullContentJob?.cancel()
+        fullContentJob = null
+        return generation
+    }
+
+    private fun isCurrentFullContent(articleID: String, generation: Long): Boolean {
+        return generation == fullContentGeneration.get() && _article?.id == articleID
+    }
+
+    private suspend fun fetchFullContent(article: Article, generation: Long) {
         account.fetchFullContent(article)
             .fold(
                 onSuccess = { value ->
-                    if (_article?.id == article.id) {
+                    if (isCurrentFullContent(article.id, generation)) {
                         articleFullContentRecords.upsert(
                             articleID = article.id,
                             contentHTML = value,
@@ -1450,31 +1471,34 @@ class ArticleScreenViewModel(
                         articleImageDownloader.downloadPendingForArticle(article.id)
                         val cachedImages = cachedImagesForArticle(article.id)
 
-                        _article = article.copy(
-                            content = value,
-                            fullContent = Article.FullContentState.LOADED,
-                            cachedImages = cachedImages,
-                        )
+                        withUIContext {
+                            if (isCurrentFullContent(article.id, generation)) {
+                                _article = _article?.copy(
+                                    content = value,
+                                    fullContent = Article.FullContentState.LOADED,
+                                    cachedImages = cachedImages,
+                                )
+                            }
+                        }
                     }
                 },
                 onFailure = {
-                    if (_article?.id != article.id) {
-                        return
-                    }
-                    _article = article.copy(
-                        content = article.defaultContent,
-                        fullContent = Article.FullContentState.ERROR
-                    )
-
-                    CapyLog.warn(
-                        "full_content",
-                        mapOf(
-                            "error_type" to it::class.simpleName,
-                            "error_message" to it.message
+                    withUIContext {
+                        if (!isCurrentFullContent(article.id, generation)) {
+                            return@withUIContext
+                        }
+                        _article = _article?.copy(
+                            content = article.defaultContent,
+                            fullContent = Article.FullContentState.ERROR
                         )
-                    )
 
-                    viewModelScope.launchUI {
+                        CapyLog.warn(
+                            "full_content",
+                            mapOf(
+                                "error_type" to it::class.simpleName,
+                                "error_message" to it.message
+                            )
+                        )
                         context.showFullContentErrorToast(it)
                     }
                 }

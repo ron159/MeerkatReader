@@ -29,6 +29,7 @@ class ArticleTtsController(
     private var currentUtteranceID: String? = null
     private var currentContentKey: String? = null
     private var generation = 0L
+    private var playbackGeneration = 0L
 
     private val _state = MutableStateFlow(ArticleTtsState())
     val state: StateFlow<ArticleTtsState> = _state.asStateFlow()
@@ -46,7 +47,7 @@ class ArticleTtsController(
             override fun onDone(utteranceID: String) {
                 scope.launch {
                     if (utteranceID == currentUtteranceID) {
-                        advanceAfterCompletion()
+                        advanceAfterCompletion(playbackGeneration)
                     }
                 }
             }
@@ -92,11 +93,13 @@ class ArticleTtsController(
         }
 
         prepareJob?.cancel()
-        engine.stop()
+        val playback = ++playbackGeneration
         currentUtteranceID = null
+        engine.stop()
         currentContentKey = content.contentKey
         sentences = emptyList()
         prepareJob = scope.launch {
+            if (playback != playbackGeneration) return@launch
             _state.value = ArticleTtsState(
                 articleID = content.articleID,
                 articleTitle = content.articleTitle,
@@ -112,6 +115,7 @@ class ArticleTtsController(
                 val preparedSentences = withContext(ioDispatcher) {
                     ArticleTtsText.sentences(content.text, locale)
                 }
+                if (playback != playbackGeneration) return@launch
                 if (preparedSentences.isEmpty()) {
                     _state.value = _state.value.copy(
                         status = ArticleTtsStatus.ERROR,
@@ -121,17 +125,21 @@ class ArticleTtsController(
                 }
 
                 engine.initialize(configuration).getOrElse { error ->
-                    _state.value = _state.value.copy(
-                        status = ArticleTtsStatus.UNAVAILABLE,
-                        errorMessage = error.message,
-                    )
+                    if (playback == playbackGeneration) {
+                        _state.value = _state.value.copy(
+                            status = ArticleTtsStatus.UNAVAILABLE,
+                            errorMessage = error.message,
+                        )
+                    }
                     return@launch
                 }
+                if (playback != playbackGeneration) return@launch
 
                 sentences = preparedSentences
                 val saved = withContext(ioDispatcher) {
                     progressRecords.find(content.articleID, content.source)
                 }
+                if (playback != playbackGeneration) return@launch
                 val savedIndex = saved
                     ?.takeIf { it.contentKey == content.contentKey }
                     ?.sentenceIndex
@@ -149,24 +157,30 @@ class ArticleTtsController(
                     sentenceCount = sentences.size,
                     errorMessage = null,
                 )
-                speakCurrent()
+                speakCurrent(playback)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                _state.value = _state.value.copy(
-                    status = ArticleTtsStatus.ERROR,
-                    errorMessage = e.message ?: "Text-to-speech playback failed",
-                )
+                if (playback == playbackGeneration) {
+                    _state.value = _state.value.copy(
+                        status = ArticleTtsStatus.ERROR,
+                        errorMessage = e.message ?: "Text-to-speech playback failed",
+                    )
+                }
             }
         }
     }
 
     fun pause() {
-        if (_state.value.status != ArticleTtsStatus.PLAYING) {
+        val state = _state.value
+        if (state.status != ArticleTtsStatus.PLAYING &&
+            !(state.status == ArticleTtsStatus.INITIALIZING && state.sentenceCount > 0)
+        ) {
             return
         }
-        engine.stop()
+        playbackGeneration += 1
         currentUtteranceID = null
+        engine.stop()
         _state.value = _state.value.copy(status = ArticleTtsStatus.PAUSED)
     }
 
@@ -174,7 +188,8 @@ class ArticleTtsController(
         if (_state.value.status != ArticleTtsStatus.PAUSED) {
             return
         }
-        scope.launch { speakCurrent() }
+        val playback = ++playbackGeneration
+        scope.launch { speakCurrent(playback) }
     }
 
     fun skipNext() {
@@ -187,8 +202,9 @@ class ArticleTtsController(
 
     fun dismiss() {
         prepareJob?.cancel()
-        engine.stop()
+        playbackGeneration += 1
         currentUtteranceID = null
+        engine.stop()
         currentContentKey = null
         sentences = emptyList()
         _state.value = ArticleTtsState()
@@ -208,28 +224,32 @@ class ArticleTtsController(
 
         val wasPlaying = _state.value.status == ArticleTtsStatus.PLAYING
         val target = index.coerceIn(0, sentences.lastIndex)
-        engine.stop()
+        val playback = ++playbackGeneration
         currentUtteranceID = null
+        engine.stop()
         _state.value = _state.value.copy(
             sentenceIndex = target,
             status = if (wasPlaying) ArticleTtsStatus.INITIALIZING else ArticleTtsStatus.PAUSED,
             errorMessage = null,
         )
         scope.launch {
+            if (playback != playbackGeneration) return@launch
             persistProgress(target)
-            if (wasPlaying) {
-                speakCurrent()
+            if (wasPlaying && playback == playbackGeneration) {
+                speakCurrent(playback)
             }
         }
     }
 
-    private suspend fun speakCurrent() {
+    private suspend fun speakCurrent(playback: Long) {
+        if (playback != playbackGeneration) return
         val state = _state.value
         val sentence = sentences.getOrNull(state.sentenceIndex) ?: return
         generation += 1
         val utteranceID = "${state.articleID}:${state.sentenceIndex}:$generation"
         currentUtteranceID = utteranceID
         persistProgress(state.sentenceIndex)
+        if (playback != playbackGeneration || currentUtteranceID != utteranceID) return
         engine.speak(sentence, utteranceID).fold(
             onSuccess = {
                 _state.value = _state.value.copy(
@@ -247,7 +267,7 @@ class ArticleTtsController(
         )
     }
 
-    private suspend fun advanceAfterCompletion() {
+    private suspend fun advanceAfterCompletion(playback: Long) {
         val nextIndex = _state.value.sentenceIndex + 1
         if (nextIndex > sentences.lastIndex) {
             currentUtteranceID = null
@@ -257,16 +277,17 @@ class ArticleTtsController(
         }
 
         _state.value = _state.value.copy(sentenceIndex = nextIndex)
-        speakCurrent()
+        speakCurrent(playback)
     }
 
     private suspend fun persistProgress(sentenceIndex: Int) {
-        val articleID = _state.value.articleID ?: return
+        val state = _state.value
+        val articleID = state.articleID ?: return
         val contentKey = currentContentKey ?: return
         withContext(ioDispatcher) {
             progressRecords.upsert(
                 articleID = articleID,
-                source = _state.value.source,
+                source = state.source,
                 contentKey = contentKey,
                 sentenceIndex = sentenceIndex,
             )

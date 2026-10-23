@@ -6,11 +6,13 @@ import com.jocmp.capy.persistence.ArticleTtsProgressRecords
 import com.jocmp.capy.persistence.ArticleTtsSource
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -232,6 +234,108 @@ class ArticleTtsControllerTest {
         assertEquals(ArticleTtsState(), controller.state.value)
         assertEquals(null, engine.listener)
         assertEquals(1, engine.closeCount)
+    }
+
+    @Test
+    fun `dismiss during sentence progress save does not restart playback`() = pendingSentenceTest {
+        it.dismiss()
+        ArticleTtsState()
+    }
+
+    @Test
+    fun `pause during sentence progress save does not restart playback`() = pendingSentenceTest {
+        it.pause()
+        it.state.value.also { state -> assertEquals(ArticleTtsStatus.PAUSED, state.status) }
+    }
+
+    @Test
+    fun `pause during skip progress save does not restart playback`() = pendingSentenceTest(skipSentence = true) {
+        it.pause()
+        it.state.value.also { state -> assertEquals(ArticleTtsStatus.PAUSED, state.status) }
+    }
+
+    @Test
+    fun `dismiss during skip progress save does not restart playback`() = pendingSentenceTest(skipSentence = true) {
+        it.dismiss()
+        ArticleTtsState()
+    }
+
+    @Test
+    fun `switching source during a previous progress save ignores its completion`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val engine = FakeArticleTtsEngine()
+        val controller = controller(engine, dispatcher)
+        val progressGate = CompletableDeferred<Unit>()
+        coEvery { records.find(any(), any()) } returns null
+        coEvery { records.upsert(any(), ArticleTtsSource.ORIGINAL, any(), 1, any()) } coAnswers {
+            progressGate.await()
+        }
+        try {
+            controller.play(article(), Locale.ENGLISH)
+            advanceUntilIdle()
+            val previousUtterance = engine.currentUtteranceID
+            engine.completeCurrent()
+            runCurrent()
+
+            controller.play(
+                ArticleTtsContent.generated(article(), ArticleTtsSource.TRANSLATION, "Translated sentence."),
+                ArticleTtsConfiguration(languageTag = "en"),
+            )
+            advanceUntilIdle()
+            val expected = controller.state.value
+            assertEquals(ArticleTtsSource.TRANSLATION, expected.source)
+            assertEquals(2, engine.spoken.size)
+
+            progressGate.complete(Unit)
+            engine.complete(previousUtterance)
+            engine.fail(previousUtterance, "late error")
+            advanceUntilIdle()
+
+            assertEquals(expected, controller.state.value)
+            assertEquals(2, engine.spoken.size)
+            assertEquals("Translated sentence.", engine.spoken.last().first)
+        } finally {
+            progressGate.complete(Unit)
+            controller.close()
+        }
+    }
+
+    private fun pendingSentenceTest(
+        skipSentence: Boolean = false,
+        interrupt: (ArticleTtsController) -> ArticleTtsState,
+    ) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val engine = FakeArticleTtsEngine()
+        val controller = controller(engine, dispatcher)
+        val progressGate = CompletableDeferred<Unit>()
+        val progressEntered = CompletableDeferred<Unit>()
+        coEvery { records.find(any(), any()) } returns null
+        coEvery { records.upsert(any(), any(), any(), 1, any()) } coAnswers {
+            progressEntered.complete(Unit)
+            progressGate.await()
+        }
+        try {
+            controller.play(article(), Locale.ENGLISH)
+            advanceUntilIdle()
+            assertEquals(1, engine.spoken.size)
+            if (skipSentence) {
+                controller.skipNext()
+            } else {
+                engine.completeCurrent()
+            }
+            runCurrent()
+            assertTrue(progressEntered.isCompleted)
+
+            val expectedState = interrupt(controller)
+            progressGate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(expectedState, controller.state.value)
+            assertEquals(1, engine.spoken.size)
+        } finally {
+            progressGate.complete(Unit)
+            controller.close()
+        }
     }
 
     private fun controller(
