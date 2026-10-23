@@ -16,7 +16,11 @@ import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
 import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class ArticleOfflinePackageDownloader(
     private val account: Account,
@@ -29,6 +33,8 @@ class ArticleOfflinePackageDownloader(
     private val audioStore: ArticleOfflineAudioStore,
     private val appPreferences: AppPreferences,
 ) {
+    private val downloadMutex = Mutex()
+
     suspend fun queue(
         articleID: String,
         includeFullContent: Boolean = true,
@@ -101,11 +107,20 @@ class ArticleOfflinePackageDownloader(
         queued
     }
 
-    suspend fun downloadQueued(limit: Int = DEFAULT_LIMIT): DownloadResult = withIOContext {
-        val packages = (
-            packageRecords.findByState(ArticleOfflinePackageState.QUEUED) +
-                packageRecords.findByState(ArticleOfflinePackageState.STALE)
-            ).take(limit)
+    suspend fun downloadQueued(
+        limit: Int = DEFAULT_LIMIT,
+        retryFailed: Boolean = true,
+    ): DownloadResult = downloadMutex.withLock {
+        downloadBatch(limit, retryFailed)
+    }
+
+    private suspend fun downloadBatch(limit: Int, retryFailed: Boolean): DownloadResult = withIOContext {
+        // No other batch is active while holding downloadMutex, so these are
+        // interrupted downloads left behind by an earlier process.
+        packageRecords.findByState(ArticleOfflinePackageState.DOWNLOADING).forEach {
+            packageRecords.updateState(it.articleID, ArticleOfflinePackageState.QUEUED)
+        }
+        val packages = pendingPackages(retryFailed).take(limit)
 
         var failed = 0
 
@@ -115,11 +130,13 @@ class ArticleOfflinePackageDownloader(
                     failed += 1
                 }
             } catch (e: CancellationException) {
-                packageRecords.updateState(
-                    articleID = offlinePackage.articleID,
-                    state = ArticleOfflinePackageState.QUEUED,
-                    errorMessage = "Download cancelled",
-                )
+                withContext(NonCancellable) {
+                    packageRecords.updateState(
+                        articleID = offlinePackage.articleID,
+                        state = ArticleOfflinePackageState.QUEUED,
+                        errorMessage = "Download cancelled",
+                    )
+                }
                 throw e
             } catch (e: Exception) {
                 failed += 1
@@ -139,13 +156,26 @@ class ArticleOfflinePackageDownloader(
             }
         }
 
-        DownloadResult(processed = packages.size, failed = failed)
+        val processedIDs = packages.mapTo(mutableSetOf()) { it.articleID }
+        val hasMore = pendingPackages(retryFailed).any {
+            it.articleID !in processedIDs
+        }
+        DownloadResult(processed = packages.size, failed = failed, hasMore = hasMore)
+    }
+
+    private suspend fun pendingPackages(retryFailed: Boolean): List<ArticleOfflinePackageRecord> {
+        val pending = packageRecords.findByState(ArticleOfflinePackageState.QUEUED) +
+            packageRecords.findByState(ArticleOfflinePackageState.STALE)
+        return if (retryFailed) {
+            pending + packageRecords.findByState(ArticleOfflinePackageState.FAILED)
+        } else {
+            pending
+        }
     }
 
     suspend fun cleanup(): CleanupResult = withIOContext {
         val offlineOptions = appPreferences.offlineOptions
         packageRecords.deleteOrphans()
-        val removedFailed = packageRecords.deleteByState(ArticleOfflinePackageState.FAILED)
         val protectedArticleIDs = protectedReadyPackageIDs()
         val prunedReady = packageRecords.pruneReadyPackages(
             maxPackages = DEFAULT_READY_PACKAGE_LIMIT,
@@ -153,11 +183,13 @@ class ArticleOfflinePackageDownloader(
             preservedArticleIDs = protectedArticleIDs,
         )
         audioStore.deleteUnreferencedArticles(
-            packageRecords.findAll().map { it.articleID }
+            packageRecords.findAll()
+                .filterNot { it.state == ArticleOfflinePackageState.FAILED }
+                .map { it.articleID }
         )
 
         CleanupResult(
-            removedFailed = removedFailed,
+            removedFailed = 0,
             prunedReady = prunedReady,
         )
     }
@@ -285,9 +317,10 @@ class ArticleOfflinePackageDownloader(
     data class DownloadResult(
         val processed: Int,
         val failed: Int,
+        val hasMore: Boolean = false,
     ) {
         val shouldRetry: Boolean
-            get() = failed > 0
+            get() = failed > 0 || hasMore
     }
 
     data class CleanupResult(
@@ -304,6 +337,7 @@ class ArticleOfflinePackageDownloader(
             ArticleOfflinePackageState.QUEUED,
             ArticleOfflinePackageState.DOWNLOADING,
             ArticleOfflinePackageState.READY,
+            ArticleOfflinePackageState.FAILED,
         )
     }
 }

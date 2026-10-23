@@ -8,8 +8,12 @@ import com.jocmp.capy.persistence.ArticleIntegrationExportInput
 import com.jocmp.capy.persistence.ArticleIntegrationExportRecord
 import com.jocmp.capy.persistence.ArticleIntegrationExportRecords
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 
@@ -19,6 +23,8 @@ class WallabagArticleExporter(
     private val integration: WallabagIntegration,
     private val appPreferences: AppPreferences,
 ) {
+    private val exportMutex = Mutex()
+
     fun isConfigured(): Boolean = appPreferences.wallabagOptions.isConfigured()
 
     suspend fun queue(articleID: String): ArticleIntegrationExportRecord {
@@ -52,7 +58,18 @@ class WallabagArticleExporter(
             .map { exportRecords -> exportRecords.associateBy { it.articleID } }
     }
 
-    suspend fun exportQueued(limit: Int = DEFAULT_LIMIT): ExportBatchResult = withIOContext {
+    suspend fun exportQueued(limit: Int = DEFAULT_LIMIT): ExportBatchResult = exportMutex.withLock {
+        exportBatch(limit)
+    }
+
+    private suspend fun exportBatch(limit: Int): ExportBatchResult = withIOContext {
+        // A previous process may have stopped after persisting EXPORTING. The
+        // mutex ensures another active batch cannot be mistaken for that case.
+        records.findByState(ArticleIntegrationExportState.EXPORTING)
+            .filter { it.integrationID == integration.id }
+            .forEach { record ->
+                records.updateState(record.id, ArticleIntegrationExportState.QUEUED)
+            }
         val queued = records.findByState(ArticleIntegrationExportState.QUEUED)
             .filter { it.integrationID == integration.id }
             .take(limit)
@@ -97,10 +114,12 @@ class WallabagArticleExporter(
                     },
                 )
             } catch (e: CancellationException) {
-                records.updateState(
-                    id = record.id,
-                    state = ArticleIntegrationExportState.QUEUED,
-                )
+                withContext(NonCancellable) {
+                    records.updateState(
+                        id = record.id,
+                        state = ArticleIntegrationExportState.QUEUED,
+                    )
+                }
                 throw e
             } catch (e: Throwable) {
                 val retryable = e.isRetryable()
@@ -123,9 +142,9 @@ class WallabagArticleExporter(
             }
         }
 
-        val hasMore = queued.size == limit &&
-            records.findByState(ArticleIntegrationExportState.QUEUED)
-                .any { it.integrationID == integration.id }
+        val processedIDs = queued.mapTo(mutableSetOf()) { it.id }
+        val hasMore = records.findByState(ArticleIntegrationExportState.QUEUED)
+            .any { it.integrationID == integration.id && it.id !in processedIDs }
 
         ExportBatchResult(
             processed = queued.size,
