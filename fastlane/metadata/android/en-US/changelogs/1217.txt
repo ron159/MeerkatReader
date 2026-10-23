@@ -1,0 +1,6 @@
+Fixed folder search and bulk read actions affecting other folders.
+Fixed read searches omitting previously read articles and Miniflux bookmark sync after offline changes.
+Kept the selected article when full-content loading finishes.
+Stopped delayed speech after pausing or closing text-to-speech.
+Recovered interrupted Wallabag exports.
+Retained failed offline downloads for retry and continued queues beyond 50 articles.
