@@ -1,10 +1,14 @@
-name: CI
+name: Unit tests
 
 on:
   push:
     branches:
       - main
   pull_request:
+
+concurrency:
+  group: unit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   typecheck:
@@ -34,7 +38,8 @@ jobs:
         with:
           bundler-cache: true
       - name: Run tests
-        run: make test
+        # Main keeps both variants; PRs run shared cases once and compile Gplay tests.
+        run: bundle exec fastlane test single_flavor:${{ github.event_name == 'pull_request' }}
       - name: Test report
         uses: test-summary/action@v2
         if: always()

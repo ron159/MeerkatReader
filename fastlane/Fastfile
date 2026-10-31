@@ -11,11 +11,11 @@ platform :android do
   end
 
   desc "Runs all the tests"
-  lane :test do
+  lane :test do |options|
     gradle(
       tasks: [
         ":app:testFreeDebugUnitTest",
-        ":app:testGplayDebugUnitTest",
+        options[:single_flavor] ? ":app:compileGplayDebugUnitTestKotlin" : ":app:testGplayDebugUnitTest",
         ":bench:test",
         ":capy:test",
         ":feedbinclient:test",
