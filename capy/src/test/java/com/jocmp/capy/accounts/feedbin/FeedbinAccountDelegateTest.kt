@@ -754,6 +754,20 @@ class FeedbinAccountDelegateTest {
         assertEquals(feed, FeedRecords(database).find(feed.id))
     }
 
+    @Test
+    fun failedPagesResponseRetainsLocalPages() = runTest {
+        val subscription = subscriptions.first().copy(feed_url = "http://pages.feedbinusercontent.com/user")
+        val feed = feedFixture.create(feedID = subscription.feed_id.toString(), feedURL = subscription.feed_url)
+        com.jocmp.capy.fixtures.ArticleFixture(database).create(id = "777", feed = feed, starred = true)
+        stubRefresh(emptyList(), starredIDs = listOf(777L))
+        coEvery { feedbin.subscriptions() } returns Response.success(listOf(subscription))
+        coEvery { feedbin.feedEntries(feedID = feed.id, page = "1") } returns
+            Response.error(503, "Unavailable".toResponseBody())
+        assertTrue(delegate.refresh(ArticleFilter.default()).isFailure)
+        assertNotNull(ArticleRecords(database).find("777"))
+        assertEquals(0L, preferences.lastRefreshedAt.get())
+    }
+
     private fun stubRefresh(
         entries: List<Entry>,
         unreadIDs: List<Long> = emptyList(),

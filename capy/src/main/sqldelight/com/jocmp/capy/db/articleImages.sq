@@ -271,3 +271,9 @@ touchAsset:
 UPDATE article_image_assets
 SET last_accessed_at = :lastAccessedAt
 WHERE id = :id;
+
+retryFailedForArticle:
+UPDATE article_image_assets SET failure_count = 0
+WHERE status = 'failed' AND id IN (
+    SELECT asset_id FROM article_image_refs WHERE article_id = :articleID
+);

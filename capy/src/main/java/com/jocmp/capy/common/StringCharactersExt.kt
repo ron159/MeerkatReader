@@ -7,19 +7,19 @@ package com.jocmp.capy.common
  */
 val String.escapingSpecialXMLCharacters: String
     get() {
-        var escaped = ""
+        val escaped = StringBuilder(length)
 
-        this.toCharArray().forEach { char ->
+        this.forEach { char ->
             when (char) {
-                '&' -> escaped += "&amp;"
-                '<' -> escaped += "&lt;"
-                '>' -> escaped += "&gt;"
-                '\"' -> escaped += "&quot;"
-                else -> escaped += char
+                '&' -> escaped.append("&amp;")
+                '<' -> escaped.append("&lt;")
+                '>' -> escaped.append("&gt;")
+                '\"' -> escaped.append("&quot;")
+                else -> escaped.append(char)
             }
         }
 
-        return escaped
+        return escaped.toString()
     }
 
 val String.unescapingHTMLCharacters: String

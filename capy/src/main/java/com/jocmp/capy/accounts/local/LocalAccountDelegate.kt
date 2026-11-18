@@ -241,11 +241,6 @@ internal class LocalAccountDelegate(
             val channel = result.channel
 
             if (channel == null) {
-                feedRecords.updateConditionalGet(
-                    feedID = feed.id,
-                    conditionalGet = conditionalGet,
-                    refreshedAt = refreshedAt,
-                )
                 CapyLog.debug("refresh_feed_skip", mapOf("id" to feed.id))
                 return
             }

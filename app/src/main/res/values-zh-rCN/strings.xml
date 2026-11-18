@@ -702,4 +702,6 @@
     <string name="article_outline_open">文章目录</string>
     <string name="article_outline_title">目录</string>
     <string name="actions_copy_text">复制文本</string>
+    <string name="backup_account_identity_mismatch">备份属于其他服务器或账户</string>
+    <string name="opml_import_partial">共 %2$d 个订阅，%1$d 个导入失败</string>
 </resources>

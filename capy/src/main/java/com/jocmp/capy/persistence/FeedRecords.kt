@@ -63,12 +63,11 @@ internal class FeedRecords(private val database: Database) {
     }
 
     /**
-     * Persists conditional-GET state after a successful refresh (200 or 304)
+     * Persists conditional-GET state after a refresh with a response body
      *
      * - [ConditionalGetInfo.lastModified] is the server's HTTP `Last-Modified` header,
      *   an opaque value for use in the next request as `If-Modified-Since`
-     * - [refreshedAt] reflects when the feed was last fetched from the client regardless
-     *   of whether the feed had changed. Used locally to compare
+     * - [refreshedAt] reflects when the last response body was fetched. Used locally to compare
      *   staleness of the stored etag/last-modified pair.
      */
     suspend fun updateConditionalGet(

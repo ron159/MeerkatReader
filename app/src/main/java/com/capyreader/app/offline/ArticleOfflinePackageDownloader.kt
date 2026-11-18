@@ -5,6 +5,7 @@ import com.capyreader.app.preferences.AppPreferences
 import com.jocmp.capy.Account
 import com.jocmp.capy.Article
 import com.jocmp.capy.ArticleOfflinePackageState
+import com.jocmp.capy.EnclosureType
 import com.jocmp.capy.FeedOfflinePolicy
 import com.jocmp.capy.common.withIOContext
 import com.jocmp.capy.latestArticles
@@ -14,7 +15,6 @@ import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleOfflinePackageInput
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
-import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -27,7 +27,6 @@ class ArticleOfflinePackageDownloader(
     private val packageRecords: ArticleOfflinePackageRecords,
     private val fullContentRecords: ArticleFullContentRecords,
     private val imageRecords: ArticleImageRecords,
-    private val readingProgressRecords: ArticleReadingProgressRecords,
     private val imageDownloader: ArticleImageDownloader,
     private val audioDownloader: ArticleOfflineAudioDownloader,
     private val audioStore: ArticleOfflineAudioStore,
@@ -90,7 +89,9 @@ class ArticleOfflinePackageDownloader(
             }
 
             val existing = existingRecords[article.id]
-            if (existing?.state in SKIP_AUTO_QUEUE_STATES) {
+            val missingRequestedAudio = existing?.state == ArticleOfflinePackageState.READY &&
+                includeAudio && !existing.includeAudio && article.enclosureType == EnclosureType.AUDIO
+            if (existing?.state in SKIP_AUTO_QUEUE_STATES && !missingRequestedAudio) {
                 return@forEach
             }
 
@@ -98,8 +99,7 @@ class ArticleOfflinePackageDownloader(
                 articleID = article.id,
                 includeFullContent = includeFullContent,
                 includeImages = includeImages,
-                includeAudio = includeAudio &&
-                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) },
+                includeAudio = includeAudio,
             )
             queued += 1
         }
@@ -205,21 +205,12 @@ class ArticleOfflinePackageDownloader(
             return emptySet()
         }
 
-        return packageRecords.findByState(ArticleOfflinePackageState.READY)
-            .mapNotNull { offlinePackage ->
-                val article = account.findArticle(offlinePackage.articleID) ?: return@mapNotNull null
-                val feed = account.findFeed(article.feedID)
-                val shouldProtect =
-                    (offlineOptions.preserveStarred.get() && article.starred) ||
-                        (offlineOptions.preserveSavedForLater.get() && article.isReadLater) ||
-                        (offlineOptions.preserveRecentlyOpened.get() &&
-                            readingProgressRecords.find(article.id) != null) ||
-                        (offlineOptions.preserveFeedOffline.get() &&
-                            feed?.offlinePolicy == FeedOfflinePolicy.ALWAYS)
-
-                if (shouldProtect) article.id else null
-            }
-            .toSet()
+        return packageRecords.protectedReadyIDs(
+            starred = offlineOptions.preserveStarred.get(),
+            saved = offlineOptions.preserveSavedForLater.get(),
+            feed = offlineOptions.preserveFeedOffline.get(),
+            recentlyOpened = offlineOptions.preserveRecentlyOpened.get(),
+        )
     }
 
     private suspend fun download(offlinePackage: ArticleOfflinePackageRecord): Boolean {
@@ -259,7 +250,11 @@ class ArticleOfflinePackageDownloader(
                 articleURL = article.url?.toString(),
                 siteURL = article.siteURL,
             )
+            imageRecords.retryFailedForArticle(article.id)
             imageDownloader.downloadPendingForArticle(article.id)
+            if (imageRecords.findRefs(article.id).any { it.status == ArticleImageRecords.Status.FAILED.value }) {
+                throw java.io.IOException("Some article images could not be downloaded")
+            }
             bytes += imageRecords.readyBytesForArticle(article.id)
         }
 

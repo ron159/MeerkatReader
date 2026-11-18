@@ -613,17 +613,17 @@ data class Account(
         get() = FaviconFinder(localHttpClient, faviconPolicy, userAgent, acceptLanguage)
 
     internal suspend fun asOPML(): String {
-        var opml = ""
+        val opml = StringBuilder()
 
         feeds.first().forEach { feed ->
-            opml += feed.asOPML(indentLevel = 2)
+            opml.append(feed.asOPML(indentLevel = 2))
         }
 
         folders.first().forEach { folder ->
-            opml += folder.asOPML(indentLevel = 2)
+            opml.append(folder.asOPML(indentLevel = 2))
         }
 
-        return opml
+        return opml.toString()
     }
 }
 

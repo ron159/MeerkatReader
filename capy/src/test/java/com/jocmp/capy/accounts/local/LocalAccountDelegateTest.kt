@@ -96,6 +96,11 @@ class LocalAccountDelegateTest {
 
     private lateinit var accountPreferences: AccountPreferences
 
+    @org.junit.After
+    fun restoreClock() {
+        io.mockk.unmockkObject(TimeHelpers)
+    }
+
     @Before
     fun setup() {
         mockkObject(CapyLog)
@@ -435,7 +440,7 @@ class LocalAccountDelegateTest {
 
 
     @Test
-    fun refreshAll_whenNotModified_skipsArticleSaveAndPersistsRefreshedAt() = runTest {
+    fun refreshAll_whenNotModified_keepsOriginalValidatorTimestamp() = runTest {
         val feedID = channel.link!!
         FeedFixture(database).create(feedID = feedID, feedURL = feedID)
 
@@ -475,7 +480,9 @@ class LocalAccountDelegateTest {
             .findConditionalGet(feedID)
             .executeAsOne()
             .conditional_get_refreshed_at
-        assertEquals(expected = mockNow.toEpochSecond(), actual = refreshedAt)
+        assertEquals(expected = mockNow.minusDays(1).toEpochSecond(), actual = refreshedAt)
+        every { TimeHelpers.nowUTC() } returns mockNow.plusDays(8)
+        assertEquals(ConditionalGetInfo.EMPTY, feedRecords.findConditionalGet(feedID))
     }
 
     @Test

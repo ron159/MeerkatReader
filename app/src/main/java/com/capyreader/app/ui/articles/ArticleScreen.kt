@@ -500,7 +500,7 @@ fun ArticleScreen(
         }
 
         val selectSavedSearch = { savedSearch: SavedSearch ->
-            if (savedSearch.query != null || !filter.isSavedSearchSelected(savedSearch)) {
+            if (savedSearch.isLocalQuery || !filter.isSavedSearchSelected(savedSearch)) {
                 openNextList { viewModel.selectSavedSearch(savedSearch) }
             }
         }

@@ -713,4 +713,6 @@
     <string name="article_outline_open">Article outline</string>
     <string name="article_outline_title">Contents</string>
     <string name="actions_copy_text">Copy text</string>
+    <string name="backup_account_identity_mismatch">This backup belongs to a different server or account</string>
+    <string name="opml_import_partial">Could not import %1$d of %2$d subscriptions</string>
 </resources>

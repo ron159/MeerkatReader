@@ -86,7 +86,6 @@ val accountModule = module {
             packageRecords = get(),
             fullContentRecords = get(),
             imageRecords = get(),
-            readingProgressRecords = get(),
             imageDownloader = get(),
             audioDownloader = get(),
             audioStore = get(),

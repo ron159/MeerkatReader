@@ -5,7 +5,7 @@ internal sealed class Outline {
 
     data class FolderOutline(val folder: Folder) : Outline() {
         override val title: String
-            get() = folder.title ?: ""
+            get() = folder.title?.takeIf { it.isNotBlank() } ?: folder.text.orEmpty()
     }
 
     data class FeedOutline(val feed: Feed) : Outline() {

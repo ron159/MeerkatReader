@@ -350,6 +350,12 @@ class ArticleTtsControllerTest {
         )
     }
 
+    @Test
+    fun originalSpeechUsesVisibleFullText() {
+        val loaded = article().copy(content = "<p>Complete body.</p>", fullContent = Article.FullContentState.LOADED)
+        assertEquals("Example article. Complete body.", ArticleTtsContent.original(loaded).text)
+    }
+
     private fun article() = Article(
         id = "article-1",
         feedID = "feed-1",

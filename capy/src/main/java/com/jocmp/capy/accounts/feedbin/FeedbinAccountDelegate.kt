@@ -303,8 +303,8 @@ internal class FeedbinAccountDelegate(
         }
     }
 
-    private fun upsertFeed(subscription: Subscription, icons: List<Icon>) {
-        val icon = icons.find { it.host == subscription.host }
+    private fun upsertFeed(subscription: Subscription, icons: Map<String, Icon>) {
+        val icon = icons[subscription.host]
 
         database.feedsQueries.upsert(
             id = subscription.feed_id.toString(),
@@ -430,7 +430,7 @@ internal class FeedbinAccountDelegate(
                 feedID = feedID,
                 page = nextPage.toString()
             )
-            val entries = response.body().orEmpty()
+            val entries = response.body() ?: throw IOException("Failed to fetch saved pages: HTTP ${response.code()}")
 
             saveEntries(entries)
             entries.forEach { remoteIDs.add(it.id.toString()) }
@@ -621,15 +621,15 @@ internal class FeedbinAccountDelegate(
 
     private fun maxArrivedAt() = articleRecords.maxArrivedAt().toString()
 
-    private suspend fun fetchIcons(): List<Icon> {
+    private suspend fun fetchIcons(): Map<String, Icon> {
         val response = feedbin.icons()
         val result = response.body()
 
         if (!response.isSuccessful || result == null) {
-            return listOf()
+            return emptyMap()
         }
 
-        return result
+        return result.asReversed().associateBy { it.host }
     }
 
     companion object {

@@ -847,6 +847,21 @@ class MinifluxAccountDelegateTest {
         coVerify(exactly = 0) { miniflux.toggleBookmark(any()) }
     }
 
+    @Test
+    fun failedUnreadPagePreservesBothStatusListsAndCursor() = runTest {
+        val feed = feedFixture.create(feedID = feeds.first().id.toString())
+        ArticleFixture(database).create(id = "777", feed = feed, read = false, starred = true)
+        stubRefresh(emptyList())
+        coEvery { miniflux.entries(status = EntryStatus.UNREAD.value, limit = 250, offset = 0) } returns
+            Response.error(503, "Unavailable".toResponseBody())
+        val result = delegate.refresh(ArticleFilter.default())
+        assertTrue(result.isFailure)
+        val article = assertNotNull(ArticleRecords(database).find("777"))
+        assertTrue(article.starred)
+        assertFalse(article.read)
+        assertEquals(0L, preferences.lastRefreshedAt.get())
+    }
+
     private fun stubBookmarkState(articleID: Long, starred: Boolean) {
         coEvery { miniflux.entry(articleID) } returns
             Response.success(arsTechnicaArticle.copy(id = articleID, starred = starred))

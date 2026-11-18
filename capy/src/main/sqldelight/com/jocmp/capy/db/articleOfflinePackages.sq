@@ -85,3 +85,15 @@ DELETE FROM article_offline_packages
 WHERE article_id NOT IN (
   SELECT id FROM articles
 );
+
+protectedReadyIDs:
+SELECT p.article_id FROM article_offline_packages p
+JOIN articles a ON a.id = p.article_id
+JOIN feeds f ON f.id = a.feed_id
+LEFT JOIN article_statuses s ON s.article_id = a.id
+LEFT JOIN article_reading_progress r ON r.article_id = a.id
+WHERE p.state = 'READY'
+AND ((:keepStarred = 1 AND s.starred = 1)
+  OR (:keepSaved = 1 AND f.read_later = 1)
+  OR (:keepFeed = 1 AND f.offline_policy = 'ALWAYS')
+  OR (r.updated_at >= :recentSince));

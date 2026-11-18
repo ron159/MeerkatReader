@@ -75,6 +75,16 @@ class CapyBackupFileEndToEndTest {
     }
 
     @Test
+    fun `different remote identity cannot restore into active account`() = runTest {
+        val fixture = createExportFixture()
+        val target = createTargetFixture(Source.FEEDBIN)
+        target.account.preferences.username.set("different-user")
+        assertFalse(backupFile.restore(target.account, fixture.uri))
+        assertEquals("different-user", target.account.preferences.username.get())
+        verifyNoRestoreCalls(target.delegate)
+    }
+
+    @Test
     fun `restore does not resubscribe to feeds already in the account`() = runTest {
         val fixture = createExportFixture()
         val target = createTargetFixture(Source.FEEDBIN)
@@ -346,7 +356,7 @@ class CapyBackupFileEndToEndTest {
         )
 
         val accountPreferences = accountPreferences(target.account)
-        assertEquals(SOURCE_USERNAME, target.account.preferences.username.get())
+        assertEquals(TARGET_USERNAME, target.account.preferences.username.get())
         assertEquals(TARGET_PASSWORD, target.account.preferences.password.get())
         assertEquals(
             TARGET_LEGACY_PASSWORD,
@@ -699,7 +709,7 @@ class CapyBackupFileEndToEndTest {
         private const val TARGET_BACKGROUND_AI_DAILY_USAGE = "2026-07-25|3"
 
         private const val SOURCE_USERNAME = "source-user"
-        private const val TARGET_USERNAME = "target-user"
+        private const val TARGET_USERNAME = SOURCE_USERNAME
         private const val SOURCE_PASSWORD = "source-secret"
         private const val SOURCE_LEGACY_PASSWORD = "source-legacy-secret"
         private const val TARGET_PASSWORD = "target-secret"

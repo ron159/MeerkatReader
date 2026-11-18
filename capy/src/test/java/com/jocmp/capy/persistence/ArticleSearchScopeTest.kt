@@ -50,6 +50,16 @@ class ArticleSearchScopeTest {
     }
 
     @Test
+    fun percentAndUnderscoreAreLiteralAcrossScopes() {
+        createArticle("ordinary", techFeed)
+        for (symbol in listOf("%", "_")) {
+            val query = ArticleSearchQuery.parse("feed:$symbol")
+            lists(query, now.toOffsetDateTime()).forEach { (scope, rows) -> assertTrue(rows.isEmpty(), scope) }
+            unreadIDs(query).forEach { (scope, ids) -> assertTrue(ids.isEmpty(), scope) }
+        }
+    }
+
+    @Test
     fun folderQualifierFiltersListsCountsAndBulkReadAcrossScopes() {
         val tech = createArticle("tech", techFeed)
         createArticle("sports", sportsFeed)

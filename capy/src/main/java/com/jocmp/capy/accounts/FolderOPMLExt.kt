@@ -13,14 +13,14 @@ internal fun Folder.asOPML(indentLevel: Int = 0): String {
         return opml.prepending(tabCount = indentLevel)
     }
 
-    var opml = "<outline text=\"${parsedTitle}\" title=\"${parsedTitle}\">\n"
-    opml = opml.prepending(tabCount = indentLevel)
+    val opening = "<outline text=\"${parsedTitle}\" title=\"${parsedTitle}\">\n"
+    val opml = StringBuilder(opening.prepending(tabCount = indentLevel))
 
     feeds.forEach { feed ->
-        opml += feed.asOPML(indentLevel = indentLevel + 1)
+        opml.append(feed.asOPML(indentLevel = indentLevel + 1))
     }
 
-    opml = opml + repeatTab(tabCount = indentLevel) + "</outline>\n"
+    opml.append(repeatTab(tabCount = indentLevel)).append("</outline>\n")
 
-    return opml
+    return opml.toString()
 }

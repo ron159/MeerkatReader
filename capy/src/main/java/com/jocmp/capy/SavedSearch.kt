@@ -9,4 +9,6 @@ data class SavedSearch(
     val query: String?,
     override val count: Long = 0,
     val showUnreadBadge: Boolean = true,
-) : Countable
+) : Countable {
+    val isLocalQuery get() = com.jocmp.capy.persistence.SavedSearchRecords.isLocalQueryID(id)
+}

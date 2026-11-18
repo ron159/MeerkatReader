@@ -7,6 +7,14 @@ import org.junit.Test
 
 class AutomaticBackupTest {
     @Test
+    fun `retention ignores manual archives and directories`() {
+        assertFalse(CapyBackupFile.isAutomaticBackupDocument("meerkat-backup-manual.json", "application/json"))
+        val generated = "meerkat-backup-20260628-120001.json"
+        assertFalse(CapyBackupFile.isAutomaticBackupDocument(generated, android.provider.DocumentsContract.Document.MIME_TYPE_DIR))
+        assertTrue(CapyBackupFile.isAutomaticBackupDocument(generated, "application/json"))
+    }
+
+    @Test
     fun `retention removes oldest automatic backups`() {
         val newest = document("newest", lastModified = 300)
         val middle = document("middle", lastModified = 200)

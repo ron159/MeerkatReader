@@ -15,7 +15,6 @@ import com.jocmp.capy.db.Database
 import com.jocmp.capy.persistence.ArticleFullContentRecords
 import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
-import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -98,7 +97,6 @@ class OfflinePackageRecoveryTest {
             packageRecords = records,
             fullContentRecords = ArticleFullContentRecords(database),
             imageRecords = mockk<ArticleImageRecords>(relaxed = true),
-            readingProgressRecords = mockk<ArticleReadingProgressRecords>(relaxed = true),
             imageDownloader = mockk<ArticleImageDownloader>(relaxed = true),
             audioDownloader = ArticleOfflineAudioDownloader(audioHttpClient, audioStore),
             audioStore = audioStore,

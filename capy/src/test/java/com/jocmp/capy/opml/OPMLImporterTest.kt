@@ -65,6 +65,16 @@ class OPMLImporterTest {
     }
 
     @Test
+    fun `text only outlines preserve subscription title and folder`() = runTest {
+        val xml = """<opml version="2.0"><body><outline text="Science"><outline type="rss" text="My feed" xmlUrl="https://jvns.ca/atom.xml"/></outline></body></opml>"""
+        OPMLImporter(account).import(inputStream = xml.byteInputStream())
+        val imported = account.folders.first().single()
+        assertEquals("Science", imported.title)
+        assertEquals("My feed", imported.feeds.single().title)
+        assertEquals(0f, ImportProgress().percent)
+    }
+
+    @Test
     fun `it imports feeds and folders`() = runTest {
         val inputStream = testFile("nested_import.xml").inputStream()
 

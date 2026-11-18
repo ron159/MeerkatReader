@@ -1,5 +1,6 @@
 package com.capyreader.app.transfers
 
+import com.jocmp.capy.opml.ImportFailure
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -14,6 +15,8 @@ import com.jocmp.capy.accounts.Source
 import com.jocmp.capy.logging.CapyLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -55,6 +58,12 @@ class CapyBackupFile(
         retention: Int,
         exportedAt: Instant = Instant.now(),
     ): Uri = withContext(Dispatchers.IO) {
+        automaticBackupMutex.withLock {
+            writeAutomatic(account, treeUri, retention, exportedAt)
+        }
+    }
+
+    private suspend fun writeAutomatic(account: Account, treeUri: Uri, retention: Int, exportedAt: Instant): Uri {
         val rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(
             treeUri,
             DocumentsContract.getTreeDocumentId(treeUri),
@@ -74,8 +83,9 @@ class CapyBackupFile(
             }
             throw error
         }
+        ownedBackupDocuments.edit().putBoolean(target.toString(), true).apply()
         pruneAutomaticBackups(treeUri, retention.coerceIn(MIN_RETENTION, MAX_RETENTION))
-        target
+        return target
     }
 
     suspend fun restorePreview(account: Account, source: Uri?): BackupRestorePreview? {
@@ -138,7 +148,7 @@ class CapyBackupFile(
                 restoreValues(
                     preferences = accountPreferences(account),
                     values = accountPreferenceValues,
-                    keysToKeep = SENSITIVE_ACCOUNT_KEYS,
+                    keysToKeep = SENSITIVE_ACCOUNT_KEYS + ACCOUNT_IDENTITY_KEYS,
                     mode = mode,
                 )
 
@@ -164,12 +174,12 @@ class CapyBackupFile(
             if (it is CancellationException) throw it
         }
 
-        context.toast(
-            result.fold(
-                onSuccess = { R.string.backup_importer_success },
-                onFailure = ::showRestoreFailure,
-            )
-        )
+        val failure = result.exceptionOrNull()
+        when (failure) {
+            null -> context.toast(R.string.backup_importer_success)
+            is ImportFailure -> context.toast(context.getString(R.string.opml_import_partial, failure.failedFeeds.size, failure.total))
+            else -> context.toast(showRestoreFailure(failure))
+        }
 
         return result.isSuccess
     }
@@ -226,9 +236,15 @@ class CapyBackupFile(
         )
     }
 
+    private val ownedBackupDocuments
+        get() = context.getSharedPreferences("automatic_backup_documents", Context.MODE_PRIVATE)
+
     private fun pruneAutomaticBackups(treeUri: Uri, retention: Int) {
         automaticBackupsToDelete(
-            documents = automaticBackupDocuments(treeUri),
+            documents = automaticBackupDocuments(treeUri).filter { document ->
+                val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, document.documentID)
+                ownedBackupDocuments.contains(uri.toString())
+            },
             retention = retention,
         )
             .forEach { document ->
@@ -239,6 +255,7 @@ class CapyBackupFile(
                 if (!DocumentsContract.deleteDocument(context.contentResolver, uri)) {
                     throw IOException("Could not delete old automatic backup")
                 }
+                ownedBackupDocuments.edit().remove(uri.toString()).apply()
             }
     }
 
@@ -249,6 +266,7 @@ class CapyBackupFile(
         )
         val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
         )
@@ -265,6 +283,7 @@ class CapyBackupFile(
             val idIndex = cursor.getColumnIndexOrThrow(
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID
             )
+            val typeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
             val nameIndex = cursor.getColumnIndexOrThrow(
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME
             )
@@ -275,8 +294,7 @@ class CapyBackupFile(
             buildList {
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(nameIndex) ?: continue
-                    if (!name.startsWith(AUTOMATIC_BACKUP_FILE_PREFIX) ||
-                        !name.endsWith(".json")
+                    if (!isAutomaticBackupDocument(name, cursor.getString(typeIndex))
                     ) {
                         continue
                     }
@@ -307,11 +325,20 @@ class CapyBackupFile(
         if (backup.account.source != account.source) {
             throw SourceMismatchError(backup.account.source, account.source)
         }
+        if (account.source != Source.LOCAL) {
+            val identity = backup.account.preferences
+            val server = identity["api_url"]?.value?.stringOrNull()?.trimEnd('/')
+            val username = identity["username"]?.value?.stringOrNull()
+            if ((!server.isNullOrBlank() && server != account.preferences.url.get().trimEnd('/')) ||
+                (!username.isNullOrBlank() && username != account.preferences.username.get())
+            ) throw AccountMismatchError()
+        }
     }
 
     private fun showRestoreFailure(error: Throwable): Int {
         CapyLog.error("backup_importer", error)
 
+        if (error is AccountMismatchError) return R.string.backup_account_identity_mismatch
         return if (error is SourceMismatchError) {
             R.string.backup_importer_source_mismatch
         } else {
@@ -375,6 +402,8 @@ class CapyBackupFile(
         }
     }
 
+    private class AccountMismatchError : Exception()
+
     private class SourceMismatchError(
         val backupSource: Source,
         val currentSource: Source,
@@ -395,11 +424,17 @@ class CapyBackupFile(
         private const val MAX_RETENTION = 30
         private val SUPPORTED_BACKUP_VERSIONS = setOf(1, BACKUP_VERSION)
         private val SENSITIVE_APP_KEYS = SENSITIVE_APP_PREFERENCE_KEYS
+        private val ACCOUNT_IDENTITY_KEYS = setOf("api_url", "username", "client_cert_alias", "source")
         private val SENSITIVE_ACCOUNT_KEYS = SENSITIVE_ACCOUNT_PREFERENCE_KEYS
         private val DEVICE_LOCAL_APP_KEYS = DEVICE_LOCAL_APP_PREFERENCE_KEYS
         private val EXCLUDED_APP_KEYS = SENSITIVE_APP_KEYS + DEVICE_LOCAL_APP_KEYS
+        private val automaticBackupMutex = Mutex()
+        private val AUTOMATIC_BACKUP_NAME = Regex("""meerkat-backup-[0-9]{8}-[0-9]{6}(?: \([0-9]+\))?\.json""")
         private val AUTOMATIC_BACKUP_FILE_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+        internal fun isAutomaticBackupDocument(name: String, mimeType: String?): Boolean =
+            mimeType != DocumentsContract.Document.MIME_TYPE_DIR && AUTOMATIC_BACKUP_NAME.matches(name)
 
         internal fun automaticBackupFileName(exportedAt: Instant): String {
             val timestamp = AUTOMATIC_BACKUP_FILE_FORMAT.format(

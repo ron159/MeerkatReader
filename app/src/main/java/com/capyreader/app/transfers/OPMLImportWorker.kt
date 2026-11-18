@@ -3,6 +3,7 @@ package com.capyreader.app.transfers
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.jocmp.capy.opml.ImportFailure
 import android.content.Context
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.net.Uri
@@ -55,9 +56,15 @@ class OPMLImportWorker(
             import(opmlURI)
 
             showToast(R.string.opml_import_toast_complete)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: ImportFailure) {
+            showToast(R.string.opml_import_partial, e.failedFeeds.size, e.total)
+            return Result.failure()
         } catch (e: Throwable) {
             CapyLog.error("importer", e)
             showToast(R.string.opml_import_toast_failed)
+            return Result.failure()
         }
 
         return Result.success()
@@ -66,25 +73,27 @@ class OPMLImportWorker(
     private suspend fun import(opmlUri: Uri) {
         val inputStream = applicationContext.contentResolver.openInputStream(opmlUri)!!
 
-        account.import(inputStream) { progress ->
-            val notification = buildNotification(
-                percentProgress = (progress.percent * 100f).roundToInt(),
-            )
-
-            setProgressAsync(
-                workDataOf(
-                    PROGRESS_CURRENT_COUNT to progress.currentCount,
-                    PROGRESS_TOTAL to progress.total
+        inputStream.use { stream ->
+            account.import(stream) { progress ->
+                val notification = buildNotification(
+                    percentProgress = (progress.percent * 100f).roundToInt(),
                 )
-            )
 
-            setForegroundAsync(
-                ForegroundInfo(
-                    Notifications.OPML_IMPORT_NOTIFICATION_ID,
-                    notification,
-                    FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                setProgressAsync(
+                    workDataOf(
+                        PROGRESS_CURRENT_COUNT to progress.currentCount,
+                        PROGRESS_TOTAL to progress.total
+                    )
                 )
-            )
+
+                setForegroundAsync(
+                    ForegroundInfo(
+                        Notifications.OPML_IMPORT_NOTIFICATION_ID,
+                        notification,
+                        FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                )
+            }
         }
 
         coroutineScope {
@@ -140,10 +149,10 @@ class OPMLImportWorker(
         notificationManager.createNotificationChannel(channel)
     }
 
-    private suspend fun showToast(@StringRes string: Int) = withContext(Dispatchers.Main) {
+    private suspend fun showToast(@StringRes string: Int, vararg args: Any) = withContext(Dispatchers.Main) {
         Toast.makeText(
             applicationContext,
-            applicationContext.getString(string),
+            applicationContext.getString(string, *args),
             Toast.LENGTH_SHORT
         ).show()
     }

@@ -14,7 +14,7 @@ data class ArticleTtsContent(
 
     companion object {
         fun original(article: Article): ArticleTtsContent {
-            val body = ArticleTtsText.extractText(article.defaultContent)
+            val body = ArticleTtsText.extractText(article.content.ifBlank { article.defaultContent })
             val text = listOf(article.title.trim(), body)
                 .filter(String::isNotBlank)
                 .joinToString(separator = ". ")

@@ -1,5 +1,6 @@
 package com.jocmp.capy.opml
 
+import com.jocmp.capy.accounts.AddFeedResult
 import com.jocmp.capy.Account
 import com.jocmp.capy.common.optionalURL
 import kotlinx.coroutines.currentCoroutineContext
@@ -14,6 +15,7 @@ internal class OPMLImporter(private val account: Account) {
         inputStream: InputStream,
         skipExistingFeeds: Boolean = false,
     ) {
+        val failed = mutableListOf<String>()
         var counter = 0
         val outlines = OPMLHandler.parse(inputStream)
 
@@ -35,7 +37,8 @@ internal class OPMLImporter(private val account: Account) {
             val title = forms.first().title
 
             if (feedURL !in existingFeedURLs) {
-                account.addFeed(url = feedURL, title = title, folderTitles = folderTitles)
+                val result = account.addFeed(url = feedURL, title = title, folderTitles = folderTitles)
+                if (result !is AddFeedResult.Success) failed += feedURL
             }
             counter += 1
 
@@ -46,6 +49,7 @@ internal class OPMLImporter(private val account: Account) {
                 )
             )
         }
+        if (failed.isNotEmpty()) throw ImportFailure(failed, size)
     }
 
     private fun findEntries(outlines: List<Outline>): List<AddFeedForm> {
@@ -60,7 +64,7 @@ internal class OPMLImporter(private val account: Account) {
                     feedEntries.add(
                         AddFeedForm(
                             url = xmlURL,
-                            title = feed.title.orEmpty()
+                            title = feed.title?.takeIf { it.isNotBlank() } ?: feed.text.orEmpty()
                         )
                     )
                 }
@@ -74,7 +78,7 @@ internal class OPMLImporter(private val account: Account) {
                         feedEntries.add(
                             AddFeedForm(
                                 url = xmlURL,
-                                title = it.title.orEmpty(),
+                                title = it.title?.takeIf { it.isNotBlank() } ?: it.text.orEmpty(),
                                 folderTitles = folderTitle(outline.title)
                             )
                         )
@@ -106,10 +110,13 @@ internal class OPMLImporter(private val account: Account) {
     )
 }
 
+class ImportFailure(val failedFeeds: List<String>, val total: Int) :
+    Exception("Could not import ${failedFeeds.size} of $total subscriptions")
+
 data class ImportProgress(
     val currentCount: Int = 0,
     val total: Int = 0,
 ) {
     val percent: Float
-        get() = (currentCount.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+        get() = if (total == 0) 0f else (currentCount.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }

@@ -12,7 +12,7 @@ object ArticleTtsText {
         article: Article,
         locale: Locale = Locale.getDefault(),
     ): List<String> {
-        val body = extractText(article.defaultContent)
+        val body = extractText(article.content.ifBlank { article.defaultContent })
         val text = listOf(article.title.trim(), body)
             .filter(String::isNotBlank)
             .joinToString(separator = ". ")

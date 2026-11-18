@@ -90,6 +90,14 @@ class ArticleOfflinePackageRecords(
         }
     }
 
+    fun protectedReadyIDs(starred: Boolean, saved: Boolean, feed: Boolean, recentlyOpened: Boolean): Set<String> =
+        database.articleOfflinePackagesQueries.protectedReadyIDs(
+            keepStarred = if (starred) 1 else 0,
+            keepSaved = if (saved) 1 else 0,
+            keepFeed = if (feed) 1 else 0,
+            recentSince = if (recentlyOpened) nowUTC().minusDays(30).toEpochSecond() else Long.MAX_VALUE,
+        ).executeAsList().toSet()
+
     suspend fun pruneReadyPackages(
         maxPackages: Int,
         maxBytes: Long,

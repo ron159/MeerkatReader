@@ -293,7 +293,7 @@ internal class MinifluxAccountDelegate(
         val feeds = feedsResponse.body()
 
         if (!feedsResponse.isSuccessful || feeds == null) {
-            return
+            throw IOException("Failed to fetch subscriptions: HTTP ${feedsResponse.code()}")
         }
 
         val feedIDsWithIcons = database.feedsQueries.all()
@@ -310,52 +310,55 @@ internal class MinifluxAccountDelegate(
             }
         }
 
+        taggingRecords.deleteOrphaned(feeds.mapNotNull { feed ->
+            feed.category?.let { taggingID(feed.id.toString(), it.id) }
+        })
         val feedsToKeep = feeds.map { it.id.toString() }
         database.feedsQueries.deleteAllExcept(feedsToKeep)
     }
 
     private suspend fun refreshArticles(cutoffDate: ZonedDateTime? = null) = coroutineScope {
-        val starred = async { refreshStarredEntries() }
-        val unread = async { refreshUnreadEntries() }
-        starred.await()
-        unread.await()
+        val starred = async { fetchStarredIDs() }
+        val unread = async { fetchUnreadIDs() }
+        val starredIDs = starred.await()
+        val unreadIDs = unread.await()
+        database.transaction {
+            articleRecords.markAllStarred(starredIDs)
+            articleRecords.markAllUnread(unreadIDs)
+        }
         fetchAllEntries(cutoffDate = cutoffDate)
     }
 
-    private suspend fun refreshStarredEntries() {
-        val ids = fetchAllEntryIDs { offset ->
+    private suspend fun fetchStarredIDs(): List<String> {
+        return fetchAllEntryIDs { offset ->
             miniflux.entries(starred = true, limit = MAX_ENTRY_LIMIT, offset = offset)
         }
-
-        articleRecords.markAllStarred(articleIDs = ids)
     }
 
-    private suspend fun refreshUnreadEntries() {
-        val ids = fetchAllEntryIDs { offset ->
+    private suspend fun fetchUnreadIDs(): List<String> {
+        return fetchAllEntryIDs { offset ->
             miniflux.entries(
                 status = EntryStatus.UNREAD.value,
                 limit = MAX_ENTRY_LIMIT,
                 offset = offset
             )
         }
-
-        articleRecords.markAllUnread(articleIDs = ids)
     }
 
     private suspend fun fetchAllEntryIDs(
         fetch: suspend (offset: Int) -> Response<EntryResultSet>
     ): List<String> {
-        val firstPage = fetch(0).body() ?: return emptyList()
+        val firstPage = fetch(0).body() ?: throw IOException("Missing first status page")
         val ids = firstPage.entries.map { it.id.toString() }.toMutableList()
 
-        var offset = MAX_ENTRY_LIMIT
         while (ids.size < firstPage.total) {
-            val page = fetch(offset).body() ?: break
-            if (page.entries.isEmpty()) break
+            val offset = ids.size
+            val page = fetch(offset).body() ?: throw IOException("Missing status page at offset $offset")
+            if (page.entries.isEmpty()) throw IOException("Incomplete status list")
             ids.addAll(page.entries.map { it.id.toString() })
-            offset += MAX_ENTRY_LIMIT
         }
 
+        if (ids.distinct().size < firstPage.total) throw IOException("Incomplete status list")
         return ids
     }
 
@@ -368,9 +371,10 @@ internal class MinifluxAccountDelegate(
             order = "published_at",
             direction = "desc",
             changedAfter = changedAfter,
-        ).body() ?: return@coroutineScope
+        ).body() ?: throw IOException("Missing first article page")
 
         val total = firstResult.total
+        if (firstResult.entries.size < minOf(total, MAX_ENTRY_LIMIT)) throw IOException("Incomplete first article page")
 
         saveEntries(firstResult.entries, cutoffDate = cutoffDate)
 
@@ -386,7 +390,8 @@ internal class MinifluxAccountDelegate(
                             order = "published_at",
                             direction = "desc",
                             changedAfter = changedAfter,
-                        ).body()?.entries ?: return@withPermit
+                        ).body()?.entries ?: throw IOException("Missing article page at offset $offset")
+                        if (entries.size < minOf(MAX_ENTRY_LIMIT, total - offset)) throw IOException("Incomplete article page at offset $offset")
                         saveEntries(entries, cutoffDate = cutoffDate)
                     }
                 }

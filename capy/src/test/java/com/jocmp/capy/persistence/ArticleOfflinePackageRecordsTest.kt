@@ -24,6 +24,20 @@ class ArticleOfflinePackageRecordsTest {
     }
 
     @Test
+    fun recentProtectionExpiresWithoutLoadingArticleBodies() = runTest {
+        val recent = articleFixture.create()
+        val old = articleFixture.create()
+        val starred = articleFixture.create(starred = true)
+        for (article in listOf(recent, old, starred)) {
+            records.upsert(ArticleOfflinePackageInput(article.id, ArticleOfflinePackageState.READY, true, false, false))
+        }
+        val progress = ArticleReadingProgressRecords(database)
+        progress.upsert(recent.id, 0.5, nowUTC().minusDays(1))
+        progress.upsert(old.id, 0.5, nowUTC().minusDays(31))
+        assertEquals(setOf(recent.id, starred.id), records.protectedReadyIDs(true, false, false, true))
+    }
+
+    @Test
     fun upsertStoresPackageState() = runTest {
         val article = articleFixture.create()
 

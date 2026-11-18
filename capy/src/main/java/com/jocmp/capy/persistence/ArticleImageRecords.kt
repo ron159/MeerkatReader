@@ -145,6 +145,10 @@ class ArticleImageRecords(
         ).executeAsList()
     }
 
+    fun retryFailedForArticle(articleID: String) {
+        database.articleImagesQueries.retryFailedForArticle(articleID)
+    }
+
     fun markDownloading(assetID: String) {
         database.articleImagesQueries.markDownloading(
             id = assetID,

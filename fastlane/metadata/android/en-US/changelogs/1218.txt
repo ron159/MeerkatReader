@@ -1,0 +1,1 @@
+Improved backup and restore, OPML imports, offline downloads, article search, feed synchronization, and text-to-speech playback.

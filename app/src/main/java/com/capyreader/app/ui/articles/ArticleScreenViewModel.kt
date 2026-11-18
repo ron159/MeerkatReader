@@ -418,7 +418,8 @@ class ArticleScreenViewModel(
     fun selectSavedSearch(savedSearch: SavedSearch) {
         val query = savedSearch.query
 
-        if (query.isNullOrBlank()) {
+        if (!savedSearch.isLocalQuery || query.isNullOrBlank()) {
+            clearSearch()
             selectSavedSearch(savedSearch.id)
             return
         }
@@ -669,8 +670,7 @@ class ArticleScreenViewModel(
             val offlineOptions = appPreferences.offlineOptions
             val includeFullContent = offlineOptions.includeFullContent.get()
             val includeImages = offlineOptions.includeImages.get()
-            val includeAudio = offlineOptions.includeAudio.get() &&
-                article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) }
+            val includeAudio = offlineOptions.includeAudio.get()
 
             articleOfflinePackageDownloader.queue(
                 articleID = article.id,
@@ -716,8 +716,7 @@ class ArticleScreenViewModel(
                 existing?.includeFullContent ?: offlineOptions.includeFullContent.get()
             val includeImages = existing?.includeImages ?: offlineOptions.includeImages.get()
             val includeAudio = existing?.includeAudio
-                ?: (offlineOptions.includeAudio.get() &&
-                    article.enclosures.any { it.type.startsWith("audio/", ignoreCase = true) })
+                ?: offlineOptions.includeAudio.get()
 
             articleOfflinePackageDownloader.queue(
                 articleID = article.id,
@@ -1327,7 +1326,8 @@ class ArticleScreenViewModel(
     ): Article? {
         val article = account.findArticle(articleID = articleID) ?: return null
         val cachedFullContent = articleFullContentRecords.find(articleID)
-        val hasCachedFullContent = cachedFullContent != null && article.enableStickyFullContent
+        val hasCachedFullContent = cachedFullContent != null && (article.enableStickyFullContent ||
+            articleOfflinePackageDownloader.findRecords(listOf(articleID))[articleID]?.includeFullContent == true)
 
         val fullContent = if (hasCachedFullContent) {
             Article.FullContentState.LOADED
@@ -1454,7 +1454,8 @@ class ArticleScreenViewModel(
     }
 
     private suspend fun fetchFullContent(article: Article, generation: Long) {
-        account.fetchFullContent(article)
+        val cached = articleFullContentRecords.find(article.id)?.contentHTML?.takeIf { it.isNotBlank() }
+        (cached?.let { Result.success(it) } ?: account.fetchFullContent(article))
             .fold(
                 onSuccess = { value ->
                     if (isCurrentFullContent(article.id, generation)) {

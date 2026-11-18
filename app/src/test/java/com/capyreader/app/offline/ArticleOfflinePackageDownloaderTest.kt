@@ -11,7 +11,6 @@ import com.jocmp.capy.persistence.ArticleImageRecords
 import com.jocmp.capy.persistence.ArticleOfflinePackageInput
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecord
 import com.jocmp.capy.persistence.ArticleOfflinePackageRecords
-import com.jocmp.capy.persistence.ArticleReadingProgressRecords
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -31,7 +30,6 @@ class ArticleOfflinePackageDownloaderTest {
     private val packageRecords = mockk<ArticleOfflinePackageRecords>(relaxed = true)
     private val fullContentRecords = mockk<ArticleFullContentRecords>(relaxed = true)
     private val imageRecords = mockk<ArticleImageRecords>(relaxed = true)
-    private val readingProgressRecords = mockk<ArticleReadingProgressRecords>(relaxed = true)
     private val imageDownloader = mockk<ArticleImageDownloader>(relaxed = true)
     private val audioDownloader = mockk<ArticleOfflineAudioDownloader>(relaxed = true)
     private val audioStore = mockk<ArticleOfflineAudioStore>(relaxed = true)
@@ -42,7 +40,6 @@ class ArticleOfflinePackageDownloaderTest {
         packageRecords = packageRecords,
         fullContentRecords = fullContentRecords,
         imageRecords = imageRecords,
-        readingProgressRecords = readingProgressRecords,
         imageDownloader = imageDownloader,
         audioDownloader = audioDownloader,
         audioStore = audioStore,
@@ -96,6 +93,20 @@ class ArticleOfflinePackageDownloaderTest {
                 updatedAt = any(),
             )
         }
+    }
+
+    @Test
+    fun `failed image prevents ready state`() = runTest {
+        val article = article()
+        val pending = packageRecord(includeFullContent = false, includeImages = true, includeAudio = false)
+        coEvery { packageRecords.findByState(ArticleOfflinePackageState.QUEUED) } returns listOf(pending)
+        coEvery { account.findArticle(article.id) } returns article
+        coEvery { account.findFeed(article.feedID) } returns feed()
+        val failedRef = mockk<com.jocmp.capy.persistence.ArticleImageRefRecord>()
+        io.mockk.every { failedRef.status } returns "failed"
+        coEvery { imageRecords.findRefs(article.id) } returns listOf(failedRef)
+        assertEquals(1, downloader.downloadQueued().failed)
+        coVerify(exactly = 0) { packageRecords.updateState(article.id, ArticleOfflinePackageState.READY, any(), any(), any()) }
     }
 
     @Test
