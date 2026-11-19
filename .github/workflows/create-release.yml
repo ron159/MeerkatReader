@@ -3,6 +3,12 @@ on:
     tags:
       - "*"
       - "!*-nightly"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing stable release tag
+        required: true
+        type: string
 
 name: Create Release
 
@@ -13,17 +19,29 @@ concurrency:
 jobs:
   build:
     name: Create Release
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Both release variants use the signing credentials stored in this environment.
     environment: nightly
     permissions:
       contents: write
     steps:
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]+$ ]]; then
+            echo "Expected a stable version tag (YYYY.MM.BUILD)"
+            exit 1
+          fi
       - name: Checkout code
         uses: actions/checkout@v4.2.1
+        with:
+          ref: refs/tags/${{ inputs.release_tag || github.ref_name }}
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
+          ruby-version: '3.3'
           bundler-cache: true
       - name: Set up Java
         uses: actions/setup-java@v4.4.0
@@ -43,6 +61,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: Meerkat Reader ${{ inputs.release_tag || github.ref_name }}
+          fail_on_unmatched_files: true
           generate_release_notes: true
           draft: false
           prerelease: false
