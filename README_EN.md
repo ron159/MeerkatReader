@@ -30,6 +30,7 @@ Keep feeds on your device or connect an existing RSS service. Organize articles 
 - 🎨 **Your reading style**: Customizable typography, themes, gestures, image visibility, and list density.
 - 📥 **Read later**: Save articles through the Wallabag integration.
 - 💾 **Backup and migration**: Back up subscriptions, account settings, and preferences; use WebDAV backups, OPML import/export, and starred bookmark export.
+  When restoring a full backup for a remote account, any server URL and username recorded in the backup must match the current account. To move subscriptions to a different account or server, use OPML; it does not restore account settings or reading state.
 - 🏠 **Everyday access**: Home screen widgets and feed update notifications.
 
 ## Downloads and requirements
